@@ -52,9 +52,9 @@ export function FactsPanel({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+    <div className="flex h-full flex-col border-l border-line">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-4">
+        <div className="flex items-center gap-2 text-title text-ink">
           <IconBrain size={18} className="text-accent" />
           Memory
         </div>
@@ -62,7 +62,7 @@ export function FactsPanel({
           <button
             onClick={onClose}
             aria-label="Close memory panel"
-            className="rounded-lg p-1 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+            className="rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <IconClose size={18} />
           </button>
@@ -72,35 +72,35 @@ export function FactsPanel({
       <div className="flex-1 space-y-6 overflow-y-auto p-4">
         {/* About */}
         <section>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+          <h3 className="mb-2 text-meta font-semibold uppercase tracking-wider text-ink-muted">
             About {conversation.name}
           </h3>
-          <label className="block text-[11px] text-zinc-500">Where you matched</label>
+          <label className="block text-meta text-ink-muted">Where you matched</label>
           <input
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
             onBlur={savePlatform}
             placeholder="Hinge, Tinder, IRL…"
-            className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-sm outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+            className="mt-1 w-full rounded-md border border-line bg-black/30 px-3 py-1.5 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
           />
-          <label className="mt-3 block text-[11px] text-zinc-500">Your notes</label>
+          <label className="mt-3 block text-meta text-ink-muted">Your notes</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             onBlur={saveNotes}
             rows={3}
             placeholder="context only you know…"
-            className="mt-1 w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+            className="mt-1 w-full resize-none rounded-md border border-line bg-black/30 px-3 py-2 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
           />
         </section>
 
         {/* Facts */}
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            <h3 className="text-meta font-semibold uppercase tracking-wider text-ink-muted">
               Remembered facts
             </h3>
-            <span className="text-[11px] text-zinc-600">{facts.length}</span>
+            <span className="text-meta tabular-nums text-ink-faint">{facts.length}</span>
           </div>
 
           <div className="flex gap-1.5">
@@ -114,19 +114,19 @@ export function FactsPanel({
                 }
               }}
               placeholder="add a detail to remember…"
-              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-sm outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+              className="min-w-0 flex-1 rounded-md border border-line bg-black/30 px-3 py-1.5 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
             />
             <button
               onClick={addFact}
               aria-label="Add fact"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-zinc-300 transition hover:border-accent/40 hover:text-accent"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-line-strong text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:text-accent motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
               <IconPlus size={16} />
             </button>
           </div>
 
           {facts.length === 0 ? (
-            <p className="mt-3 text-xs leading-relaxed text-zinc-600">
+            <p className="mt-3 text-xs leading-normal text-ink-muted">
               Nothing yet. Cyrano remembers details automatically as you generate replies — or
               jot one down here.
             </p>
@@ -136,8 +136,8 @@ export function FactsPanel({
                 <li
                   key={f.id}
                   className={cx(
-                    "group flex items-start gap-2 rounded-lg px-2 py-1.5 transition hover:bg-white/[0.04]",
-                    f.pinned === 1 && "bg-accent-soft",
+                    "group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-fill",
+                    f.pinned === 1 && "bg-accent-faint ring-1 ring-accent/20",
                   )}
                 >
                   <button
@@ -145,17 +145,17 @@ export function FactsPanel({
                     aria-label={f.pinned ? "Unpin fact" : "Pin fact"}
                     title={f.pinned ? "Unpin" : "Pin to keep on top"}
                     className={cx(
-                      "mt-0.5 shrink-0 transition",
-                      f.pinned ? "text-accent" : "text-zinc-600 hover:text-zinc-300",
+                      "-ml-1 shrink-0 rounded-md p-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+                      f.pinned ? "text-accent" : "text-ink-faint hover:text-ink",
                     )}
                   >
                     <IconPin size={14} />
                   </button>
-                  <span className="flex-1 text-sm leading-snug text-zinc-200">{f.content}</span>
+                  <span className="flex-1 text-sm leading-snug text-ink">{f.content}</span>
                   <button
                     onClick={() => onDeleteFact(f.id)}
                     aria-label="Delete fact"
-                    className="mt-0.5 shrink-0 text-zinc-700 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
+                    className="-mr-1 shrink-0 rounded-md p-1 text-ink-faint opacity-0 transition-colors duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   >
                     <IconTrash size={14} />
                   </button>

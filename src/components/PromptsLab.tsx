@@ -9,18 +9,18 @@ import { Spinner } from "./ui";
 type Answer = { text: string; angle: string };
 
 const ANGLE_STYLES: Record<string, string> = {
-  funny: "bg-amber-500/15 text-amber-300 ring-amber-400/20",
-  playful: "bg-amber-500/15 text-amber-300 ring-amber-400/20",
-  dry: "bg-zinc-500/15 text-zinc-300 ring-zinc-400/20",
-  curious: "bg-sky-500/15 text-sky-300 ring-sky-400/20",
-  chill: "bg-sky-500/15 text-sky-300 ring-sky-400/20",
-  flirty: "bg-rose-500/15 text-rose-300 ring-rose-400/20",
-  sincere: "bg-emerald-500/15 text-emerald-300 ring-emerald-400/20",
-  adventurous: "bg-emerald-500/15 text-emerald-300 ring-emerald-400/20",
-  bold: "bg-violet-500/15 text-violet-300 ring-violet-400/20",
+  funny: "bg-amber-500/12 text-amber-300 ring-amber-400/25",
+  playful: "bg-amber-500/12 text-amber-300 ring-amber-400/25",
+  dry: "bg-fill text-ink-secondary ring-line-strong",
+  curious: "bg-sky-500/12 text-sky-300 ring-sky-400/25",
+  chill: "bg-sky-500/12 text-sky-300 ring-sky-400/25",
+  flirty: "bg-rose-500/12 text-rose-300 ring-rose-400/25",
+  sincere: "bg-emerald-500/12 text-emerald-300 ring-emerald-400/25",
+  adventurous: "bg-emerald-500/12 text-emerald-300 ring-emerald-400/25",
+  bold: "bg-violet-500/12 text-violet-300 ring-violet-400/25",
 };
 function angleStyle(a: string): string {
-  return ANGLE_STYLES[a.toLowerCase().trim()] ?? "bg-white/10 text-zinc-300 ring-white/15";
+  return ANGLE_STYLES[a.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong";
 }
 
 const PLATFORMS = ["Hinge", "Tinder", "Bumble"];
@@ -99,26 +99,26 @@ export function PromptsLab({
     }
   }
 
-  const labelCls = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-zinc-500";
+  const labelCls = "mb-1.5 block text-meta font-semibold uppercase tracking-wider text-ink-muted";
   const fieldCls =
-    "w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20";
+    "w-full rounded-md border border-line bg-black/30 px-3 py-2 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20";
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex h-16 shrink-0 items-center gap-2.5 border-b border-white/5 px-4">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent">
+      <header className="flex h-16 shrink-0 items-center gap-2.5 border-b border-line px-4">
+        <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-accent/25 to-accent-strong/10 text-title text-accent ring-1 ring-line">
           <IconCards size={18} />
         </span>
         <div className="leading-tight">
-          <div className="font-semibold">Profile prompts</div>
-          <div className="text-[11px] text-zinc-500">answers in your voice, easy to match on</div>
+          <div className="text-title text-ink">Profile prompts</div>
+          <div className="text-meta text-ink-muted">answers in your voice, easy to match on</div>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto max-w-2xl space-y-5">
           {/* Controls */}
-          <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="space-y-4 rounded-xl border border-line-strong bg-fill p-4">
             <div>
               <label className={labelCls}>Prompt</label>
               <select
@@ -127,11 +127,11 @@ export function PromptsLab({
                 className={fieldCls}
               >
                 {PROFILE_PROMPTS.map((p) => (
-                  <option key={p} value={p} className="bg-zinc-900">
+                  <option key={p} value={p} className="bg-surface">
                     {p}
                   </option>
                 ))}
-                <option value={CUSTOM} className="bg-zinc-900">
+                <option value={CUSTOM} className="bg-surface">
                   {CUSTOM}
                 </option>
               </select>
@@ -153,10 +153,10 @@ export function PromptsLab({
                     key={p}
                     onClick={() => setPlatform(p)}
                     className={cx(
-                      "rounded-full px-3 py-1 text-xs transition",
+                      "rounded-full px-3 py-1 text-xs transition-colors duration-150 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
                       platform === p
-                        ? "bg-accent font-medium text-zinc-950"
-                        : "border border-white/10 text-zinc-300 hover:border-white/25",
+                        ? "bg-accent font-medium text-on-accent"
+                        : "border border-line-strong text-ink-secondary hover:bg-fill hover:text-ink",
                     )}
                   >
                     {p}
@@ -173,10 +173,10 @@ export function PromptsLab({
                     key={l}
                     onClick={() => setLanguage(l)}
                     className={cx(
-                      "rounded-full px-3 py-1 text-xs transition",
+                      "rounded-full px-3 py-1 text-xs transition-colors duration-150 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
                       language === l
-                        ? "bg-accent font-medium text-zinc-950"
-                        : "border border-white/10 text-zinc-300 hover:border-white/25",
+                        ? "bg-accent font-medium text-on-accent"
+                        : "border border-line-strong text-ink-secondary hover:bg-fill hover:text-ink",
                     )}
                   >
                     {l}
@@ -187,7 +187,7 @@ export function PromptsLab({
 
             <div>
               <label className={labelCls}>
-                Mood / vibe <span className="font-normal normal-case text-zinc-600">(optional)</span>
+                Mood / vibe <span className="font-normal normal-case text-ink-faint">(optional)</span>
               </label>
               <input
                 value={mood}
@@ -201,10 +201,10 @@ export function PromptsLab({
                     key={m}
                     onClick={() => setMood((cur) => (cur === m ? "" : m))}
                     className={cx(
-                      "rounded-full px-2.5 py-0.5 text-[11px] transition",
+                      "rounded-full px-2.5 py-0.5 text-meta transition-colors duration-150 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
                       mood === m
-                        ? "bg-accent-soft text-accent ring-1 ring-accent/30"
-                        : "border border-white/10 text-zinc-400 hover:border-white/25",
+                        ? "bg-accent font-medium text-on-accent"
+                        : "border border-line-strong text-ink-secondary hover:bg-fill hover:text-ink",
                     )}
                   >
                     {m}
@@ -216,7 +216,7 @@ export function PromptsLab({
             <button
               onClick={generate}
               disabled={!canGenerate}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-zinc-950 transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
               {loading ? <Spinner size={15} /> : <IconSparkles size={16} />}
               {options ? "Generate more" : "Generate answers"}
@@ -225,7 +225,7 @@ export function PromptsLab({
 
           {/* Results */}
           {error && (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+            <div className="rounded-lg border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
               {error}
             </div>
           )}
@@ -233,13 +233,9 @@ export function PromptsLab({
           {loading && (
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="animate-thinking rounded-xl bg-white/[0.04] p-4"
-                  style={{ animationDelay: `${i * 0.15}s` }}
-                >
-                  <div className="h-3 w-2/3 rounded bg-white/10" />
-                  <div className="mt-2 h-3 w-1/3 rounded bg-white/10" />
+                <div key={i} className="rounded-md border border-line bg-fill p-4">
+                  <div className="skeleton h-3 w-2/3 rounded" />
+                  <div className="skeleton mt-2 h-3 w-1/3 rounded" />
                 </div>
               ))}
             </div>
@@ -252,13 +248,13 @@ export function PromptsLab({
                 return (
                   <div
                     key={i}
-                    className="animate-fade-up rounded-xl border border-white/5 bg-white/[0.03] p-3.5 transition hover:border-white/10"
+                    className="animate-fade-up rounded-md border border-line bg-fill p-3.5 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
                     style={{ animationDelay: `${i * 0.04}s` }}
                   >
                     <div className="flex items-center justify-between">
                       <span
                         className={cx(
-                          "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1",
+                          "rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
                           angleStyle(o.angle),
                         )}
                       >
@@ -269,14 +265,15 @@ export function PromptsLab({
                           onClick={() => regenerateOne(i)}
                           disabled={regenIndex !== null}
                           title="Regenerate just this one"
-                          className="inline-flex items-center rounded-md px-1.5 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-label="Regenerate just this one"
+                          className="inline-flex items-center rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {busy ? <Spinner size={13} /> : <IconRefresh size={13} />}
                         </button>
                         <button
                           onClick={() => copy(o.text, i)}
                           disabled={busy}
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
                         >
                           {copied === i ? (
                             <>
@@ -292,7 +289,7 @@ export function PromptsLab({
                     </div>
                     <p
                       className={cx(
-                        "mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-100 transition",
+                        "mt-2 whitespace-pre-wrap rounded-md bg-black/20 px-2.5 py-1.5 text-sm leading-normal text-ink transition-opacity duration-150",
                         busy && "opacity-40",
                       )}
                     >
@@ -305,9 +302,9 @@ export function PromptsLab({
           )}
 
           {!loading && !options && !error && (
-            <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center">
-              <p className="text-sm text-zinc-400">Pick a prompt, set a mood, and generate.</p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+            <div className="rounded-xl border border-dashed border-line-strong p-8 text-center">
+              <p className="text-sm text-ink-secondary">Pick a prompt, set a mood, and generate.</p>
+              <p className="mt-1 text-xs leading-normal text-ink-muted">
                 Answers are grounded in your context file and written to give matches an easy
                 opening.
               </p>

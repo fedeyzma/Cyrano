@@ -24,26 +24,26 @@ export function Sidebar({
 }) {
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-4">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-4">
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent">
             <IconHeart size={18} />
           </span>
           <div className="leading-tight">
-            <div className="font-semibold tracking-tight">Cyrano</div>
-            <div className="text-[11px] text-zinc-500">reply copilot</div>
+            <div className="text-title tracking-tight">Cyrano</div>
+            <div className="text-meta text-ink-muted">reply copilot</div>
           </div>
         </div>
         <button
           onClick={onNew}
           aria-label="New conversation"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-zinc-300 transition hover:border-accent/40 hover:bg-accent-soft hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+          className="grid h-9 w-9 place-items-center rounded-md border border-line-strong text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-accent-soft hover:text-accent motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
         >
           <IconPlus size={18} />
         </button>
       </header>
 
-      <div className="flex gap-1 border-b border-white/5 p-2">
+      <div className="flex gap-1 border-b border-line p-2">
         {(
           [
             ["replies", "Replies", IconChat],
@@ -54,10 +54,10 @@ export function Sidebar({
             key={key}
             onClick={() => onView(key)}
             className={cx(
-              "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition",
+              "inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-label transition-colors duration-150",
               view === key
-                ? "bg-white/10 text-zinc-100"
-                : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200",
+                ? "bg-fill-active text-ink shadow-highlight"
+                : "text-ink-muted hover:bg-fill hover:text-ink",
             )}
           >
             <Icon size={14} /> {label}
@@ -69,15 +69,15 @@ export function Sidebar({
         {loading ? (
           <div className="space-y-1.5">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-[58px] animate-pulse rounded-xl bg-white/[0.03]" />
+              <div key={i} className="skeleton h-[58px] rounded-md" />
             ))}
           </div>
         ) : conversations.length === 0 ? (
-          <div className="px-3 py-10 text-center text-sm text-zinc-500">
+          <div className="px-3 py-10 text-center text-sm text-ink-secondary">
             No conversations yet.
             <button
               onClick={onNew}
-              className="mt-3 block w-full rounded-lg border border-dashed border-white/15 px-3 py-2 text-zinc-300 transition hover:border-accent/40 hover:text-accent"
+              className="mt-3 block w-full rounded-md border border-dashed border-line-strong px-3 py-2 text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:text-accent"
             >
               + Start one
             </button>
@@ -91,25 +91,25 @@ export function Sidebar({
                   <button
                     onClick={() => onSelect(c.id)}
                     className={cx(
-                      "w-full rounded-xl px-3 py-2.5 text-left transition",
+                      "relative w-full rounded-md px-3 py-2.5 text-left transition-colors duration-150",
                       active
-                        ? "bg-white/[0.08] ring-1 ring-white/10"
-                        : "hover:bg-white/[0.04]",
+                        ? "bg-fill-active ring-1 ring-line-strong shadow-highlight before:absolute before:left-0 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-accent"
+                        : "hover:bg-fill",
                     )}
                   >
                     <div className="flex min-w-0 items-center justify-between gap-2">
-                      <span className="truncate font-medium text-zinc-100">{c.name}</span>
-                      <span className="shrink-0 text-[10px] text-zinc-500">
+                      <span className="truncate text-sm font-medium text-ink">{c.name}</span>
+                      <span className="shrink-0 text-meta tabular-nums text-ink-faint">
                         {relativeTime(c.last_message_at ?? c.updated_at)}
                       </span>
                     </div>
                     <div className="mt-0.5 flex min-w-0 items-center gap-2">
                       {c.platform && (
-                        <span className="shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-400">
+                        <span className="shrink-0 rounded-full bg-fill px-1.5 py-0.5 text-meta uppercase tracking-wider text-ink-muted">
                           {c.platform}
                         </span>
                       )}
-                      <span className="truncate text-xs text-zinc-500">
+                      <span className="truncate text-[13px] text-ink-muted">
                         {c.last_message ?? "No messages yet"}
                       </span>
                     </div>
@@ -121,8 +121,9 @@ export function Sidebar({
         )}
       </div>
 
-      <footer className="shrink-0 border-t border-white/5 px-4 py-2 text-[10px] text-zinc-600">
-        {conversations.length} {conversations.length === 1 ? "person" : "people"} · stored locally
+      <footer className="shrink-0 border-t border-line px-4 py-2 text-meta text-ink-faint">
+        <span className="tabular-nums">{conversations.length}</span>{" "}
+        {conversations.length === 1 ? "person" : "people"} · stored locally
       </footer>
     </div>
   );

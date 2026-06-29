@@ -382,9 +382,9 @@ export default function Home() {
   const factsCount = detail?.facts.length ?? 0;
 
   return (
-    <div className="app-backdrop flex h-dvh overflow-hidden text-zinc-100">
+    <div className="app-backdrop flex h-dvh overflow-hidden text-ink">
       {/* Inline sidebar (md+) */}
-      <aside className="hidden w-72 shrink-0 overflow-hidden border-r border-white/5 md:flex">
+      <aside className="hidden w-72 shrink-0 overflow-hidden border-r border-line md:flex">
         <Sidebar
           conversations={conversations}
           selectedId={selectedId}
@@ -399,15 +399,15 @@ export default function Home() {
       {/* Center + right */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-white/5 px-3 md:hidden">
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-3 md:hidden">
           <button
             onClick={() => setMobileNav(true)}
             aria-label="Open conversations"
-            className="rounded-lg p-1.5 text-zinc-300 hover:bg-white/5"
+            className="rounded-md p-1.5 text-ink-secondary transition-colors duration-150 hover:bg-fill-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <IconMenu size={20} />
           </button>
-          <span className="flex items-center gap-1.5 font-semibold">
+          <span className="flex items-center gap-1.5 text-title">
             <IconHeart size={16} className="text-accent" /> Cyrano
           </span>
         </div>
@@ -457,7 +457,7 @@ export default function Home() {
 
           {/* Inline facts (xl+) */}
           {view === "replies" && detail && (
-            <aside className="hidden w-80 shrink-0 border-l border-white/5 xl:flex">
+            <aside className="hidden w-80 shrink-0 border-l border-line xl:flex">
               <FactsPanel
                 detail={detail}
                 onAddFact={handleAddFact}
@@ -531,10 +531,10 @@ export default function Home() {
         <div className="pointer-events-none fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
           <div
             className={cx(
-              "animate-fade-up rounded-full border px-4 py-2 text-sm shadow-lg backdrop-blur",
+              "animate-fade-up rounded-full border px-4 py-2 text-sm shadow-md backdrop-blur",
               toast.kind === "error"
-                ? "border-red-500/30 bg-red-500/15 text-red-200"
-                : "border-white/10 bg-zinc-900/90 text-zinc-100",
+                ? "border-danger/30 bg-danger-soft text-danger"
+                : "border-line bg-surface-high/90 text-ink",
             )}
           >
             {toast.message}
@@ -558,10 +558,12 @@ function Drawer({
     <div className={cx("fixed inset-0 z-40", side === "left" ? "md:hidden" : "xl:hidden")}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
+        role="dialog"
+        aria-modal="true"
         className={cx(
-          "absolute inset-y-0 w-[86%] max-w-xs animate-fade-up bg-zinc-900",
+          "absolute inset-y-0 w-[86%] max-w-xs animate-fade-up bg-surface",
           side === "left" ? "left-0 border-r" : "right-0 border-l",
-          "border-white/10 shadow-2xl",
+          "border-line-strong shadow-lg",
         )}
       >
         {children}
@@ -581,28 +583,28 @@ function EmptyMain({
 }) {
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-zinc-600">
-        <span className="animate-thinking">Loading…</span>
+      <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">
+        <span>Loading…</span>
       </div>
     );
   }
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="max-w-sm text-center">
-        <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-accent">
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-xl bg-accent-soft text-accent">
           <IconSparkles size={26} />
         </span>
-        <h2 className="mt-4 text-lg font-semibold">
+        <h2 className="mt-4 text-display text-ink">
           {hasConversations ? "Pick a conversation" : "Welcome to Cyrano"}
         </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">
+        <p className="mt-1.5 text-sm leading-normal text-ink-secondary">
           {hasConversations
             ? "Choose someone from the left, paste their latest message, and get a few natural ways to reply."
             : "Your private reply copilot. Add the first person you're talking to, paste what they said, and get dry, natural replies — with a memory for the details."}
         </p>
         <button
           onClick={onNew}
-          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-accent-strong"
+          className="mt-5 inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
         >
           <IconSparkles size={16} /> New conversation
         </button>

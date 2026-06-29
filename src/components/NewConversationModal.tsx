@@ -65,20 +65,27 @@ export function NewConversationModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md animate-fade-up rounded-2xl border border-white/10 bg-zinc-900/95 p-5 shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-conversation-title"
+        className="relative w-full max-w-md animate-fade-up rounded-xl border border-line-strong bg-surface p-5 shadow-lg"
+      >
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">New conversation</h2>
+          <h2 id="new-conversation-title" className="text-title text-ink">
+            New conversation
+          </h2>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+            className="rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <IconClose size={18} />
           </button>
         </div>
-        <p className="mt-1 text-xs text-zinc-500">Who are you talking to?</p>
+        <p className="mt-1 text-xs text-ink-muted">Who are you talking to?</p>
 
-        <label className="mt-4 block text-xs font-medium text-zinc-400">Name</label>
+        <label className="mt-4 block text-xs font-medium text-ink-secondary">Name</label>
         <input
           ref={nameRef}
           value={name}
@@ -90,11 +97,11 @@ export function NewConversationModal({
             }
           }}
           placeholder="e.g. Sofia"
-          className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+          className="mt-1 w-full rounded-md border border-line bg-black/30 px-3 py-2 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
         />
 
-        <label className="mt-4 block text-xs font-medium text-zinc-400">
-          Where you matched <span className="text-zinc-600">(optional)</span>
+        <label className="mt-4 block text-xs font-medium text-ink-secondary">
+          Where you matched <span className="text-ink-faint">(optional)</span>
         </label>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {PLATFORMS.map((p) => (
@@ -103,10 +110,10 @@ export function NewConversationModal({
               type="button"
               onClick={() => setPlatform(platform === p ? "" : p)}
               className={cx(
-                "rounded-full px-3 py-1 text-xs transition",
+                "rounded-full px-3 py-1 text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
                 platform === p
-                  ? "bg-accent font-medium text-zinc-950"
-                  : "border border-white/10 text-zinc-300 hover:border-white/25",
+                  ? "bg-accent font-medium text-on-accent"
+                  : "border border-line-strong text-ink-secondary hover:bg-fill hover:text-ink",
               )}
             >
               {p}
@@ -114,19 +121,19 @@ export function NewConversationModal({
           ))}
         </div>
 
-        <label className="mt-4 block text-xs font-medium text-zinc-400">
-          Notes / context <span className="text-zinc-600">(optional)</span>
+        <label className="mt-4 block text-xs font-medium text-ink-secondary">
+          Notes / context <span className="text-ink-faint">(optional)</span>
         </label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           placeholder="anything you already know — how you matched, their vibe, what you've talked about…"
-          className="mt-1 w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+          className="mt-1 w-full resize-none rounded-md border border-line bg-black/30 px-3 py-2 text-sm text-ink placeholder:text-ink-faint outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
         />
 
         {error && (
-          <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          <div className="mt-3 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
             {error}
           </div>
         )}
@@ -134,14 +141,14 @@ export function NewConversationModal({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg px-3 py-2 text-sm text-zinc-400 transition hover:text-zinc-200"
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             Cancel
           </button>
           <button
             onClick={submit}
             disabled={creating || !name.trim()}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             {creating && <Spinner size={14} />} Create
           </button>

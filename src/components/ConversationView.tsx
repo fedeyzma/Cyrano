@@ -23,16 +23,16 @@ import {
 import { Spinner } from "./ui";
 
 const TONE_STYLES: Record<string, string> = {
-  dry: "bg-zinc-500/15 text-zinc-300 ring-zinc-400/20",
-  playful: "bg-amber-500/15 text-amber-300 ring-amber-400/20",
-  curious: "bg-sky-500/15 text-sky-300 ring-sky-400/20",
-  flirty: "bg-rose-500/15 text-rose-300 ring-rose-400/20",
-  sincere: "bg-emerald-500/15 text-emerald-300 ring-emerald-400/20",
-  bold: "bg-violet-500/15 text-violet-300 ring-violet-400/20",
+  dry: "bg-zinc-500/12 text-zinc-300 ring-zinc-400/25",
+  playful: "bg-amber-500/12 text-amber-300 ring-amber-400/25",
+  curious: "bg-sky-500/12 text-sky-300 ring-sky-400/25",
+  flirty: "bg-rose-500/12 text-rose-300 ring-rose-400/25",
+  sincere: "bg-emerald-500/12 text-emerald-300 ring-emerald-400/25",
+  bold: "bg-violet-500/12 text-violet-300 ring-violet-400/25",
 };
 
 function toneStyle(tone: string): string {
-  return TONE_STYLES[tone.toLowerCase().trim()] ?? "bg-white/10 text-zinc-300 ring-white/15";
+  return TONE_STYLES[tone.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong";
 }
 
 export function ConversationView({
@@ -164,37 +164,37 @@ export function ConversationView({
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-4">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent/30 to-indigo-500/20 text-sm font-semibold text-accent">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent/25 to-accent-strong/10 text-title text-accent ring-1 ring-line">
             {conversation.name.slice(0, 1).toUpperCase() || <IconUser size={16} />}
           </span>
           <div className="min-w-0">
-            <div className="truncate font-semibold leading-tight">{conversation.name}</div>
+            <div className="truncate text-title leading-tight text-ink">{conversation.name}</div>
             {conversation.platform && (
-              <div className="text-[11px] text-zinc-500">{conversation.platform}</div>
+              <div className="text-meta text-ink-muted">{conversation.platform}</div>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
           <button
             onClick={onOpenImport}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300 transition hover:border-accent/40 hover:text-accent"
+            className="inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-fill hover:text-accent motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <IconImport size={15} />
             <span className="hidden sm:inline">Import</span>
           </button>
           <button
             onClick={onOpenFacts}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300 transition hover:border-accent/40 hover:text-accent xl:hidden"
+            className="inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-fill hover:text-accent motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas xl:hidden"
           >
             <IconBrain size={15} />
-            {factsCount > 0 && <span>{factsCount}</span>}
+            {factsCount > 0 && <span className="tabular-nums">{factsCount}</span>}
           </button>
           <button
             onClick={onDeleteConversation}
             aria-label="Delete conversation"
-            className="rounded-lg p-2 text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400"
+            className="inline-flex items-center justify-center rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <IconTrash size={16} />
           </button>
@@ -205,18 +205,18 @@ export function ConversationView({
       <div className="flex-1 overflow-y-auto px-4 py-5">
         <div className="mx-auto max-w-2xl space-y-2.5">
           {messages.length === 0 && (
-            <div className="mx-auto mt-10 max-w-sm rounded-2xl border border-dashed border-white/10 p-6 text-center">
+            <div className="mx-auto mt-10 max-w-sm rounded-xl border border-dashed border-line-strong p-6 text-center">
               <span className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-accent-soft text-accent">
                 <IconSparkles size={20} />
               </span>
-              <p className="mt-3 text-sm text-zinc-300">No messages yet.</p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+              <p className="mt-3 text-sm text-ink-secondary">No messages yet.</p>
+              <p className="mt-1 text-xs leading-normal text-ink-muted">
                 Paste what {conversation.name} said in the box below and hit Generate — Cyrano
                 will hand you a few ways to reply.
               </p>
               <button
                 onClick={onOpenImport}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-accent/40 hover:text-accent"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-fill hover:text-accent motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 <IconImport size={14} /> Import an existing thread
               </button>
@@ -246,19 +246,19 @@ export function ConversationView({
                         }
                       }}
                       rows={2}
-                      className="w-full resize-none rounded-xl border border-accent/40 bg-black/40 px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-accent/20"
+                      className="w-full resize-none rounded-md border border-accent/50 bg-black/30 px-3 py-2 text-sm leading-normal text-ink outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
                     />
                     <div className="mt-1 flex justify-end gap-2">
                       <button
                         onClick={cancelEdit}
-                        className="rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:text-zinc-200"
+                        className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={() => void saveEdit(m.id)}
                         disabled={!editText.trim()}
-                        className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-zinc-950 transition hover:bg-accent-strong disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                       >
                         Save
                       </button>
@@ -271,8 +271,10 @@ export function ConversationView({
             const actions = (
               <div
                 className={cx(
-                  "mb-0.5 flex flex-col gap-1 transition",
-                  isTarget ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                  "mb-0.5 flex flex-col gap-1 transition-opacity duration-150",
+                  isTarget
+                    ? "opacity-100"
+                    : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
                 )}
               >
                 {m.role === "them" && (
@@ -281,8 +283,8 @@ export function ConversationView({
                     aria-label={isTarget ? "Stop replying to this" : "Reply to this message"}
                     title={isTarget ? "Stop replying to this" : "Reply to this message"}
                     className={cx(
-                      "transition",
-                      isTarget ? "text-accent" : "text-zinc-600 hover:text-zinc-300",
+                      "transition-colors duration-150",
+                      isTarget ? "text-accent" : "text-ink-faint hover:text-ink",
                     )}
                   >
                     <IconReply size={14} />
@@ -292,7 +294,7 @@ export function ConversationView({
                   onClick={() => startEdit(m.id, m.content)}
                   aria-label="Edit message"
                   title="Edit message"
-                  className="text-zinc-600 transition hover:text-zinc-300"
+                  className="text-ink-faint transition-colors duration-150 hover:text-ink"
                 >
                   <IconEdit size={13} />
                 </button>
@@ -300,7 +302,7 @@ export function ConversationView({
                   onClick={() => onDeleteMessage(m.id)}
                   aria-label="Delete message"
                   title="Delete message"
-                  className="text-zinc-700 transition hover:text-red-400"
+                  className="text-ink-faint transition-colors duration-150 hover:text-danger"
                 >
                   <IconTrash size={13} />
                 </button>
@@ -318,10 +320,10 @@ export function ConversationView({
                 {m.role === "me" && actions}
                 <div
                   className={cx(
-                    "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+                    "max-w-[78%] rounded-lg px-3.5 py-2 text-sm leading-normal",
                     m.role === "me"
-                      ? "rounded-br-md bg-accent text-zinc-950"
-                      : "rounded-bl-md bg-white/[0.06] text-zinc-100 ring-1 ring-white/5",
+                      ? "rounded-br-sm bg-accent text-on-accent shadow-xs shadow-[inset_0_1px_0_0_rgb(255_255_255/0.20)]"
+                      : "rounded-bl-sm bg-fill text-ink ring-1 ring-line",
                     isTarget && "ring-2 ring-accent/70",
                   )}
                   title={clockTime(m.created_at)}
@@ -335,23 +337,27 @@ export function ConversationView({
 
           {/* Suggestions */}
           {(suggesting || suggestions || suggestError) && (
-            <div className="!mt-6 animate-fade-up rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+            <div className="!mt-6 animate-fade-up rounded-lg border border-line bg-fill p-3">
               <div className="mb-2.5 flex items-center justify-between px-1">
-                <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+                <div className="flex items-center gap-2 text-label font-medium text-ink-secondary">
                   <IconSparkles size={15} className="text-accent" />
-                  {suggesting ? "Cyrano is thinking…" : "Pick a reply"}
+                  {suggesting ? (
+                    <span className="animate-thinking">Cyrano is thinking…</span>
+                  ) : (
+                    "Pick a reply"
+                  )}
                 </div>
                 {!suggesting && (suggestions || suggestError) && (
                   <div className="flex items-center gap-1">
                     <button
                       onClick={regenerate}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
                     >
                       <IconRefresh size={13} /> Regenerate
                     </button>
                     <button
                       onClick={onDismissSuggestions}
-                      className="rounded-md px-2 py-1 text-xs text-zinc-500 transition hover:text-zinc-300"
+                      className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
                     >
                       Dismiss
                     </button>
@@ -362,24 +368,20 @@ export function ConversationView({
               {suggesting && (
                 <div className="space-y-2">
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="animate-thinking rounded-xl bg-white/[0.04] p-3"
-                      style={{ animationDelay: `${i * 0.15}s` }}
-                    >
-                      <div className="h-3 w-3/4 rounded bg-white/10" />
-                      <div className="mt-2 h-3 w-1/2 rounded bg-white/10" />
+                    <div key={i} className="rounded-md border border-line bg-fill p-3">
+                      <div className="skeleton h-3 w-3/4 rounded" />
+                      <div className="skeleton mt-2 h-3 w-1/2 rounded" />
                     </div>
                   ))}
                 </div>
               )}
 
               {!suggesting && suggestError && (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
                   {suggestError}
                   <button
                     onClick={regenerate}
-                    className="mt-2 block text-xs text-red-200 underline underline-offset-2 hover:text-white"
+                    className="mt-2 block text-xs text-danger underline underline-offset-2 transition-colors duration-150 hover:text-ink"
                   >
                     Try again
                   </button>
@@ -393,19 +395,19 @@ export function ConversationView({
                     return (
                       <div
                         key={i}
-                        className="animate-fade-up rounded-xl border border-white/5 bg-white/[0.03] p-3 transition hover:border-white/10 hover:bg-white/[0.05]"
+                        className="animate-fade-up rounded-md border border-line bg-fill p-3 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
                         style={{ animationDelay: `${i * 0.04}s` }}
                       >
                         <div className="flex items-center justify-between">
                           <span
                             className={cx(
-                              "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1",
+                              "rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
                               toneStyle(opt.tone),
                             )}
                           >
                             {opt.tone}
                             {opt.texts.length > 1 && (
-                              <span className="ml-1 normal-case text-zinc-500">
+                              <span className="ml-1 normal-case tabular-nums text-ink-muted">
                                 · {opt.texts.length} texts
                               </span>
                             )}
@@ -416,14 +418,15 @@ export function ConversationView({
                               disabled={regenIndex !== null}
                               title="Regenerate just this one"
                               aria-label="Regenerate this reply"
-                              className="inline-flex items-center rounded-md px-1.5 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex items-center justify-center rounded-md p-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {busy ? <Spinner size={13} /> : <IconRefresh size={13} />}
                             </button>
                             <button
                               onClick={() => copyValue(opt.texts.join("\n"), `opt-${i}`)}
                               disabled={busy}
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
+                              aria-label="Copy reply"
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
                             >
                               {copied === `opt-${i}` ? (
                                 <>
@@ -438,7 +441,8 @@ export function ConversationView({
                             <button
                               onClick={() => onQueueOption(opt.texts, opt.tone, primaryTargetId)}
                               disabled={busy}
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
+                              aria-label="Queue reply"
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
                             >
                               <IconClock size={13} /> Queue
                             </button>
@@ -448,17 +452,22 @@ export function ConversationView({
                                 onUseOption(opt.texts);
                               }}
                               disabled={busy}
-                              className="inline-flex items-center gap-1 rounded-md bg-accent/90 px-2.5 py-1 text-xs font-medium text-zinc-950 transition hover:bg-accent disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                             >
                               <IconSend size={13} /> Use
                             </button>
                           </div>
                         </div>
-                        <div className={cx("mt-2 space-y-1 transition", busy && "opacity-40")}>
+                        <div
+                          className={cx(
+                            "mt-2 space-y-1 transition-opacity duration-150",
+                            busy && "opacity-40",
+                          )}
+                        >
                           {opt.texts.map((t, j) => (
                             <p
                               key={j}
-                              className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-sm leading-relaxed text-zinc-100"
+                              className="rounded-md bg-black/20 px-2.5 py-1.5 text-sm leading-normal text-ink"
                             >
                               {t}
                             </p>
@@ -467,7 +476,7 @@ export function ConversationView({
                       </div>
                     );
                   })}
-                  <p className="px-1 pt-1 text-[11px] text-zinc-600">
+                  <p className="px-1 pt-1 text-meta text-ink-muted">
                     “Use” sends now (logs to the thread); “Queue” saves it as a draft for later.
                   </p>
                 </div>
@@ -480,18 +489,19 @@ export function ConversationView({
       </div>
 
       {/* Bottom: queue + targeting + composer */}
-      <div className="shrink-0 border-t border-white/5 bg-zinc-950/60 px-4 py-3 backdrop-blur">
+      <div className="shrink-0 border-t border-line bg-canvas/60 px-4 py-3 backdrop-blur">
         {/* Queued replies */}
         {queued.length > 0 && (
-          <div className="mx-auto mb-2 max-w-2xl rounded-xl border border-white/10 bg-white/[0.02]">
+          <div className="mx-auto mb-2 max-w-2xl rounded-lg border border-line bg-fill">
             <button
               onClick={() => setQueueOpen((o) => !o)}
-              className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-400"
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-label font-medium text-ink-secondary transition-colors duration-150"
             >
               <span className="flex items-center gap-1.5">
-                <IconClock size={14} className="text-accent" /> Queued replies · {queued.length}
+                <IconClock size={14} className="text-accent" /> Queued replies ·{" "}
+                <span className="tabular-nums">{queued.length}</span>
               </span>
-              <span className="text-zinc-600">{queueOpen ? "hide" : "show"}</span>
+              <span className="text-ink-faint">{queueOpen ? "hide" : "show"}</span>
             </button>
             {queueOpen && (
               <div className="max-h-56 space-y-1.5 overflow-y-auto px-3 pb-3">
@@ -499,16 +509,19 @@ export function ConversationView({
                   const tm = q.target_message_id ? messageById.get(q.target_message_id) : null;
                   const parts = q.content.split("\n").filter((l) => l.trim());
                   return (
-                    <div key={q.id} className="rounded-lg border border-white/5 bg-white/[0.03] p-2.5">
+                    <div
+                      key={q.id}
+                      className="animate-fade-up rounded-md border border-line bg-fill p-2.5 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
+                    >
                       {tm && (
-                        <div className="mb-1 flex items-center gap-1 text-[11px] text-zinc-500">
+                        <div className="mb-1 flex items-center gap-1 text-meta text-ink-muted">
                           <IconReply size={11} className="shrink-0" />
                           <span className="truncate">{tm.content}</span>
                         </div>
                       )}
                       <div className="space-y-0.5">
                         {parts.map((p, idx) => (
-                          <p key={idx} className="text-sm leading-relaxed text-zinc-100">
+                          <p key={idx} className="text-sm leading-normal text-ink">
                             {p}
                           </p>
                         ))}
@@ -517,7 +530,7 @@ export function ConversationView({
                         {q.tone && (
                           <span
                             className={cx(
-                              "mr-auto rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1",
+                              "mr-auto rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
                               toneStyle(q.tone),
                             )}
                           >
@@ -526,7 +539,8 @@ export function ConversationView({
                         )}
                         <button
                           onClick={() => copyValue(q.content, `q-${q.id}`)}
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+                          aria-label="Copy queued reply"
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
                         >
                           {copied === `q-${q.id}` ? (
                             <>
@@ -540,13 +554,13 @@ export function ConversationView({
                         </button>
                         <button
                           onClick={() => onDeleteQueued(q.id)}
-                          className="rounded-md px-2 py-1 text-xs text-zinc-500 transition hover:text-red-400"
+                          className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger"
                         >
                           Delete
                         </button>
                         <button
                           onClick={() => onSendQueued(q)}
-                          className="inline-flex items-center gap-1 rounded-md bg-accent/90 px-2.5 py-1 text-xs font-medium text-zinc-950 transition hover:bg-accent"
+                          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                         >
                           <IconSend size={13} /> Mark sent
                         </button>
@@ -561,10 +575,10 @@ export function ConversationView({
 
         {/* Targeting bar */}
         {targets.length > 0 && (
-          <div className="mx-auto mb-2 flex max-w-2xl items-start gap-2 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2">
+          <div className="mx-auto mb-2 flex max-w-2xl items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft px-3 py-2">
             <IconReply size={14} className="mt-0.5 shrink-0 text-accent" />
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-accent">
+              <div className="text-label font-medium tabular-nums text-accent">
                 Replying to {targets.length} message{targets.length > 1 ? "s" : ""}
               </div>
               <div className="mt-1 flex flex-wrap gap-1">
@@ -574,13 +588,13 @@ export function ConversationView({
                   return (
                     <span
                       key={tid}
-                      className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[11px] text-zinc-300"
+                      className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-meta text-ink-secondary"
                     >
                       <span className="truncate">{tm.content}</span>
                       <button
                         onClick={() => toggleTarget(tid)}
                         aria-label="Remove target"
-                        className="shrink-0 text-zinc-500 transition hover:text-zinc-200"
+                        className="shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
                       >
                         <IconClose size={11} />
                       </button>
@@ -591,7 +605,7 @@ export function ConversationView({
             </div>
             <button
               onClick={() => setTargets([])}
-              className="shrink-0 text-xs text-zinc-400 transition hover:text-zinc-200"
+              className="shrink-0 text-label text-ink-muted transition-colors duration-150 hover:text-ink"
             >
               clear
             </button>
@@ -600,26 +614,26 @@ export function ConversationView({
 
         {/* Composer */}
         <div className="mx-auto max-w-2xl">
-          <div className="rounded-2xl border border-white/10 bg-black/30 p-2 transition focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/15">
+          <div className="rounded-lg border border-line bg-fill p-2 shadow-highlight transition-colors duration-150 focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/20">
             <div className="flex items-center gap-1.5 px-1 pb-1.5">
-              <IconCompass size={14} className="shrink-0 text-zinc-500" />
+              <IconCompass size={14} className="shrink-0 text-ink-muted" />
               <input
                 value={steer}
                 onChange={(e) => setSteer(e.target.value)}
                 placeholder="optional: steer it — “be flirtier”, “ask her out”, “say something like…”"
-                className="min-w-0 flex-1 bg-transparent text-xs text-zinc-300 outline-none placeholder:text-zinc-600"
+                className="min-w-0 flex-1 bg-transparent text-xs text-ink-secondary outline-none placeholder:text-ink-faint"
               />
               {steer && (
                 <button
                   onClick={() => setSteer("")}
                   aria-label="Clear steer"
-                  className="shrink-0 text-zinc-600 transition hover:text-zinc-300"
+                  className="shrink-0 text-ink-faint transition-colors duration-150 hover:text-ink"
                 >
                   <IconClose size={13} />
                 </button>
               )}
             </div>
-            <div className="mb-1 h-px bg-white/5" />
+            <div className="my-1 h-px bg-line" />
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -631,37 +645,43 @@ export function ConversationView({
               }}
               rows={2}
               placeholder={`Paste ${conversation.name}'s latest message…`}
-              className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-zinc-600"
+              className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-normal text-ink outline-none placeholder:text-ink-faint"
             />
             <div className="flex items-center justify-between gap-2 px-1 pt-1">
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => addAs("me")}
                   disabled={!text.trim()}
-                  className="rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded-md px-2.5 py-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Add as me
                 </button>
                 <button
                   onClick={() => addAs("them")}
                   disabled={!text.trim()}
-                  className="rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded-md px-2.5 py-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Add as them
                 </button>
               </div>
-              <button
-                onClick={handleGenerate}
-                disabled={!canGenerate || suggesting}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-zinc-950 transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {suggesting ? <Spinner size={14} /> : <IconSparkles size={15} />}
-                {targets.length > 0
-                  ? `Reply to ${targets.length}`
-                  : text.trim() || !canRegenerate
-                    ? "Generate replies"
-                    : "Regenerate"}
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="hidden items-center gap-1.5 text-meta text-ink-muted sm:flex">
+                  <span className="kbd">↵</span> generate ·{" "}
+                  <span className="kbd">⇧↵</span> newline
+                </span>
+                <button
+                  onClick={handleGenerate}
+                  disabled={!canGenerate || suggesting}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label tabular-nums text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                >
+                  {suggesting ? <Spinner size={14} /> : <IconSparkles size={15} />}
+                  {targets.length > 0
+                    ? `Reply to ${targets.length}`
+                    : text.trim() || !canRegenerate
+                      ? "Generate replies"
+                      : "Regenerate"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

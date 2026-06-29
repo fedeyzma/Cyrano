@@ -87,18 +87,25 @@ export function ImportThreadModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[85vh] w-full max-w-lg animate-fade-up flex-col rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/5 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-thread-title"
+        className="relative flex max-h-[85vh] w-full max-w-lg animate-fade-up flex-col rounded-xl border border-line-strong bg-surface shadow-lg"
+      >
+        <div className="flex items-center justify-between border-b border-line p-4">
           <div>
-            <h2 className="text-base font-semibold">Import a thread</h2>
-            <p className="text-xs text-zinc-500">
+            <h2 id="import-thread-title" className="text-title text-ink">
+              Import a thread
+            </h2>
+            <p className="text-xs text-ink-muted">
               Paste an existing conversation with {conversationName}.
             </p>
           </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+            className="rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
           >
             <IconClose size={18} />
           </button>
@@ -113,29 +120,32 @@ export function ImportThreadModal({
               placeholder={
                 "Paste the whole conversation here — names, timestamps, whatever junk. Auto-detect figures out who said what; you can fix any line (or flip both sides) on the next step."
               }
-              className="h-64 max-h-[45vh] min-h-[10rem] w-full resize-y rounded-lg border border-white/10 bg-black/30 p-3 text-sm leading-relaxed outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+              className="h-64 max-h-[45vh] min-h-[10rem] w-full resize-y rounded-md border border-line bg-black/30 p-3 text-sm leading-normal text-ink placeholder:text-ink-faint outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
             />
-            <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-zinc-600">
-              <span>
+            <div className="mt-1.5 flex items-center justify-between gap-2 text-meta text-ink-faint">
+              <span className="tabular-nums">
                 {raw.length.toLocaleString()} characters ·{" "}
                 {raw.split(/\r?\n/).filter((l) => l.trim()).length} lines
               </span>
               {raw.length > MAX_IMPORT_CHARS && (
-                <span className="text-amber-400/80">
+                <span className="tabular-nums text-amber-400/80">
                   only the first {MAX_IMPORT_CHARS.toLocaleString()} characters will be read —
                   split very long threads
                 </span>
               )}
             </div>
             {parseError && (
-              <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              <div
+                role="alert"
+                className="mt-3 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger"
+              >
                 {parseError}
               </div>
             )}
             <div className="mt-4 flex items-center justify-between gap-2">
               <button
                 onClick={onClose}
-                className="rounded-lg px-3 py-2 text-sm text-zinc-400 transition hover:text-zinc-200"
+                className="rounded-md px-3 py-2 text-sm text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
               >
                 Cancel
               </button>
@@ -147,14 +157,14 @@ export function ImportThreadModal({
                   }}
                   disabled={!raw.trim() || aiParsing}
                   title="No AI — split by lines and Me:/Them: labels"
-                  className="rounded-lg border border-white/10 px-3 py-2 text-sm text-zinc-300 transition hover:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:bg-fill hover:text-ink motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
                   Quick parse
                 </button>
                 <button
                   onClick={runAiParse}
                   disabled={!raw.trim() || aiParsing}
-                  className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
                   {aiParsing ? <Spinner size={14} /> : <IconSparkles size={15} />}
                   {aiParsing ? "Reading…" : "Auto-detect with AI"}
@@ -164,11 +174,14 @@ export function ImportThreadModal({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b border-white/5 px-4 py-2 text-xs text-zinc-500">
-              <span>{parsed.length} messages · tap a bubble to switch speaker</span>
+            <div className="flex items-center justify-between border-b border-line px-4 py-2 text-xs text-ink-muted">
+              <span>
+                <span className="tabular-nums">{parsed.length}</span> messages · tap a bubble to
+                switch speaker
+              </span>
               <button
                 onClick={flipAll}
-                className="rounded-md px-2 py-1 text-zinc-300 transition hover:bg-white/5"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
               >
                 Flip all
               </button>
@@ -176,7 +189,7 @@ export function ImportThreadModal({
 
             <div className="flex-1 space-y-1.5 overflow-y-auto p-4">
               {parsed.length === 0 ? (
-                <p className="py-8 text-center text-sm text-zinc-500">
+                <p className="py-8 text-center text-sm text-ink-secondary">
                   Nothing to import — go back and paste some text.
                 </p>
               ) : (
@@ -192,10 +205,10 @@ export function ImportThreadModal({
                       onClick={() => toggleRole(i)}
                       title="Switch speaker"
                       className={cx(
-                        "max-w-[74%] whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-left text-sm",
+                        "max-w-[74%] whitespace-pre-wrap break-words rounded-lg px-3.5 py-2 text-left text-sm leading-normal transition-colors duration-150",
                         m.role === "me"
-                          ? "rounded-br-md bg-accent text-zinc-950"
-                          : "rounded-bl-md bg-white/[0.06] text-zinc-100 ring-1 ring-white/5",
+                          ? "rounded-br-sm bg-accent text-on-accent shadow-xs shadow-[inset_0_1px_0_0_rgb(255_255_255/0.20)]"
+                          : "rounded-bl-sm bg-fill text-ink ring-1 ring-line",
                       )}
                     >
                       {m.content}
@@ -203,7 +216,7 @@ export function ImportThreadModal({
                     <button
                       onClick={() => removeAt(i)}
                       aria-label="Remove message"
-                      className="text-zinc-700 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
+                      className="rounded-md p-1.5 text-ink-faint opacity-0 transition-colors duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100"
                     >
                       <IconClose size={13} />
                     </button>
@@ -213,24 +226,28 @@ export function ImportThreadModal({
             </div>
 
             {error && (
-              <div className="mx-4 mb-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              <div
+                role="alert"
+                className="mx-4 mb-2 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger"
+              >
                 {error}
               </div>
             )}
 
-            <div className="flex justify-between gap-2 border-t border-white/5 p-4">
+            <div className="flex justify-between gap-2 border-t border-line p-4">
               <button
                 onClick={() => setParsed(null)}
-                className="rounded-lg px-3 py-2 text-sm text-zinc-400 transition hover:text-zinc-200"
+                className="rounded-md px-3 py-2 text-sm text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
               >
                 ← Back to edit
               </button>
               <button
                 onClick={() => onImport(parsed)}
                 disabled={importing || parsed.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
-                {importing && <Spinner size={14} />} Import {parsed.length}{" "}
+                {importing && <Spinner size={14} />} Import{" "}
+                <span className="tabular-nums">{parsed.length}</span>{" "}
                 {parsed.length === 1 ? "message" : "messages"}
               </button>
             </div>
