@@ -15,6 +15,9 @@ next-env.d.ts
 *.db-shm
 *.db-wal
 
+# personal context (keep fred_context.example.md tracked)
+/fred_context.md
+
 # env files (keep .env.example tracked)
 .env
 .env.local

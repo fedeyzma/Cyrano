@@ -14,9 +14,12 @@ services:
       - CAMI_API_TIMEOUT_MS=${CAMI_API_TIMEOUT_MS:-45000}
       - SUGGESTION_COUNT=${SUGGESTION_COUNT:-4}
       - SUGGESTION_TEMPERATURE=${SUGGESTION_TEMPERATURE:-0.8}
+      - USER_CONTEXT_PATH=${USER_CONTEXT_PATH:-/app/fred_context.md}
       - DATABASE_PATH=/data/cyrano.db
     volumes:
       - cyrano-data:/data
+      # Uncomment to live-edit your context without rebuilding the image:
+      # - ./fred_context.md:/app/fred_context.md:ro
     restart: unless-stopped
 
 volumes:

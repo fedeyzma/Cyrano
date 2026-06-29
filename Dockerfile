@@ -32,6 +32,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
+# Personal context. The glob always matches the committed example, and also
+# picks up fred_context.md when present — so the build never fails either way.
+COPY --chown=node:node fred_context*.md ./
+
 USER node
 EXPOSE 3000
 VOLUME ["/data"]

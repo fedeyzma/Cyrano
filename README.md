@@ -48,11 +48,21 @@ npm run dev                 # http://localhost:3000
 | `CAMI_API_TIMEOUT_MS`    | `45000`                        | Per-request timeout.                               |
 | `SUGGESTION_COUNT`       | `4`                            | Replies generated per request (2–5).               |
 | `SUGGESTION_TEMPERATURE` | `0.8`                          | Sampling temperature.                              |
+| `USER_CONTEXT_PATH`      | `./fred_context.md`            | Markdown describing you, injected for grounding.    |
 | `DATABASE_PATH`          | `./data/cyrano.db`             | Where the SQLite file lives.                        |
 
 > Cami is an *agent*, so the app asks for **strict JSON only** (no tools, no
 > notifications) and validates the result with Zod, retrying once if the first
 > response isn't parseable. The key is only ever used server-side.
+
+### Personalization
+
+Replies are grounded in a personal-context markdown file (see
+`USER_CONTEXT_PATH`). Copy `fred_context.example.md` → `fred_context.md` and
+fill it in with raw background about yourself (who you are, how you text, your
+interests). It's injected into the system prompt as grounding — never quoted —
+and read fresh on each generation, so edits apply immediately. The real file is
+**gitignored** (it's personal); it's still included in local Docker builds.
 
 ---
 

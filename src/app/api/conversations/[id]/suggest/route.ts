@@ -1,7 +1,8 @@
 import { addFact, addMessage, getConversation, getFacts, getMessages } from "@/lib/db";
 import { json, parseId, readJson } from "@/lib/http";
 import { generateSuggestions, LlmError } from "@/lib/llm";
-import { assemblePrompt, SYSTEM_PROMPT } from "@/lib/prompt";
+import { assemblePrompt, buildSystemPrompt } from "@/lib/prompt";
+import { getUserContext } from "@/lib/userContext";
 import type { Fact, Message } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -65,7 +66,7 @@ export async function POST(req: Request, { params }: Ctx) {
 
   let suggestion;
   try {
-    suggestion = await generateSuggestions(SYSTEM_PROMPT, prompt);
+    suggestion = await generateSuggestions(buildSystemPrompt(getUserContext()), prompt);
   } catch (err) {
     const message =
       err instanceof LlmError
