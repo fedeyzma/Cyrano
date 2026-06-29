@@ -1,10 +1,13 @@
 import {
   IMPORTED_THREAD_JSON_EXAMPLE,
   importedThreadSchema,
+  PROFILE_SCAN_JSON_EXAMPLE,
+  profileScanSchema,
   PROMPT_ANSWERS_JSON_EXAMPLE,
   promptAnswersSchema,
   SUGGESTION_JSON_EXAMPLE,
   suggestionSchema,
+  type ProfileScan,
   type PromptAnswers,
   type Suggestion,
 } from "./schema";
@@ -34,7 +37,7 @@ interface ChatResponse {
 async function chat(
   system: string,
   user: string,
-  opts: { maxTokens?: number; temperature?: number; timeoutMs?: number } = {},
+  opts: { maxTokens?: number; temperature?: number; timeoutMs?: number; images?: string[] } = {},
 ): Promise<string> {
   if (!API_KEY) {
     throw new LlmError("CAMI_API_KEY is not set — add it to your .env file.");
@@ -54,7 +57,16 @@ async function chat(
         max_tokens: opts.maxTokens ?? 900,
         messages: [
           { role: "system", content: system },
-          { role: "user", content: user },
+          {
+            role: "user",
+            content:
+              opts.images && opts.images.length > 0
+                ? [
+                    { type: "text", text: user },
+                    ...opts.images.map((url) => ({ type: "image_url", image_url: { url } })),
+                  ]
+                : user,
+          },
         ],
       }),
       signal: AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS),
@@ -119,6 +131,32 @@ export async function generatePromptAnswers(
     }
   }
   throw new LlmError("Cami did not return usable prompt answers. Try again.", lastParseError);
+}
+
+/** Read profile screenshot(s) and return a hook + openers (strict JSON, with retry). */
+export async function generateProfileScan(
+  system: string,
+  userMsg: string,
+  images: string[],
+): Promise<ProfileScan> {
+  const jsonInstruction = `\n\nThis is a pure analysis task. Do NOT use tools, notify anyone, or ask questions. Return ONLY a single valid JSON object — no markdown, no commentary — exactly:\n${PROFILE_SCAN_JSON_EXAMPLE}`;
+  const sys = system + jsonInstruction;
+
+  let lastParseError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = await chat(sys, userMsg, {
+      images,
+      maxTokens: 1400,
+      temperature: 0.9,
+      timeoutMs: 90000,
+    });
+    try {
+      return profileScanSchema.parse(extractJson(raw));
+    } catch (err) {
+      lastParseError = err;
+    }
+  }
+  throw new LlmError("Cami couldn't read that profile. Try clearer or fewer screenshots.", lastParseError);
 }
 
 /** Pull the outermost JSON object out of a possibly-chatty response. */

@@ -152,4 +152,22 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  scanProfile: (data: {
+    images: string[];
+    mood?: string;
+    language?: string;
+    platform?: string;
+    count?: number;
+    avoid?: string[];
+  }) =>
+    req<ProfileScanResult>("/api/scan", { method: "POST", body: JSON.stringify(data) }),
 };
+
+export interface ProfileScanResult {
+  name: string;
+  read: string;
+  pick: { target: string; type: string; reason: string };
+  openers: Array<{ text: string; tone: string }>;
+  extractedFacts: string[];
+}

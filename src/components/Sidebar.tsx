@@ -3,7 +3,7 @@
 import { cx } from "@/lib/cx";
 import { relativeTime } from "@/lib/time";
 import type { ConversationListItem } from "@/lib/types";
-import { IconCards, IconChat, IconHeart, IconPlus } from "./icons";
+import { IconCards, IconChat, IconHeart, IconPlus, IconScan } from "./icons";
 
 export function Sidebar({
   conversations,
@@ -17,8 +17,8 @@ export function Sidebar({
   conversations: ConversationListItem[];
   selectedId: number | null;
   loading: boolean;
-  view: "replies" | "prompts";
-  onView: (view: "replies" | "prompts") => void;
+  view: "replies" | "prompts" | "scan";
+  onView: (view: "replies" | "prompts" | "scan") => void;
   onSelect: (id: number) => void;
   onNew: () => void;
 }) {
@@ -48,6 +48,7 @@ export function Sidebar({
           [
             ["replies", "Replies", IconChat],
             ["prompts", "Prompts", IconCards],
+            ["scan", "Scan", IconScan],
           ] as const
         ).map(([key, label, Icon]) => (
           <button

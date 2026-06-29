@@ -144,6 +144,55 @@ export function assemblePromptRequest(
   return lines.join("\n");
 }
 
+/** Persona for reading a profile screenshot and writing openers (the Scan module). */
+export const SCAN_SYSTEM = `You are shown one or more SCREENSHOTS of a dating-app profile (mostly Hinge). Read the whole profile carefully — photos, prompt answers, bio, and any visible job / hometown / age / interests. Your job: pick the single best thing to OPEN on, and write a few opener messages for the user to send. Who the user is — background, personality, voice — is in the WHO I AM section; ground the openers in it, never quote it.
+
+# How opening works (Hinge)
+You open by liking/commenting on ONE specific item — a prompt answer or a photo. The opener MUST reference that exact thing. Never a generic "hey", never a comment about her looks/attractiveness, never a pickup line.
+
+# Pick the hook
+Choose the most engaging, openable item: usually a prompt answer with personality, an unusual or specific interest, or a photo with a real detail (an activity, a place, a pet, something with a story). Quote the prompt answer verbatim, or describe the photo precisely. Give a short reason why it's the best hook. If nothing is strong, choose the least generic thing and keep the opener light.
+
+# The openers
+- Each opener references the chosen hook and gives her an easy, low-pressure way to reply (a light question, a playful observation, a shared-interest hook).
+- Sound like ME, in the requested language, with my energy. Short — one or two lines.
+- Warm and a little playful, curious about her. No interview questions, no over-eagerness, no compliments about looks.
+- Return a few DISTINCT options with different tones.
+
+# Facts
+Also extract durable facts about HER from the profile (job, hometown, interests, pet, what she's into) for remembering later. And return her first name if it's visible, else an empty string.`;
+
+export function buildScanSystem(userContext?: string): string {
+  return compose(SCAN_SYSTEM, userContext);
+}
+
+export function assembleScanRequest(
+  mood: string,
+  language: string,
+  count: number,
+  platform?: string,
+  avoid?: string[],
+): string {
+  const lines: string[] = [];
+  if (platform) lines.push(`PLATFORM: ${platform}`);
+  lines.push(
+    `LANGUAGE FOR THE OPENERS: ${language.trim() || "match the language of the profile"} — natural and native-sounding.`,
+  );
+  lines.push(`MOOD / VIBE: ${mood.trim() || "your call — engaging, warm, easy for her to reply to"}`);
+
+  if (avoid && avoid.length > 0) {
+    lines.push("");
+    lines.push("I already have these openers — give me genuinely DIFFERENT ones, not rewordings:");
+    for (const a of avoid) lines.push(`- "${a}"`);
+  }
+
+  lines.push("");
+  lines.push(
+    `Read the attached profile screenshot(s), pick the single best hook to open on, and write ${count} opener options. Then extract durable facts about her and her first name if visible.`,
+  );
+  return lines.join("\n");
+}
+
 const MAX_MESSAGES = 24;
 const MAX_FACTS = 40;
 

@@ -6,6 +6,7 @@ import { FactsPanel } from "@/components/FactsPanel";
 import { IconHeart, IconMenu, IconSparkles } from "@/components/icons";
 import { ImportThreadModal } from "@/components/ImportThreadModal";
 import { NewConversationModal } from "@/components/NewConversationModal";
+import { ProfileScan } from "@/components/ProfileScan";
 import { PromptsLab } from "@/components/PromptsLab";
 import { Sidebar } from "@/components/Sidebar";
 import { ApiError, api } from "@/lib/api";
@@ -43,7 +44,7 @@ export default function Home() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
-  const [view, setView] = useState<"replies" | "prompts">("replies");
+  const [view, setView] = useState<"replies" | "prompts" | "scan">("replies");
 
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -379,6 +380,38 @@ export default function Home() {
     }
   }
 
+  async function handleStartFromScan(data: {
+    name: string;
+    platform: string;
+    facts: string[];
+    opener: string;
+  }) {
+    try {
+      const conv = await api.createConversation({
+        name: data.name?.trim() || "New match",
+        platform: data.platform || undefined,
+      });
+      for (const f of data.facts) {
+        try {
+          await api.addFact(conv.id, f);
+        } catch {
+          /* skip duplicates */
+        }
+      }
+      await refreshList();
+      setView("replies");
+      setSelectedId(conv.id);
+      try {
+        await navigator.clipboard.writeText(data.opener);
+      } catch {
+        /* clipboard unavailable */
+      }
+      showToast("Conversation started — opener copied");
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
   const factsCount = detail?.facts.length ?? 0;
 
   return (
@@ -414,7 +447,9 @@ export default function Home() {
 
         <div className="flex min-h-0 flex-1">
           <main className="flex min-w-0 flex-1 flex-col">
-            {view === "prompts" ? (
+            {view === "scan" ? (
+              <ProfileScan onScan={(d) => api.scanProfile(d)} onStart={handleStartFromScan} />
+            ) : view === "prompts" ? (
               <PromptsLab
                 onGenerate={async (data) => {
                   const res = await api.suggestPrompt(data);

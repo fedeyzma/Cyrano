@@ -78,6 +78,13 @@ export const IconClose = (p: IconProps) => (
   </Icon>
 );
 
+export const IconScan = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
+    <path d="M3 12h18" opacity={0.55} />
+  </Icon>
+);
+
 export const IconCards = (p: IconProps) => (
   <Icon {...p}>
     <rect x="3" y="8" width="13" height="13" rx="2" />

@@ -67,3 +67,33 @@ export type PromptAnswers = z.infer<typeof promptAnswersSchema>;
 
 export const PROMPT_ANSWERS_JSON_EXAMPLE =
   '{"options":[{"text":"...","angle":"funny"},{"text":"...","angle":"sincere"}]}';
+
+/** Result of scanning dating-profile screenshot(s) for an opener. */
+export const profileScanSchema = z.object({
+  name: z.string().describe("her first name if visible in the profile, else empty string"),
+  read: z.string().describe("a 1-2 line read of who she seems to be, used to ground the openers"),
+  pick: z.object({
+    target: z
+      .string()
+      .describe("the single best thing to open on — quote the prompt answer, or describe the photo/detail"),
+    type: z.string().describe("one of: prompt, photo, bio, detail"),
+    reason: z.string().describe("a short why this is the best hook"),
+  }),
+  openers: z
+    .array(
+      z.object({
+        text: z.string().describe("the opener message to send, ready to paste"),
+        tone: z.string().describe("one tone: dry, playful, curious, flirty, sincere, bold"),
+      }),
+    )
+    .min(1)
+    .describe("a few distinct opener options that reference the hook"),
+  extractedFacts: z
+    .array(z.string())
+    .describe("durable facts about HER from the profile (job, hometown, interests, pet); empty if none"),
+});
+
+export type ProfileScan = z.infer<typeof profileScanSchema>;
+
+export const PROFILE_SCAN_JSON_EXAMPLE =
+  '{"name":"","read":"...","pick":{"target":"...","type":"prompt","reason":"..."},"openers":[{"text":"...","tone":"playful"}],"extractedFacts":["..."]}';
