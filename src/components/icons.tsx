@@ -78,6 +78,13 @@ export const IconClose = (p: IconProps) => (
   </Icon>
 );
 
+export const IconCards = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="8" width="13" height="13" rx="2" />
+    <path d="M8 8V6a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" opacity={0.55} />
+  </Icon>
+);
+
 export const IconChat = (p: IconProps) => (
   <Icon {...p}>
     <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" />

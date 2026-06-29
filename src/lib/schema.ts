@@ -47,3 +47,23 @@ export type ImportedThread = z.infer<typeof importedThreadSchema>;
 
 export const IMPORTED_THREAD_JSON_EXAMPLE =
   '{"messages":[{"role":"them","content":"hey how was your weekend"},{"role":"me","content":"good, climbed a bit. you?"}]}';
+
+/** Answers to a dating-app profile prompt. */
+export const promptAnswersSchema = z.object({
+  options: z
+    .array(
+      z.object({
+        text: z.string().describe("the profile-prompt answer, ready to paste"),
+        angle: z
+          .string()
+          .describe("one-word angle label, e.g. funny, flirty, sincere, dry, bold, curious"),
+      }),
+    )
+    .min(1)
+    .describe("a few distinct profile-prompt answers, each a different angle"),
+});
+
+export type PromptAnswers = z.infer<typeof promptAnswersSchema>;
+
+export const PROMPT_ANSWERS_JSON_EXAMPLE =
+  '{"options":[{"text":"...","angle":"funny"},{"text":"...","angle":"sincere"}]}';

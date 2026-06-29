@@ -6,6 +6,7 @@ import { FactsPanel } from "@/components/FactsPanel";
 import { IconHeart, IconMenu, IconSparkles } from "@/components/icons";
 import { ImportThreadModal } from "@/components/ImportThreadModal";
 import { NewConversationModal } from "@/components/NewConversationModal";
+import { PromptsLab } from "@/components/PromptsLab";
 import { Sidebar } from "@/components/Sidebar";
 import { ApiError, api } from "@/lib/api";
 import { cx } from "@/lib/cx";
@@ -41,6 +42,8 @@ export default function Home() {
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+
+  const [view, setView] = useState<"replies" | "prompts">("replies");
 
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,6 +119,7 @@ export default function Home() {
 
   function selectConversation(id: number) {
     setSelectedId(id);
+    setView("replies");
     setMobileNav(false);
   }
 
@@ -385,6 +389,8 @@ export default function Home() {
           conversations={conversations}
           selectedId={selectedId}
           loading={loadingList}
+          view={view}
+          onView={setView}
           onSelect={selectConversation}
           onNew={() => setModalOpen(true)}
         />
@@ -408,7 +414,14 @@ export default function Home() {
 
         <div className="flex min-h-0 flex-1">
           <main className="flex min-w-0 flex-1 flex-col">
-            {detail ? (
+            {view === "prompts" ? (
+              <PromptsLab
+                onGenerate={async (data) => {
+                  const res = await api.suggestPrompt(data);
+                  return res.options;
+                }}
+              />
+            ) : detail ? (
               <ConversationView
                 key={detail.conversation.id}
                 detail={detail}
@@ -443,7 +456,7 @@ export default function Home() {
           </main>
 
           {/* Inline facts (xl+) */}
-          {detail && (
+          {view === "replies" && detail && (
             <aside className="hidden w-80 shrink-0 border-l border-white/5 xl:flex">
               <FactsPanel
                 detail={detail}
@@ -464,6 +477,11 @@ export default function Home() {
             conversations={conversations}
             selectedId={selectedId}
             loading={loadingList}
+            view={view}
+            onView={(v) => {
+              setView(v);
+              setMobileNav(false);
+            }}
             onSelect={selectConversation}
             onNew={() => {
               setMobileNav(false);

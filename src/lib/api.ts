@@ -139,4 +139,16 @@ export const api = {
     req<{ ok: boolean }>(`/api/conversations/${id}/facts/${factId}`, {
       method: "DELETE",
     }),
+
+  suggestPrompt: (data: {
+    prompt: string;
+    mood?: string;
+    count?: number;
+    platform?: string;
+    avoid?: string[];
+  }) =>
+    req<{ options: Array<{ text: string; angle: string }> }>("/api/prompts/suggest", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };

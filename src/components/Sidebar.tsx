@@ -3,18 +3,22 @@
 import { cx } from "@/lib/cx";
 import { relativeTime } from "@/lib/time";
 import type { ConversationListItem } from "@/lib/types";
-import { IconHeart, IconPlus } from "./icons";
+import { IconCards, IconChat, IconHeart, IconPlus } from "./icons";
 
 export function Sidebar({
   conversations,
   selectedId,
   loading,
+  view,
+  onView,
   onSelect,
   onNew,
 }: {
   conversations: ConversationListItem[];
   selectedId: number | null;
   loading: boolean;
+  view: "replies" | "prompts";
+  onView: (view: "replies" | "prompts") => void;
   onSelect: (id: number) => void;
   onNew: () => void;
 }) {
@@ -38,6 +42,28 @@ export function Sidebar({
           <IconPlus size={18} />
         </button>
       </header>
+
+      <div className="flex gap-1 border-b border-white/5 p-2">
+        {(
+          [
+            ["replies", "Replies", IconChat],
+            ["prompts", "Prompts", IconCards],
+          ] as const
+        ).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            onClick={() => onView(key)}
+            className={cx(
+              "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition",
+              view === key
+                ? "bg-white/10 text-zinc-100"
+                : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200",
+            )}
+          >
+            <Icon size={14} /> {label}
+          </button>
+        ))}
+      </div>
 
       <div className="flex-1 overflow-y-auto p-2">
         {loading ? (

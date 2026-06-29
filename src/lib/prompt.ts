@@ -65,6 +65,56 @@ export function buildSystemPrompt(userContext?: string): string {
   return `${SYSTEM_PROMPT}\n\n# WHO I AM (you are writing as me — grounding only, never quote or list this)\n${ctx}`;
 }
 
+/** Persona for writing dating-app PROFILE PROMPT answers (a separate module). */
+export const PROMPT_SYSTEM = `You write dating-app PROFILE PROMPT answers for the user (Hinge, Tinder, Bumble). Given a prompt (the profile question) and an optional mood, return a few short answers the user can paste straight onto their profile. Who the user is — background, personality, voice — is in the WHO I AM section; ground every answer in it, never quote or list it.
+
+# Goal
+- Engaging and EASY TO MATCH ON: every answer hands the reader an obvious hook — a specific detail, a playful claim, a small invitation — something they can comment on or open with. No dead-ends that invite no reply.
+- Sounds like me: natural, casual, a little playful, dry humor as seasoning, confident without bragging. Keep a bit of my energy.
+- Specific beats generic. Real details from WHO I AM beat vague claims. No clichés ("just ask", "fluent in sarcasm", "partner in crime", "I don't bite"), no humblebrags, no pickup-artist lines, no listing hobbies like a CV.
+- SHORT — profile length, usually one line, occasionally two. Respect the prompt's format (e.g. "Two truths and a lie" needs exactly three items; a fill-in-the-blank continues the sentence naturally).
+- Low-pressure and warm. At most one emoji, usually none. Casual punctuation, lowercase-leaning is fine.
+
+# Mood
+If a mood/vibe is given, lean the whole set into it while staying true to me.
+
+# Variety
+Each option is a genuinely different angle and feel, not rewordings of one idea.
+
+# Output
+For each option return: text (the answer, ready to paste) and angle (a one-word label: funny, flirty, sincere, dry, bold, curious, etc.). Return the structured object only, no prose outside it.`;
+
+export function buildPromptSystem(userContext?: string): string {
+  const ctx = userContext?.trim();
+  if (!ctx) return PROMPT_SYSTEM;
+  return `${PROMPT_SYSTEM}\n\n# WHO I AM (you are writing as me — grounding only, never quote or list this)\n${ctx}`;
+}
+
+export function assemblePromptRequest(
+  prompt: string,
+  mood: string,
+  count: number,
+  platform?: string,
+  avoid?: string[],
+): string {
+  const lines: string[] = [];
+  lines.push(`PROFILE PROMPT: "${prompt}"`);
+  if (platform) lines.push(`PLATFORM: ${platform}`);
+  lines.push(`MOOD / VIBE: ${mood.trim() || "your call — natural, engaging, a bit of my energy"}`);
+
+  if (avoid && avoid.length > 0) {
+    lines.push("");
+    lines.push("I already have these — give me genuinely DIFFERENT answers, not rewordings:");
+    for (const a of avoid) lines.push(`- "${a}"`);
+  }
+
+  lines.push("");
+  lines.push(
+    `Write ${count} distinct answer options, each a different angle, grounded in who i am — engaging and easy to match on, ready to paste on my profile.`,
+  );
+  return lines.join("\n");
+}
+
 const MAX_MESSAGES = 24;
 const MAX_FACTS = 40;
 

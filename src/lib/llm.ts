@@ -1,8 +1,11 @@
 import {
   IMPORTED_THREAD_JSON_EXAMPLE,
   importedThreadSchema,
+  PROMPT_ANSWERS_JSON_EXAMPLE,
+  promptAnswersSchema,
   SUGGESTION_JSON_EXAMPLE,
   suggestionSchema,
+  type PromptAnswers,
   type Suggestion,
 } from "./schema";
 import type { Role } from "./types";
@@ -96,6 +99,26 @@ export async function generateSuggestions(system: string, prompt: string): Promi
     "Cami did not return usable JSON. Try again, or tweak the prompt.",
     lastParseError,
   );
+}
+
+/** Generate answers to a dating-app profile prompt (strict JSON, with retry). */
+export async function generatePromptAnswers(
+  system: string,
+  userMsg: string,
+): Promise<PromptAnswers> {
+  const jsonInstruction = `\n\nThis is a pure text task. Do NOT use tools, notify anyone, or ask questions. Return ONLY a single valid JSON object — no markdown, no commentary — exactly:\n${PROMPT_ANSWERS_JSON_EXAMPLE}`;
+  const sys = system + jsonInstruction;
+
+  let lastParseError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = await chat(sys, userMsg, { maxTokens: 800, temperature: 0.95 });
+    try {
+      return promptAnswersSchema.parse(extractJson(raw));
+    } catch (err) {
+      lastParseError = err;
+    }
+  }
+  throw new LlmError("Cami did not return usable prompt answers. Try again.", lastParseError);
 }
 
 /** Pull the outermost JSON object out of a possibly-chatty response. */
