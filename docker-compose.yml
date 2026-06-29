@@ -1,0 +1,24 @@
+services:
+  cyrano:
+    build: .
+    container_name: cyrano
+    ports:
+      - "3000:3000"
+    environment:
+      # Point this at your Hermes / OpenAI-compatible endpoint.
+      # From inside the container, "localhost" is the container itself — use
+      # host.docker.internal (Docker Desktop) or your host's LAN IP for a
+      # model server running on the host machine.
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - SUGGESTION_COUNT=${SUGGESTION_COUNT:-4}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.9}
+      - LLM_TIMEOUT_MS=${LLM_TIMEOUT_MS:-60000}
+      - DATABASE_PATH=/data/cyrano.db
+    volumes:
+      - cyrano-data:/data
+    restart: unless-stopped
+
+volumes:
+  cyrano-data:

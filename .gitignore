@@ -1,0 +1,30 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+
+# production / local data (SQLite lives here)
+/data
+*.db
+*.db-shm
+*.db-wal
+
+# env files (keep .env.example tracked)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# misc
+*.log
+npm-debug.log*
+.DS_Store
+.vercel
+*.tsbuildinfo
