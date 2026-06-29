@@ -3,6 +3,7 @@ import {
   getConversation,
   getFacts,
   getMessages,
+  getQueuedReplies,
   updateConversation,
 } from "@/lib/db";
 import { json, parseId, readJson } from "@/lib/http";
@@ -21,6 +22,7 @@ export async function GET(_req: Request, { params }: Ctx) {
     conversation,
     messages: getMessages(id),
     facts: getFacts(id),
+    queued: getQueuedReplies(id),
   });
 }
 

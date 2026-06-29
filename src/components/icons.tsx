@@ -112,6 +112,20 @@ export const IconCompass = (p: IconProps) => (
   </Icon>
 );
 
+export const IconReply = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 17 4 12l5-5" />
+    <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+  </Icon>
+);
+
+export const IconClock = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </Icon>
+);
+
 export const IconImport = (p: IconProps) => (
   <Icon {...p}>
     <path d="M12 3v12m0 0 4-4m-4 4-4-4" />

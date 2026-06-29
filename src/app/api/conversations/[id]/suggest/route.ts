@@ -19,9 +19,17 @@ export async function POST(req: Request, { params }: Ctx) {
   const conversation = getConversation(id);
   if (!conversation) return json({ error: "Not found" }, 404);
 
-  const body = await readJson<{ incoming?: string; count?: number; steer?: string }>(req);
+  const body = await readJson<{
+    incoming?: string;
+    count?: number;
+    steer?: string;
+    targetMessageIds?: number[];
+  }>(req);
   const incoming = typeof body?.incoming === "string" ? body.incoming.trim() : "";
   const steer = typeof body?.steer === "string" ? body.steer.trim() : "";
+  const targetMessageIds = Array.isArray(body?.targetMessageIds)
+    ? body.targetMessageIds.filter((n): n is number => Number.isInteger(n))
+    : [];
   const optionCount = clamp(
     Math.round(Number(body?.count ?? process.env.SUGGESTION_COUNT ?? 4)) || 4,
     2,
@@ -41,7 +49,12 @@ export async function POST(req: Request, { params }: Ctx) {
     );
   }
 
-  const prompt = assemblePrompt({ conversation, messages, facts }, optionCount, steer);
+  const prompt = assemblePrompt(
+    { conversation, messages, facts, queued: [] },
+    optionCount,
+    steer,
+    targetMessageIds,
+  );
 
   let suggestion;
   try {

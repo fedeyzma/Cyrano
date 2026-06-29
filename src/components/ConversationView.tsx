@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { clockTime } from "@/lib/time";
-import type { ConversationDetail, ReplyOption, Role } from "@/lib/types";
+import type { ConversationDetail, QueuedReply, ReplyOption, Role } from "@/lib/types";
 import {
   IconBrain,
   IconCheck,
+  IconClock,
   IconClose,
   IconCompass,
   IconCopy,
   IconImport,
   IconRefresh,
+  IconReply,
   IconSend,
   IconSparkles,
   IconTrash,
@@ -41,9 +43,12 @@ export function ConversationView({
   onSuggest,
   onAddMessage,
   onUseOption,
+  onQueueOption,
   onDismissSuggestions,
   onDeleteMessage,
   onDeleteConversation,
+  onDeleteQueued,
+  onSendQueued,
   onOpenImport,
   onOpenFacts,
 }: {
@@ -52,41 +57,58 @@ export function ConversationView({
   suggesting: boolean;
   suggestError: string | null;
   factsCount: number;
-  onSuggest: (incoming: string, steer: string) => void;
+  onSuggest: (incoming: string, steer: string, targetIds: number[]) => void;
   onAddMessage: (role: Role, content: string) => void;
-  onUseOption: (text: string) => void;
+  onUseOption: (texts: string[]) => void;
+  onQueueOption: (texts: string[], tone: string, targetId: number | null) => void;
   onDismissSuggestions: () => void;
   onDeleteMessage: (messageId: number) => void;
   onDeleteConversation: () => void;
+  onDeleteQueued: (queueId: number) => void;
+  onSendQueued: (q: QueuedReply) => void;
   onOpenImport: () => void;
   onOpenFacts: () => void;
 }) {
-  const { conversation, messages } = detail;
+  const { conversation, messages, queued } = detail;
   const [text, setText] = useState("");
   const [steer, setSteer] = useState("");
-  const [copied, setCopied] = useState<number | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [targets, setTargets] = useState<number[]>([]);
+  const [queueOpen, setQueueOpen] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const messageById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, suggestions, suggesting]);
 
+  // Drop any targets whose message no longer exists.
+  useEffect(() => {
+    setTargets((prev) => prev.filter((id) => messageById.has(id)));
+  }, [messageById]);
+
   const lastThem = [...messages].reverse().find((m) => m.role === "them");
-  const canRegenerate = !!lastThem;
+  const canRegenerate = !!lastThem || targets.length > 0;
   const canGenerate = text.trim().length > 0 || canRegenerate;
+  const primaryTargetId = targets.length > 0 ? targets[targets.length - 1] : (lastThem?.id ?? null);
+
+  function toggleTarget(id: number) {
+    setTargets((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
+  }
 
   function handleGenerate() {
     const t = text.trim();
     if (t) {
-      onSuggest(t, steer);
+      onSuggest(t, steer, targets);
       setText("");
     } else if (canRegenerate) {
-      onSuggest("", steer);
+      onSuggest("", steer, targets);
     }
   }
 
   function regenerate() {
-    onSuggest("", steer);
+    onSuggest("", steer, targets);
   }
 
   function addAs(role: Role) {
@@ -96,19 +118,14 @@ export function ConversationView({
     setText("");
   }
 
-  async function copyText(value: string, index: number) {
+  async function copyValue(value: string, key: string) {
     try {
       await navigator.clipboard.writeText(value);
-      setCopied(index);
-      setTimeout(() => setCopied((c) => (c === index ? null : c)), 1600);
+      setCopied(key);
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), 1600);
     } catch {
       /* clipboard not available */
     }
-  }
-
-  function handleUse(value: string, index: number) {
-    void copyText(value, index);
-    onUseOption(value);
   }
 
   return (
@@ -151,7 +168,7 @@ export function ConversationView({
         </div>
       </header>
 
-      {/* Thread + suggestions (scrolls together) */}
+      {/* Thread + suggestions */}
       <div className="flex-1 overflow-y-auto px-4 py-5">
         <div className="mx-auto max-w-2xl space-y-2.5">
           {messages.length === 0 && (
@@ -173,45 +190,67 @@ export function ConversationView({
             </div>
           )}
 
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={cx(
-                "group flex items-end gap-2",
-                m.role === "me" ? "justify-end" : "justify-start",
-              )}
-            >
-              {m.role === "me" && (
-                <button
-                  onClick={() => onDeleteMessage(m.id)}
-                  aria-label="Delete message"
-                  className="mb-1 text-zinc-700 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
-                >
-                  <IconTrash size={13} />
-                </button>
-              )}
+          {messages.map((m) => {
+            const isTarget = m.role === "them" && targets.includes(m.id);
+            return (
               <div
+                key={m.id}
                 className={cx(
-                  "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-                  m.role === "me"
-                    ? "rounded-br-md bg-accent text-zinc-950"
-                    : "rounded-bl-md bg-white/[0.06] text-zinc-100 ring-1 ring-white/5",
+                  "group flex items-end gap-2",
+                  m.role === "me" ? "justify-end" : "justify-start",
                 )}
-                title={clockTime(m.created_at)}
               >
-                <span className="whitespace-pre-wrap break-words">{m.content}</span>
-              </div>
-              {m.role === "them" && (
-                <button
-                  onClick={() => onDeleteMessage(m.id)}
-                  aria-label="Delete message"
-                  className="mb-1 text-zinc-700 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
+                {m.role === "me" && (
+                  <button
+                    onClick={() => onDeleteMessage(m.id)}
+                    aria-label="Delete message"
+                    className="mb-1 text-zinc-700 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
+                  >
+                    <IconTrash size={13} />
+                  </button>
+                )}
+                <div
+                  className={cx(
+                    "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+                    m.role === "me"
+                      ? "rounded-br-md bg-accent text-zinc-950"
+                      : "rounded-bl-md bg-white/[0.06] text-zinc-100 ring-1 ring-white/5",
+                    isTarget && "ring-2 ring-accent/70",
+                  )}
+                  title={clockTime(m.created_at)}
                 >
-                  <IconTrash size={13} />
-                </button>
-              )}
-            </div>
-          ))}
+                  <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                </div>
+                {m.role === "them" && (
+                  <div
+                    className={cx(
+                      "mb-0.5 flex flex-col gap-1 transition",
+                      isTarget ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                    )}
+                  >
+                    <button
+                      onClick={() => toggleTarget(m.id)}
+                      aria-label={isTarget ? "Stop replying to this" : "Reply to this message"}
+                      title={isTarget ? "Stop replying to this" : "Reply to this message"}
+                      className={cx(
+                        "transition",
+                        isTarget ? "text-accent" : "text-zinc-600 hover:text-zinc-300",
+                      )}
+                    >
+                      <IconReply size={14} />
+                    </button>
+                    <button
+                      onClick={() => onDeleteMessage(m.id)}
+                      aria-label="Delete message"
+                      className="text-zinc-700 transition hover:text-red-400"
+                    >
+                      <IconTrash size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {/* Suggestions */}
           {(suggesting || suggestions || suggestError) && (
@@ -282,13 +321,18 @@ export function ConversationView({
                           )}
                         >
                           {opt.tone}
+                          {opt.texts.length > 1 && (
+                            <span className="ml-1 normal-case text-zinc-500">
+                              · {opt.texts.length} texts
+                            </span>
+                          )}
                         </span>
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => copyText(opt.text, i)}
+                            onClick={() => copyValue(opt.texts.join("\n"), `opt-${i}`)}
                             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
                           >
-                            {copied === i ? (
+                            {copied === `opt-${i}` ? (
                               <>
                                 <IconCheck size={13} /> Copied
                               </>
@@ -299,18 +343,36 @@ export function ConversationView({
                             )}
                           </button>
                           <button
-                            onClick={() => handleUse(opt.text, i)}
+                            onClick={() => onQueueOption(opt.texts, opt.tone, primaryTargetId)}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+                          >
+                            <IconClock size={13} /> Queue
+                          </button>
+                          <button
+                            onClick={() => {
+                              void copyValue(opt.texts.join("\n"), `opt-${i}`);
+                              onUseOption(opt.texts);
+                            }}
                             className="inline-flex items-center gap-1 rounded-md bg-accent/90 px-2.5 py-1 text-xs font-medium text-zinc-950 transition hover:bg-accent"
                           >
                             <IconSend size={13} /> Use
                           </button>
                         </div>
                       </div>
-                      <p className="mt-2 text-sm leading-relaxed text-zinc-100">{opt.text}</p>
+                      <div className="mt-2 space-y-1">
+                        {opt.texts.map((t, j) => (
+                          <p
+                            key={j}
+                            className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-sm leading-relaxed text-zinc-100"
+                          >
+                            {t}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                   ))}
                   <p className="px-1 pt-1 text-[11px] text-zinc-600">
-                    “Use” copies the reply and logs it to the thread as sent.
+                    “Use” sends now (logs to the thread); “Queue” saves it as a draft for later.
                   </p>
                 </div>
               )}
@@ -321,8 +383,126 @@ export function ConversationView({
         </div>
       </div>
 
-      {/* Composer */}
+      {/* Bottom: queue + targeting + composer */}
       <div className="shrink-0 border-t border-white/5 bg-zinc-950/60 px-4 py-3 backdrop-blur">
+        {/* Queued replies */}
+        {queued.length > 0 && (
+          <div className="mx-auto mb-2 max-w-2xl rounded-xl border border-white/10 bg-white/[0.02]">
+            <button
+              onClick={() => setQueueOpen((o) => !o)}
+              className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-400"
+            >
+              <span className="flex items-center gap-1.5">
+                <IconClock size={14} className="text-accent" /> Queued replies · {queued.length}
+              </span>
+              <span className="text-zinc-600">{queueOpen ? "hide" : "show"}</span>
+            </button>
+            {queueOpen && (
+              <div className="max-h-56 space-y-1.5 overflow-y-auto px-3 pb-3">
+                {queued.map((q) => {
+                  const tm = q.target_message_id ? messageById.get(q.target_message_id) : null;
+                  const parts = q.content.split("\n").filter((l) => l.trim());
+                  return (
+                    <div key={q.id} className="rounded-lg border border-white/5 bg-white/[0.03] p-2.5">
+                      {tm && (
+                        <div className="mb-1 flex items-center gap-1 text-[11px] text-zinc-500">
+                          <IconReply size={11} className="shrink-0" />
+                          <span className="truncate">{tm.content}</span>
+                        </div>
+                      )}
+                      <div className="space-y-0.5">
+                        {parts.map((p, idx) => (
+                          <p key={idx} className="text-sm leading-relaxed text-zinc-100">
+                            {p}
+                          </p>
+                        ))}
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-1">
+                        {q.tone && (
+                          <span
+                            className={cx(
+                              "mr-auto rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1",
+                              toneStyle(q.tone),
+                            )}
+                          >
+                            {q.tone}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => copyValue(q.content, `q-${q.id}`)}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+                        >
+                          {copied === `q-${q.id}` ? (
+                            <>
+                              <IconCheck size={13} /> Copied
+                            </>
+                          ) : (
+                            <>
+                              <IconCopy size={13} /> Copy
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => onDeleteQueued(q.id)}
+                          className="rounded-md px-2 py-1 text-xs text-zinc-500 transition hover:text-red-400"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => onSendQueued(q)}
+                          className="inline-flex items-center gap-1 rounded-md bg-accent/90 px-2.5 py-1 text-xs font-medium text-zinc-950 transition hover:bg-accent"
+                        >
+                          <IconSend size={13} /> Mark sent
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Targeting bar */}
+        {targets.length > 0 && (
+          <div className="mx-auto mb-2 flex max-w-2xl items-start gap-2 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2">
+            <IconReply size={14} className="mt-0.5 shrink-0 text-accent" />
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-accent">
+                Replying to {targets.length} message{targets.length > 1 ? "s" : ""}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {targets.map((tid) => {
+                  const tm = messageById.get(tid);
+                  if (!tm) return null;
+                  return (
+                    <span
+                      key={tid}
+                      className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[11px] text-zinc-300"
+                    >
+                      <span className="truncate">{tm.content}</span>
+                      <button
+                        onClick={() => toggleTarget(tid)}
+                        aria-label="Remove target"
+                        className="shrink-0 text-zinc-500 transition hover:text-zinc-200"
+                      >
+                        <IconClose size={11} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+            <button
+              onClick={() => setTargets([])}
+              className="shrink-0 text-xs text-zinc-400 transition hover:text-zinc-200"
+            >
+              clear
+            </button>
+          </div>
+        )}
+
+        {/* Composer */}
         <div className="mx-auto max-w-2xl">
           <div className="rounded-2xl border border-white/10 bg-black/30 p-2 transition focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/15">
             <div className="flex items-center gap-1.5 px-1 pb-1.5">
@@ -380,7 +560,11 @@ export function ConversationView({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-zinc-950 transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {suggesting ? <Spinner size={14} /> : <IconSparkles size={15} />}
-                {text.trim() || !canRegenerate ? "Generate replies" : "Regenerate"}
+                {targets.length > 0
+                  ? `Reply to ${targets.length}`
+                  : text.trim() || !canRegenerate
+                    ? "Generate replies"
+                    : "Regenerate"}
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import type {
   ConversationListItem,
   Fact,
   Message,
+  QueuedReply,
   ReplyOption,
   Role,
 } from "./types";
@@ -83,15 +84,30 @@ export const api = {
       { method: "POST", body: JSON.stringify({ raw }) },
     ),
 
+  addQueuedReply: (
+    id: number,
+    data: { content: string; tone?: string | null; targetMessageId?: number | null },
+  ) =>
+    req<QueuedReply>(`/api/conversations/${id}/queue`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  deleteQueuedReply: (id: number, queueId: number) =>
+    req<{ ok: boolean }>(`/api/conversations/${id}/queue/${queueId}`, { method: "DELETE" }),
+
   deleteMessage: (id: number, messageId: number) =>
     req<{ ok: boolean }>(`/api/conversations/${id}/messages/${messageId}`, {
       method: "DELETE",
     }),
 
-  suggest: (id: number, incoming?: string, count?: number, steer?: string) =>
+  suggest: (
+    id: number,
+    opts: { incoming?: string; count?: number; steer?: string; targetMessageIds?: number[] } = {},
+  ) =>
     req<SuggestResponse>(`/api/conversations/${id}/suggest`, {
       method: "POST",
-      body: JSON.stringify({ incoming, count, steer }),
+      body: JSON.stringify(opts),
     }),
 
   addFact: (id: number, content: string) =>

@@ -1,9 +1,13 @@
 import { z } from "zod";
 
 export const replyOptionSchema = z.object({
-  text: z
-    .string()
-    .describe("the reply itself, written in my first-person voice, ready to copy and send"),
+  texts: z
+    .array(z.string())
+    .min(1)
+    .max(3)
+    .describe(
+      "the reply as 1-3 short back-to-back texts in my first-person voice, ready to send; usually just one",
+    ),
   tone: z
     .string()
     .describe("one tone label from exactly this set: dry, playful, curious, flirty, sincere, bold"),
@@ -25,7 +29,7 @@ export type Suggestion = z.infer<typeof suggestionSchema>;
 
 /** A compact example of the expected JSON, used in the text-mode fallback. */
 export const SUGGESTION_JSON_EXAMPLE =
-  '{"options":[{"text":"...","tone":"dry"},{"text":"...","tone":"curious"}],"extractedFacts":["..."]}';
+  '{"options":[{"texts":["..."],"tone":"dry"},{"texts":["wait","actually no"],"tone":"playful"}],"extractedFacts":["..."]}';
 
 /** Shape returned when the LLM parses a raw pasted thread into messages. */
 export const importedThreadSchema = z.object({

@@ -13,7 +13,7 @@ Lead with restraint. It should never look like the user is trying hard. Confiden
 Dry, deadpan, understated, but warm underneath. Sounds like an actual person texting on a phone, not a brand, a wingman, or an AI. Humor comes from brevity, restraint, and subverted expectations, never from "jokes." Tease the situation or a harmless preference, never the person (their looks, intelligence, background, or insecurities). A tease should feel like flirting, never a put-down.
 
 # Hard rules
-- SHORT. Match the other person's length and energy. One line in, one line out. Never out-text them.
+- SHORT. Match the other person's length and energy. Usually one text; you may split a reply into 2-3 short back-to-back texts when that's genuinely how someone texts (a quick aside, a follow-up), never to pad. Don't out-text them.
 - One idea per reply. Don't stack a joke, a question, and a comment into one message.
 - No pickup-artist energy: no negging, no "challenges," no over-complimenting, no performative confidence, no manufactured intrigue, no pet names (babe, gorgeous).
 - No cheese, no corny openers, no rehearsed banter.
@@ -68,7 +68,7 @@ Good set (four different moves, not all dead-ends):
 You receive the recent conversation, the specific incoming message to reply to, and optional remembered facts. Read their tone and length, then write replies that fit that exact moment.
 
 # Output
-Return the structured object only: options (each { text, tone }) plus extractedFacts (an array of short strings). No prose outside the structured fields.`;
+Return the structured object only: options (each { texts, tone } where texts is an array of 1-3 short messages) plus extractedFacts (an array of short strings). No prose outside the structured fields.`;
 
 const MAX_MESSAGES = 24;
 const MAX_FACTS = 40;
@@ -77,6 +77,7 @@ export function assemblePrompt(
   detail: ConversationDetail,
   optionCount: number,
   steer?: string,
+  targetIds?: number[],
 ): string {
   const { conversation, messages, facts } = detail;
   const lines: string[] = [];
@@ -107,10 +108,22 @@ export function assemblePrompt(
     for (const m of recent) {
       lines.push(`${m.role === "them" ? "Them" : "Me"}: ${m.content}`);
     }
-    const lastThem = [...recent].reverse().find((m) => m.role === "them");
-    if (lastThem) {
+
+    const targets =
+      targetIds && targetIds.length > 0
+        ? messages.filter((m) => targetIds.includes(m.id))
+        : (() => {
+            const lt = [...recent].reverse().find((m) => m.role === "them");
+            return lt ? [lt] : [];
+          })();
+
+    if (targets.length === 1) {
       lines.push("");
-      lines.push(`REPLY TO THIS MESSAGE: "${lastThem.content}"`);
+      lines.push(`REPLY TO THIS MESSAGE: "${targets[0].content}"`);
+    } else if (targets.length > 1) {
+      lines.push("");
+      lines.push("REPLY TO THESE MESSAGES FROM THEM, addressing all of them together:");
+      for (const t of targets) lines.push(`- "${t.content}"`);
     }
   }
 
@@ -124,7 +137,7 @@ export function assemblePrompt(
 
   lines.push("");
   lines.push(
-    `Write exactly ${optionCount} reply options i could send next, each a genuinely different move, each with a one-word tone label. Then list any new durable facts worth remembering about them.`,
+    `Write exactly ${optionCount} reply options i could send next, each a genuinely different move with a one-word tone label. Each option is 1-3 short texts (usually 1; use 2-3 only when a real back-to-back burst fits). Then list any new durable facts worth remembering about them.`,
   );
 
   return lines.join("\n");

@@ -13,6 +13,7 @@ import type { ParsedMessage } from "@/lib/parseThread";
 import type {
   ConversationDetail,
   ConversationListItem,
+  QueuedReply,
   ReplyOption,
   Role,
 } from "@/lib/types";
@@ -148,14 +149,18 @@ export default function Home() {
     }
   }
 
-  async function handleSuggest(incoming: string, steer: string) {
+  async function handleSuggest(incoming: string, steer: string, targetIds: number[]) {
     if (selectedId === null) return;
     const id = selectedId;
     setSuggesting(true);
     setSuggestError(null);
     setSuggestions(null);
     try {
-      const res = await api.suggest(id, incoming || undefined, undefined, steer || undefined);
+      const res = await api.suggest(id, {
+        incoming: incoming || undefined,
+        steer: steer || undefined,
+        targetMessageIds: targetIds.length ? targetIds : undefined,
+      });
       setSuggestions(res.options);
       await loadDetail(id, { silent: true });
       await refreshList();
@@ -208,16 +213,68 @@ export default function Home() {
     }
   }
 
-  async function handleUseOption(text: string) {
+  async function handleUseOption(texts: string[]) {
     if (selectedId === null) return;
     const id = selectedId;
     try {
-      await api.addMessage(id, "me", text);
+      await api.addMessagesBulk(
+        id,
+        texts.map((t) => ({ role: "me" as Role, content: t })),
+      );
       setSuggestions(null);
       setSuggestError(null);
       await loadDetail(id, { silent: true });
       await refreshList();
-      showToast("Copied & logged as sent");
+      showToast(texts.length > 1 ? `Sent ${texts.length} messages` : "Sent & logged");
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
+  async function handleQueue(texts: string[], tone: string, targetId: number | null) {
+    if (selectedId === null) return;
+    const id = selectedId;
+    try {
+      await api.addQueuedReply(id, {
+        content: texts.join("\n"),
+        tone,
+        targetMessageId: targetId,
+      });
+      await loadDetail(id, { silent: true });
+      showToast("Queued");
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
+  async function handleDeleteQueued(queueId: number) {
+    if (selectedId === null) return;
+    const id = selectedId;
+    try {
+      await api.deleteQueuedReply(id, queueId);
+      await loadDetail(id, { silent: true });
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
+  async function handleSendQueued(q: QueuedReply) {
+    if (selectedId === null) return;
+    const id = selectedId;
+    const texts = q.content
+      .split("\n")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (texts.length === 0) return;
+    try {
+      await api.addMessagesBulk(
+        id,
+        texts.map((t) => ({ role: "me" as Role, content: t })),
+      );
+      await api.deleteQueuedReply(id, q.id);
+      await loadDetail(id, { silent: true });
+      await refreshList();
+      showToast(texts.length > 1 ? `Sent ${texts.length} messages` : "Sent & logged");
     } catch (e) {
       handleError(e);
     }
@@ -327,12 +384,15 @@ export default function Home() {
                 onSuggest={handleSuggest}
                 onAddMessage={handleAddMessage}
                 onUseOption={handleUseOption}
+                onQueueOption={handleQueue}
                 onDismissSuggestions={() => {
                   setSuggestions(null);
                   setSuggestError(null);
                 }}
                 onDeleteMessage={handleDeleteMessage}
                 onDeleteConversation={handleDeleteConversation}
+                onDeleteQueued={handleDeleteQueued}
+                onSendQueued={handleSendQueued}
                 onOpenImport={() => setImportOpen(true)}
                 onOpenFacts={() => setFactsOpen(true)}
               />

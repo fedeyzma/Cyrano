@@ -7,6 +7,7 @@ import type {
   Fact,
   FactSource,
   Message,
+  QueuedReply,
   Role,
 } from "./types";
 
@@ -48,8 +49,20 @@ const SCHEMA = `
     FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS queued_replies (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id   INTEGER NOT NULL,
+    target_message_id INTEGER,
+    content           TEXT    NOT NULL,
+    tone              TEXT,
+    created_at        INTEGER NOT NULL,
+    FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE,
+    FOREIGN KEY (target_message_id) REFERENCES messages (id) ON DELETE SET NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages (conversation_id);
   CREATE INDEX IF NOT EXISTS idx_facts_conv ON facts (conversation_id);
+  CREATE INDEX IF NOT EXISTS idx_queued_conv ON queued_replies (conversation_id);
 `;
 
 function createDb(): DatabaseSync {
@@ -243,5 +256,43 @@ export function deleteFact(conversationId: number, factId: number): boolean {
   const res = getDb()
     .prepare(`DELETE FROM facts WHERE id = ? AND conversation_id = ?`)
     .run(factId, conversationId);
+  return res.changes > 0;
+}
+
+/* ----------------------------- queued replies ------------------------------ */
+
+export function getQueuedReplies(conversationId: number): QueuedReply[] {
+  return getDb()
+    .prepare(`SELECT * FROM queued_replies WHERE conversation_id = ? ORDER BY id ASC`)
+    .all(conversationId) as unknown as QueuedReply[];
+}
+
+export function addQueuedReply(
+  conversationId: number,
+  input: { content: string; tone?: string | null; targetMessageId?: number | null },
+): QueuedReply {
+  const ts = now();
+  const res = getDb()
+    .prepare(
+      `INSERT INTO queued_replies (conversation_id, target_message_id, content, tone, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(
+      conversationId,
+      input.targetMessageId ?? null,
+      input.content.trim(),
+      input.tone?.trim() || null,
+      ts,
+    );
+  touchConversation(conversationId, ts);
+  return getDb()
+    .prepare(`SELECT * FROM queued_replies WHERE id = ?`)
+    .get(Number(res.lastInsertRowid)) as unknown as QueuedReply;
+}
+
+export function deleteQueuedReply(conversationId: number, queueId: number): boolean {
+  const res = getDb()
+    .prepare(`DELETE FROM queued_replies WHERE id = ? AND conversation_id = ?`)
+    .run(queueId, conversationId);
   return res.changes > 0;
 }

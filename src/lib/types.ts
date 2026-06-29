@@ -38,11 +38,22 @@ export interface ConversationDetail {
   conversation: Conversation;
   messages: Message[];
   facts: Fact[];
+  queued: QueuedReply[];
 }
 
 export interface ReplyOption {
-  text: string;
+  /** 1-3 short texts to send back-to-back (usually just one). */
+  texts: string[];
   tone: string;
+}
+
+export interface QueuedReply {
+  id: number;
+  conversation_id: number;
+  target_message_id: number | null;
+  content: string;
+  tone: string | null;
+  created_at: number;
 }
 
 export interface SuggestResult {
