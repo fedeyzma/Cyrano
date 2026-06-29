@@ -380,7 +380,7 @@ export default function Home() {
   return (
     <div className="app-backdrop flex h-dvh overflow-hidden text-zinc-100">
       {/* Inline sidebar (md+) */}
-      <aside className="hidden w-72 shrink-0 border-r border-white/5 md:flex">
+      <aside className="hidden w-72 shrink-0 overflow-hidden border-r border-white/5 md:flex">
         <Sidebar
           conversations={conversations}
           selectedId={selectedId}

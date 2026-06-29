@@ -19,7 +19,7 @@ export function Sidebar({
   onNew: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full w-full min-w-0 flex-col">
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-4">
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent">
@@ -71,13 +71,13 @@ export function Sidebar({
                         : "hover:bg-white/[0.04]",
                     )}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
                       <span className="truncate font-medium text-zinc-100">{c.name}</span>
                       <span className="shrink-0 text-[10px] text-zinc-500">
                         {relativeTime(c.last_message_at ?? c.updated_at)}
                       </span>
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2">
+                    <div className="mt-0.5 flex min-w-0 items-center gap-2">
                       {c.platform && (
                         <span className="shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-400">
                           {c.platform}
