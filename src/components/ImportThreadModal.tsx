@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { cx } from "@/lib/cx";
 import { parseThread, type ParsedMessage } from "@/lib/parseThread";
-import { IconClose } from "./icons";
+import { IconClose, IconSparkles } from "./icons";
 import { Spinner } from "./ui";
 
 export function ImportThreadModal({
@@ -13,6 +13,7 @@ export function ImportThreadModal({
   conversationName,
   onClose,
   onImport,
+  onAiParse,
 }: {
   open: boolean;
   importing: boolean;
@@ -20,14 +21,19 @@ export function ImportThreadModal({
   conversationName: string;
   onClose: () => void;
   onImport: (messages: ParsedMessage[]) => void;
+  onAiParse: (raw: string) => Promise<ParsedMessage[]>;
 }) {
   const [raw, setRaw] = useState("");
   const [parsed, setParsed] = useState<ParsedMessage[] | null>(null);
+  const [aiParsing, setAiParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setRaw("");
       setParsed(null);
+      setParseError(null);
+      setAiParsing(false);
     }
   }, [open]);
 
@@ -58,6 +64,18 @@ export function ImportThreadModal({
     setParsed((prev) =>
       prev ? prev.map((m) => ({ ...m, role: m.role === "me" ? "them" : "me" })) : prev,
     );
+  }
+
+  async function runAiParse() {
+    setAiParsing(true);
+    setParseError(null);
+    try {
+      setParsed(await onAiParse(raw));
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : "Could not auto-detect the messages.");
+    } finally {
+      setAiParsing(false);
+    }
   }
 
   void setRole; // (kept for clarity; toggleRole is used in the UI)
@@ -93,24 +111,43 @@ export function ImportThreadModal({
               value={raw}
               onChange={(e) => setRaw(e.target.value)}
               placeholder={
-                "Paste the whole conversation here, one message per line.\n\nTip: prefix lines with Me: / Them: (or their name) for the best guess. Otherwise it alternates speakers and you can fix any line on the next step."
+                "Paste the whole conversation here — names, timestamps, whatever junk. Auto-detect figures out who said what; you can fix any line (or flip both sides) on the next step."
               }
               className="h-56 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-3 text-sm leading-relaxed outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
             />
-            <div className="mt-4 flex justify-end gap-2">
+            {parseError && (
+              <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                {parseError}
+              </div>
+            )}
+            <div className="mt-4 flex items-center justify-between gap-2">
               <button
                 onClick={onClose}
                 className="rounded-lg px-3 py-2 text-sm text-zinc-400 transition hover:text-zinc-200"
               >
                 Cancel
               </button>
-              <button
-                onClick={() => setParsed(parseThread(raw, conversationName))}
-                disabled={!raw.trim()}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Preview
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setParseError(null);
+                    setParsed(parseThread(raw, conversationName));
+                  }}
+                  disabled={!raw.trim() || aiParsing}
+                  title="No AI — split by lines and Me:/Them: labels"
+                  className="rounded-lg border border-white/10 px-3 py-2 text-sm text-zinc-300 transition hover:border-white/25 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Quick parse
+                </button>
+                <button
+                  onClick={runAiParse}
+                  disabled={!raw.trim() || aiParsing}
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {aiParsing ? <Spinner size={14} /> : <IconSparkles size={15} />}
+                  {aiParsing ? "Reading…" : "Auto-detect with AI"}
+                </button>
+              </div>
             </div>
           </div>
         ) : (

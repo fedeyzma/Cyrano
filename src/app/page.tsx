@@ -405,6 +405,11 @@ export default function Home() {
         conversationName={detail?.conversation.name ?? "them"}
         onClose={() => setImportOpen(false)}
         onImport={handleImport}
+        onAiParse={async (raw) => {
+          if (selectedId === null) return [];
+          const res = await api.parseThread(selectedId, raw);
+          return res.messages;
+        }}
       />
 
       {toast && (

@@ -77,6 +77,12 @@ export const api = {
       body: JSON.stringify({ messages }),
     }),
 
+  parseThread: (id: number, raw: string) =>
+    req<{ messages: Array<{ role: Role; content: string }> }>(
+      `/api/conversations/${id}/parse-thread`,
+      { method: "POST", body: JSON.stringify({ raw }) },
+    ),
+
   deleteMessage: (id: number, messageId: number) =>
     req<{ ok: boolean }>(`/api/conversations/${id}/messages/${messageId}`, {
       method: "DELETE",

@@ -1,4 +1,11 @@
-import { SUGGESTION_JSON_EXAMPLE, suggestionSchema, type Suggestion } from "./schema";
+import {
+  IMPORTED_THREAD_JSON_EXAMPLE,
+  importedThreadSchema,
+  SUGGESTION_JSON_EXAMPLE,
+  suggestionSchema,
+  type Suggestion,
+} from "./schema";
+import type { Role } from "./types";
 
 const BASE_URL = (process.env.CAMI_API_URL ?? "http://192.168.69.244:8642").replace(/\/+$/, "");
 const API_KEY = process.env.CAMI_API_KEY ?? "";
@@ -99,4 +106,50 @@ function extractJson(text: string): unknown {
     throw new Error("No JSON object found in model output");
   }
   return JSON.parse(cleaned.slice(start, end + 1));
+}
+
+function normalizeRole(raw: string): Role {
+  const r = raw.trim().toLowerCase();
+  if (r === "me" || r === "you" || r === "i" || r === "self" || r === "sent") return "me";
+  return "them";
+}
+
+/**
+ * Use Cami to split a raw, unlabeled chat paste into ordered messages with a
+ * best-guess speaker for each. The caller previews and can correct the result
+ * (including a one-click "flip all" if the two sides came out swapped).
+ */
+export async function parseThreadWithAI(
+  raw: string,
+  theirName: string,
+): Promise<Array<{ role: Role; content: string }>> {
+  const them = theirName.trim() || "the other person";
+  const system = `You convert a raw, pasted chat log into structured messages. The log is a conversation between the user ("me") and ${them} ("them").
+
+Split the log into individual messages in the order they appear, and label each sender "me" (the user) or "them" (${them}). Use names, timestamps, alignment, or context to decide — any line from ${them} (or a name that clearly isn't the user) is "them".
+
+Clean each message: strip timestamps, sender names/initials, date separators, and system/receipt lines ("Delivered", "Read", "You matched", reactions like "Liked"). Keep only the actual message text. Join a single message that wraps across multiple lines into one. Drop empty/system-only lines.
+
+If you genuinely can't tell who sent a line, make your best guess — the user can fix it afterward. Use exactly "me" or "them" for the role.
+
+This is a pure text task. Do NOT use tools, do NOT notify anyone, do NOT ask questions. Return ONLY a single JSON object — no markdown, no commentary — in exactly this shape:\n${IMPORTED_THREAD_JSON_EXAMPLE}`;
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const content = await chat(system, raw);
+    try {
+      const parsed = importedThreadSchema.parse(extractJson(content));
+      const messages = parsed.messages
+        .map((m) => ({ role: normalizeRole(m.role), content: m.content.trim() }))
+        .filter((m) => m.content.length > 0);
+      if (messages.length === 0) throw new Error("no messages parsed");
+      return messages;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw new LlmError(
+    "Cami couldn't parse that into messages. Try the quick parse instead.",
+    lastError,
+  );
 }
