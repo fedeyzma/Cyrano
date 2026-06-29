@@ -24,6 +24,7 @@ function angleStyle(a: string): string {
 }
 
 const PLATFORMS = ["Hinge", "Tinder", "Bumble"];
+const LANGUAGES = ["Français", "English", "Español", "Italiano"];
 const MOODS = ["funny", "flirty", "dry", "sincere", "adventurous", "chill", "bold"];
 const CUSTOM = "Custom prompt…";
 
@@ -34,6 +35,7 @@ export function PromptsLab({
     prompt: string;
     mood: string;
     platform: string;
+    language: string;
     count?: number;
     avoid?: string[];
   }) => Promise<Answer[]>;
@@ -41,6 +43,7 @@ export function PromptsLab({
   const [selected, setSelected] = useState(PROFILE_PROMPTS[0]);
   const [custom, setCustom] = useState("");
   const [platform, setPlatform] = useState("Hinge");
+  const [language, setLanguage] = useState("Français");
   const [mood, setMood] = useState("");
   const [options, setOptions] = useState<Answer[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,7 +61,7 @@ export function PromptsLab({
     setError(null);
     setOptions(null);
     try {
-      setOptions(await onGenerate({ prompt, mood, platform }));
+      setOptions(await onGenerate({ prompt, mood, platform, language }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not generate answers.");
     } finally {
@@ -74,6 +77,7 @@ export function PromptsLab({
         prompt,
         mood,
         platform,
+        language,
         count: 1,
         avoid: options.map((o) => o.text),
       });
@@ -156,6 +160,26 @@ export function PromptsLab({
                     )}
                   >
                     {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className={labelCls}>Language</label>
+              <div className="flex flex-wrap gap-1.5">
+                {LANGUAGES.map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => setLanguage(l)}
+                    className={cx(
+                      "rounded-full px-3 py-1 text-xs transition",
+                      language === l
+                        ? "bg-accent font-medium text-zinc-950"
+                        : "border border-white/10 text-zinc-300 hover:border-white/25",
+                    )}
+                  >
+                    {l}
                   </button>
                 ))}
               </div>

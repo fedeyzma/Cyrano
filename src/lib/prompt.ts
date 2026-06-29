@@ -58,11 +58,36 @@ Alongside the replies, return extractedFacts: durable facts about HER only (neve
 # Output
 Return the structured object only: options (each { texts, tone } where texts is an array of 1-3 short messages) plus extractedFacts (an array of short strings). No prose outside the structured fields.`;
 
+/**
+ * Anti-AI humanization rules, appended to every system prompt. The model behind
+ * Cami (GPT-5.5 class) writes very polished by default, so we strip the tells.
+ */
+export const HUMANIZE_RULES = `# Sound human, not AI (critical)
+The model powering this writes very polished by default. Strip every AI tell so this reads like a real person actually typed it:
+- No em dashes (—) and no semicolons. Use a comma, a period, or just a new sentence.
+- Kill the "rule of three" — don't fall into the "x, y, and z" list rhythm. One or two things is more human.
+- No negative parallelism: never "it's not just x, it's y", "not only... but also", "not because... but because".
+- Banned AI/essay words: delve, tapestry, testament, realm, landscape, navigate, embark, foster, leverage, robust, seamless, curated, elevate, underscore, showcase, vibrant, whimsical, journey, "the kind of ___ that ___", "there's just something about".
+- No tidy wrap-up, moral, or summary at the end. Drop "honestly", "at the end of the day", "truly", "ultimately".
+- No symmetrical, perfectly balanced sentences. Let rhythm and length be uneven.
+- No marketing enthusiasm (amazing, incredible, next-level, game-changer).
+- Use contractions and real casual phrasing. A small imperfection, a fragment, or lowercase is good, not a mistake.
+- Concrete and specific beats clever and abstract. If a line sounds composed, like a caption or a brand voice, rewrite it shorter and plainer.`;
+
+function compose(base: string, userContext?: string): string {
+  const parts = [base, HUMANIZE_RULES];
+  const ctx = userContext?.trim();
+  if (ctx) {
+    parts.push(
+      `# WHO I AM (you are writing as me — grounding only, never quote or list this)\n${ctx}`,
+    );
+  }
+  return parts.join("\n\n");
+}
+
 /** Compose the full system prompt, grounding it with the user-context file. */
 export function buildSystemPrompt(userContext?: string): string {
-  const ctx = userContext?.trim();
-  if (!ctx) return SYSTEM_PROMPT;
-  return `${SYSTEM_PROMPT}\n\n# WHO I AM (you are writing as me — grounding only, never quote or list this)\n${ctx}`;
+  return compose(SYSTEM_PROMPT, userContext);
 }
 
 /** Persona for writing dating-app PROFILE PROMPT answers (a separate module). */
@@ -85,9 +110,7 @@ Each option is a genuinely different angle and feel, not rewordings of one idea.
 For each option return: text (the answer, ready to paste) and angle (a one-word label: funny, flirty, sincere, dry, bold, curious, etc.). Return the structured object only, no prose outside it.`;
 
 export function buildPromptSystem(userContext?: string): string {
-  const ctx = userContext?.trim();
-  if (!ctx) return PROMPT_SYSTEM;
-  return `${PROMPT_SYSTEM}\n\n# WHO I AM (you are writing as me — grounding only, never quote or list this)\n${ctx}`;
+  return compose(PROMPT_SYSTEM, userContext);
 }
 
 export function assemblePromptRequest(
@@ -95,12 +118,18 @@ export function assemblePromptRequest(
   mood: string,
   count: number,
   platform?: string,
+  language?: string,
   avoid?: string[],
 ): string {
   const lines: string[] = [];
   lines.push(`PROFILE PROMPT: "${prompt}"`);
   if (platform) lines.push(`PLATFORM: ${platform}`);
   lines.push(`MOOD / VIBE: ${mood.trim() || "your call — natural, engaging, a bit of my energy"}`);
+  if (language && language.trim()) {
+    lines.push(
+      `WRITE THE ANSWERS IN: ${language.trim()} — natural and native-sounding in that language, not translated-sounding. Keep the human, casual tone in that language too.`,
+    );
+  }
 
   if (avoid && avoid.length > 0) {
     lines.push("");

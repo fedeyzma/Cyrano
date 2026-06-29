@@ -145,6 +145,7 @@ export const api = {
     mood?: string;
     count?: number;
     platform?: string;
+    language?: string;
     avoid?: string[];
   }) =>
     req<{ options: Array<{ text: string; angle: string }> }>("/api/prompts/suggest", {

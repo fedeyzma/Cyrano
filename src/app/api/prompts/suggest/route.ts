@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     mood?: string;
     count?: number;
     platform?: string;
+    language?: string;
     avoid?: string[];
   }>(req);
 
@@ -23,13 +24,14 @@ export async function POST(req: Request) {
 
   const mood = typeof body?.mood === "string" ? body.mood.trim() : "";
   const platform = typeof body?.platform === "string" ? body.platform.trim() : "";
+  const language = typeof body?.language === "string" ? body.language.trim() : "";
   const count = clamp(Math.round(Number(body?.count ?? 4)) || 4, 1, 6);
   const avoid = Array.isArray(body?.avoid)
     ? body.avoid.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
     : [];
 
   const system = buildPromptSystem(getUserContext());
-  const userMsg = assemblePromptRequest(prompt, mood, count, platform, avoid);
+  const userMsg = assemblePromptRequest(prompt, mood, count, platform, language, avoid);
 
   try {
     const res = await generatePromptAnswers(system, userMsg);
