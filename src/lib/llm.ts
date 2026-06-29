@@ -28,7 +28,11 @@ interface ChatResponse {
 }
 
 /** One round-trip to Cami's OpenAI-compatible chat endpoint. */
-async function chat(system: string, user: string): Promise<string> {
+async function chat(
+  system: string,
+  user: string,
+  opts: { maxTokens?: number; temperature?: number; timeoutMs?: number } = {},
+): Promise<string> {
   if (!API_KEY) {
     throw new LlmError("CAMI_API_KEY is not set — add it to your .env file.");
   }
@@ -43,14 +47,14 @@ async function chat(system: string, user: string): Promise<string> {
       },
       body: JSON.stringify({
         model: MODEL,
-        temperature: TEMPERATURE,
-        max_tokens: 900,
+        temperature: opts.temperature ?? TEMPERATURE,
+        max_tokens: opts.maxTokens ?? 900,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
         ],
       }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS),
     });
   } catch (err) {
     throw new LlmError(
@@ -136,7 +140,13 @@ This is a pure text task. Do NOT use tools, do NOT notify anyone, do NOT ask que
 
   let lastError: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const content = await chat(system, raw);
+    // Parsing re-emits the whole thread as JSON, so it needs a big output
+    // budget; keep it near-deterministic and allow extra time for long pastes.
+    const content = await chat(system, raw, {
+      maxTokens: 8000,
+      temperature: 0.2,
+      timeoutMs: 90000,
+    });
     try {
       const parsed = importedThreadSchema.parse(extractJson(content));
       const messages = parsed.messages

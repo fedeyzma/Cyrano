@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cx } from "@/lib/cx";
-import { parseThread, type ParsedMessage } from "@/lib/parseThread";
+import { MAX_IMPORT_CHARS, parseThread, type ParsedMessage } from "@/lib/parseThread";
 import { IconClose, IconSparkles } from "./icons";
 import { Spinner } from "./ui";
 
@@ -113,8 +113,20 @@ export function ImportThreadModal({
               placeholder={
                 "Paste the whole conversation here — names, timestamps, whatever junk. Auto-detect figures out who said what; you can fix any line (or flip both sides) on the next step."
               }
-              className="h-56 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-3 text-sm leading-relaxed outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+              className="h-64 max-h-[45vh] min-h-[10rem] w-full resize-y rounded-lg border border-white/10 bg-black/30 p-3 text-sm leading-relaxed outline-none transition focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
             />
+            <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-zinc-600">
+              <span>
+                {raw.length.toLocaleString()} characters ·{" "}
+                {raw.split(/\r?\n/).filter((l) => l.trim()).length} lines
+              </span>
+              {raw.length > MAX_IMPORT_CHARS && (
+                <span className="text-amber-400/80">
+                  only the first {MAX_IMPORT_CHARS.toLocaleString()} characters will be read —
+                  split very long threads
+                </span>
+              )}
+            </div>
             {parseError && (
               <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
                 {parseError}

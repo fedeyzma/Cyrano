@@ -1,5 +1,8 @@
 import type { Role } from "./types";
 
+/** Max characters sent to the AI thread parser (keeps its JSON response within token limits). */
+export const MAX_IMPORT_CHARS = 16000;
+
 export interface ParsedMessage {
   role: Role;
   content: string;

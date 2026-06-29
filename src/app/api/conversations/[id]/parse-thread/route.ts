@@ -1,14 +1,13 @@
 import { getConversation } from "@/lib/db";
 import { json, parseId, readJson } from "@/lib/http";
 import { LlmError, parseThreadWithAI } from "@/lib/llm";
+import { MAX_IMPORT_CHARS } from "@/lib/parseThread";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 type Ctx = { params: Promise<{ id: string }> };
-
-const MAX_CHARS = 20000;
 
 export async function POST(req: Request, { params }: Ctx) {
   const id = parseId((await params).id);
@@ -17,7 +16,7 @@ export async function POST(req: Request, { params }: Ctx) {
   if (!conversation) return json({ error: "Not found" }, 404);
 
   const body = await readJson<{ raw?: string }>(req);
-  const raw = typeof body?.raw === "string" ? body.raw.trim().slice(0, MAX_CHARS) : "";
+  const raw = typeof body?.raw === "string" ? body.raw.trim().slice(0, MAX_IMPORT_CHARS) : "";
   if (!raw) return json({ error: "Paste a conversation first" }, 400);
 
   try {
