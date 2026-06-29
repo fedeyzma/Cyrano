@@ -7,6 +7,8 @@ import type { ConversationDetail, ReplyOption, Role } from "@/lib/types";
 import {
   IconBrain,
   IconCheck,
+  IconClose,
+  IconCompass,
   IconCopy,
   IconImport,
   IconRefresh,
@@ -39,7 +41,6 @@ export function ConversationView({
   onSuggest,
   onAddMessage,
   onUseOption,
-  onRegenerate,
   onDismissSuggestions,
   onDeleteMessage,
   onDeleteConversation,
@@ -51,10 +52,9 @@ export function ConversationView({
   suggesting: boolean;
   suggestError: string | null;
   factsCount: number;
-  onSuggest: (incoming: string) => void;
+  onSuggest: (incoming: string, steer: string) => void;
   onAddMessage: (role: Role, content: string) => void;
   onUseOption: (text: string) => void;
-  onRegenerate: () => void;
   onDismissSuggestions: () => void;
   onDeleteMessage: (messageId: number) => void;
   onDeleteConversation: () => void;
@@ -63,6 +63,7 @@ export function ConversationView({
 }) {
   const { conversation, messages } = detail;
   const [text, setText] = useState("");
+  const [steer, setSteer] = useState("");
   const [copied, setCopied] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -77,11 +78,15 @@ export function ConversationView({
   function handleGenerate() {
     const t = text.trim();
     if (t) {
-      onSuggest(t);
+      onSuggest(t, steer);
       setText("");
     } else if (canRegenerate) {
-      onSuggest("");
+      onSuggest("", steer);
     }
+  }
+
+  function regenerate() {
+    onSuggest("", steer);
   }
 
   function addAs(role: Role) {
@@ -219,7 +224,7 @@ export function ConversationView({
                 {!suggesting && (suggestions || suggestError) && (
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={onRegenerate}
+                      onClick={regenerate}
                       className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
                     >
                       <IconRefresh size={13} /> Regenerate
@@ -253,7 +258,7 @@ export function ConversationView({
                 <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
                   {suggestError}
                   <button
-                    onClick={onRegenerate}
+                    onClick={regenerate}
                     className="mt-2 block text-xs text-red-200 underline underline-offset-2 hover:text-white"
                   >
                     Try again
@@ -320,6 +325,25 @@ export function ConversationView({
       <div className="shrink-0 border-t border-white/5 bg-zinc-950/60 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-2xl">
           <div className="rounded-2xl border border-white/10 bg-black/30 p-2 transition focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/15">
+            <div className="flex items-center gap-1.5 px-1 pb-1.5">
+              <IconCompass size={14} className="shrink-0 text-zinc-500" />
+              <input
+                value={steer}
+                onChange={(e) => setSteer(e.target.value)}
+                placeholder="optional: steer it — “be flirtier”, “ask her out”, “say something like…”"
+                className="min-w-0 flex-1 bg-transparent text-xs text-zinc-300 outline-none placeholder:text-zinc-600"
+              />
+              {steer && (
+                <button
+                  onClick={() => setSteer("")}
+                  aria-label="Clear steer"
+                  className="shrink-0 text-zinc-600 transition hover:text-zinc-300"
+                >
+                  <IconClose size={13} />
+                </button>
+              )}
+            </div>
+            <div className="mb-1 h-px bg-white/5" />
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}

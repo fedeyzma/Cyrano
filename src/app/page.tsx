@@ -148,14 +148,14 @@ export default function Home() {
     }
   }
 
-  async function handleSuggest(incoming: string) {
+  async function handleSuggest(incoming: string, steer: string) {
     if (selectedId === null) return;
     const id = selectedId;
     setSuggesting(true);
     setSuggestError(null);
     setSuggestions(null);
     try {
-      const res = await api.suggest(id, incoming || undefined);
+      const res = await api.suggest(id, incoming || undefined, undefined, steer || undefined);
       setSuggestions(res.options);
       await loadDetail(id, { silent: true });
       await refreshList();
@@ -318,6 +318,7 @@ export default function Home() {
           <main className="flex min-w-0 flex-1 flex-col">
             {detail ? (
               <ConversationView
+                key={detail.conversation.id}
                 detail={detail}
                 suggestions={suggestions}
                 suggesting={suggesting}
@@ -326,7 +327,6 @@ export default function Home() {
                 onSuggest={handleSuggest}
                 onAddMessage={handleAddMessage}
                 onUseOption={handleUseOption}
-                onRegenerate={() => handleSuggest("")}
                 onDismissSuggestions={() => {
                   setSuggestions(null);
                   setSuggestError(null);

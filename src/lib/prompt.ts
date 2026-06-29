@@ -73,7 +73,11 @@ Return the structured object only: options (each { text, tone }) plus extractedF
 const MAX_MESSAGES = 24;
 const MAX_FACTS = 40;
 
-export function assemblePrompt(detail: ConversationDetail, optionCount: number): string {
+export function assemblePrompt(
+  detail: ConversationDetail,
+  optionCount: number,
+  steer?: string,
+): string {
   const { conversation, messages, facts } = detail;
   const lines: string[] = [];
 
@@ -108,6 +112,14 @@ export function assemblePrompt(detail: ConversationDetail, optionCount: number):
       lines.push("");
       lines.push(`REPLY TO THIS MESSAGE: "${lastThem.content}"`);
     }
+  }
+
+  if (steer && steer.trim()) {
+    lines.push("");
+    lines.push(`DIRECTION FROM ME FOR THESE REPLIES: ${steer.trim()}`);
+    lines.push(
+      'Apply this direction to every option while keeping the voice and rules above. Treat a "say something like..." note as the gist to express in my voice, not text to copy word-for-word.',
+    );
   }
 
   lines.push("");

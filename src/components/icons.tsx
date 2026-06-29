@@ -105,6 +105,13 @@ export const IconUser = (p: IconProps) => (
   </Icon>
 );
 
+export const IconCompass = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m15.5 8.5-2.2 5.3-5.3 2.2 2.2-5.3 5.3-2.2Z" />
+  </Icon>
+);
+
 export const IconImport = (p: IconProps) => (
   <Icon {...p}>
     <path d="M12 3v12m0 0 4-4m-4 4-4-4" />

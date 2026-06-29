@@ -82,10 +82,10 @@ export const api = {
       method: "DELETE",
     }),
 
-  suggest: (id: number, incoming?: string, count?: number) =>
+  suggest: (id: number, incoming?: string, count?: number, steer?: string) =>
     req<SuggestResponse>(`/api/conversations/${id}/suggest`, {
       method: "POST",
-      body: JSON.stringify({ incoming, count }),
+      body: JSON.stringify({ incoming, count, steer }),
     }),
 
   addFact: (id: number, content: string) =>
