@@ -7,7 +7,7 @@ Named after Cyrano de Bergerac, who fed the perfect lines to woo on someone else
 - **Multiple options, one voice.** Every "generate" returns a few distinct replies — a deadpan one-liner, a light tease, a warm volley — each tagged with a tone, all short and ready to send.
 - **A real persona.** The system prompt (crafted via a multi-draft, judged design pass) aims for *natural, slightly funny, dry* — never cheesy, never pickup-artist, never AI-sounding.
 - **Memory per person.** It extracts durable facts (their job, hometown, a pet, a running joke) as you go, stores them locally, and uses them for callbacks later. You can pin, edit, or delete any of them.
-- **Your model, your data.** Talks to any OpenAI-compatible endpoint — point it at your Hermes agent. Everything is stored in a single local SQLite file.
+- **Your model, your data.** Replies come from **Cami**, Fred's self-hosted Hermes agent, over its OpenAI-compatible API. Everything is stored in a single local SQLite file. The API key stays server-side and is never committed.
 
 ---
 
@@ -15,13 +15,13 @@ Named after Cyrano de Bergerac, who fed the perfect lines to woo on someone else
 
 - **Next.js 16** (App Router) + **React 19** + **TypeScript**
 - **Tailwind CSS v4**
-- **Vercel AI SDK v7** with `@ai-sdk/openai-compatible`
-- **`node:sqlite`** (Node's built-in SQLite — zero native dependencies)
+- **`node:sqlite`** — Node's built-in SQLite (zero native dependencies)
+- A small **server-side `fetch`** client to Cami's `/v1/chat/completions` (strict-JSON prompt + Zod validation; no SDK)
 
 ## Requirements
 
 - **Node.js ≥ 22.5** (uses the built-in `node:sqlite`). Developed on Node 25.
-- An **OpenAI-compatible LLM endpoint** — your Hermes agent, or llama.cpp / vLLM / LM Studio / Ollama (`/v1`), etc.
+- Network access to the **Cami** endpoint (`http://192.168.69.244:8642`) and its API key.
 
 ---
 
@@ -32,7 +32,7 @@ Named after Cyrano de Bergerac, who fed the perfect lines to woo on someone else
 npm install
 
 # 2. configure
-cp .env.example .env        # then edit LLM_BASE_URL / LLM_MODEL / LLM_API_KEY
+cp .env.example .env        # then set CAMI_API_KEY (and tweak the rest if needed)
 
 # 3. run
 npm run dev                 # http://localhost:3000
@@ -40,38 +40,48 @@ npm run dev                 # http://localhost:3000
 
 ### Environment variables
 
-| Variable           | Default                       | Notes                                                        |
-| ------------------ | ----------------------------- | ----------------------------------------------------------- |
-| `LLM_BASE_URL`     | `http://localhost:1234/v1`    | Your OpenAI-compatible endpoint (include the `/v1`).         |
-| `LLM_API_KEY`      | `not-needed`                  | Required to be non-empty even if your server ignores it.    |
-| `LLM_MODEL`        | `hermes-4`                    | The model id your server exposes (e.g. `gpt-5.5`).          |
-| `DATABASE_PATH`    | `./data/cyrano.db`            | Where the SQLite file lives.                                 |
-| `SUGGESTION_COUNT` | `4`                           | Replies generated per request (2–5).                        |
-| `LLM_TEMPERATURE`  | `0.9`                         | Sampling temperature.                                       |
-| `LLM_TIMEOUT_MS`   | `60000`                       | Per-request timeout.                                        |
+| Variable                 | Default                        | Notes                                              |
+| ------------------------ | ------------------------------ | -------------------------------------------------- |
+| `CAMI_API_URL`           | `http://192.168.69.244:8642`   | Base URL (no `/v1`); the app appends the path.     |
+| `CAMI_API_KEY`           | *(required)*                   | Bearer token. Never commit it.                     |
+| `CAMI_API_MODEL`         | `cami`                         | Model id.                                          |
+| `CAMI_API_TIMEOUT_MS`    | `45000`                        | Per-request timeout.                               |
+| `SUGGESTION_COUNT`       | `4`                            | Replies generated per request (2–5).               |
+| `SUGGESTION_TEMPERATURE` | `0.8`                          | Sampling temperature.                              |
+| `DATABASE_PATH`          | `./data/cyrano.db`             | Where the SQLite file lives.                        |
 
-> The reply generator asks the model for **structured JSON**. If your endpoint
-> doesn't support JSON-schema / JSON mode, Cyrano automatically falls back to a
-> plain-text request and parses the JSON out of the response.
+> Cami is an *agent*, so the app asks for **strict JSON only** (no tools, no
+> notifications) and validates the result with Zod, retrying once if the first
+> response isn't parseable. The key is only ever used server-side.
 
 ---
 
 ## Docker (self-hosting)
 
 ```bash
-cp .env.example .env        # fill in your LLM_* values
+cp .env.example .env        # set CAMI_API_KEY
 docker compose up -d --build
 # → http://localhost:3000
 ```
 
 The SQLite database is persisted in the named volume `cyrano-data` (mounted at
-`/data` in the container), so your conversations and memory survive restarts and
-rebuilds.
+`/data`), so your conversations and memory survive restarts and rebuilds.
 
-**Reaching a model on the host machine:** inside the container `localhost` is the
-container itself. If your Hermes endpoint runs on the Docker host, set
-`LLM_BASE_URL` to `http://host.docker.internal:<port>/v1` (Docker Desktop) or to
-your host's LAN IP.
+**Networking:** Cami is on the LAN (`192.168.69.244:8642`), not on the Docker
+host, so the default bridge network can usually route to it directly — no
+`host.docker.internal` needed. Verify from inside the container:
+
+```bash
+docker exec -it cyrano node -e \
+  "fetch('http://192.168.69.244:8642/health').then(r=>r.text()).then(console.log).catch(console.error)"
+```
+
+When you change env values, **recreate** the container (a plain restart won't
+pick them up):
+
+```bash
+docker compose up -d --build --force-recreate
+```
 
 ---
 
@@ -79,8 +89,8 @@ your host's LAN IP.
 
 1. Create a conversation for each person you're talking to.
 2. Paste their latest message into the composer and hit **Generate replies**.
-   - That message is logged to the thread, the model is given the recent thread
-     plus the remembered facts, and it returns several tone-tagged options.
+   - That message is logged to the thread, Cami is given the recent thread plus
+     the remembered facts, and returns several tone-tagged options.
    - Any new durable facts it noticed are saved to that person's memory.
 3. **Copy** a reply, or hit **Use** to copy it *and* log it to the thread as sent.
 4. Manage memory in the right-hand panel — pin the important stuff, delete noise.
@@ -96,7 +106,7 @@ src/
   components/                Sidebar, ConversationView, FactsPanel, modal, icons
   lib/
     db.ts                    node:sqlite data layer + schema
-    llm.ts                   AI SDK client + structured/text generation
+    llm.ts                   server-side Cami client (fetch + JSON parse/validate)
     prompt.ts                the persona system prompt + context assembly
     schema.ts                Zod schema for the generated object
     api.ts, types.ts, ...    client helpers and shared types

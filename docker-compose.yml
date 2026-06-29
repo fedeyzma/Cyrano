@@ -5,16 +5,15 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Point this at your Hermes / OpenAI-compatible endpoint.
-      # From inside the container, "localhost" is the container itself — use
-      # host.docker.internal (Docker Desktop) or your host's LAN IP for a
-      # model server running on the host machine.
-      - LLM_BASE_URL=${LLM_BASE_URL}
-      - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_MODEL=${LLM_MODEL}
+      # Cami lives on the LAN; the container must be able to route to that IP.
+      # (A LAN IP like 192.168.x.x works from the default bridge network — no
+      # host.docker.internal needed, since Cami isn't on the Docker host itself.)
+      - CAMI_API_URL=${CAMI_API_URL:-http://192.168.69.244:8642}
+      - CAMI_API_KEY=${CAMI_API_KEY}
+      - CAMI_API_MODEL=${CAMI_API_MODEL:-cami}
+      - CAMI_API_TIMEOUT_MS=${CAMI_API_TIMEOUT_MS:-45000}
       - SUGGESTION_COUNT=${SUGGESTION_COUNT:-4}
-      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.9}
-      - LLM_TIMEOUT_MS=${LLM_TIMEOUT_MS:-60000}
+      - SUGGESTION_TEMPERATURE=${SUGGESTION_TEMPERATURE:-0.8}
       - DATABASE_PATH=/data/cyrano.db
     volumes:
       - cyrano-data:/data
