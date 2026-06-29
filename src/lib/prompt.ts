@@ -78,6 +78,7 @@ export function assemblePrompt(
   optionCount: number,
   steer?: string,
   targetIds?: number[],
+  avoid?: string[],
 ): string {
   const { conversation, messages, facts } = detail;
   const lines: string[] = [];
@@ -133,6 +134,14 @@ export function assemblePrompt(
     lines.push(
       'Apply this direction to every option while keeping the voice and rules above. Treat a "say something like..." note as the gist to express in my voice, not text to copy word-for-word.',
     );
+  }
+
+  if (avoid && avoid.length > 0) {
+    lines.push("");
+    lines.push(
+      "I already have these suggestions — give me genuinely DIFFERENT angles, not rewordings of these:",
+    );
+    for (const a of avoid) lines.push(`- "${a}"`);
   }
 
   lines.push("");

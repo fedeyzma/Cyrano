@@ -24,15 +24,21 @@ export async function POST(req: Request, { params }: Ctx) {
     count?: number;
     steer?: string;
     targetMessageIds?: number[];
+    avoid?: string[];
+    extractFacts?: boolean;
   }>(req);
   const incoming = typeof body?.incoming === "string" ? body.incoming.trim() : "";
   const steer = typeof body?.steer === "string" ? body.steer.trim() : "";
   const targetMessageIds = Array.isArray(body?.targetMessageIds)
     ? body.targetMessageIds.filter((n): n is number => Number.isInteger(n))
     : [];
+  const avoid = Array.isArray(body?.avoid)
+    ? body.avoid.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    : [];
+  const persistFacts = body?.extractFacts !== false;
   const optionCount = clamp(
     Math.round(Number(body?.count ?? process.env.SUGGESTION_COUNT ?? 4)) || 4,
-    2,
+    1,
     5,
   );
 
@@ -54,6 +60,7 @@ export async function POST(req: Request, { params }: Ctx) {
     optionCount,
     steer,
     targetMessageIds,
+    avoid,
   );
 
   let suggestion;
@@ -71,9 +78,11 @@ export async function POST(req: Request, { params }: Ctx) {
 
   // Persist any newly-learned facts (deduped inside addFact).
   const newFacts: Fact[] = [];
-  for (const f of suggestion.extractedFacts ?? []) {
-    const added = addFact(id, f, "ai");
-    if (added) newFacts.push(added);
+  if (persistFacts) {
+    for (const f of suggestion.extractedFacts ?? []) {
+      const added = addFact(id, f, "ai");
+      if (added) newFacts.push(added);
+    }
   }
 
   return json({

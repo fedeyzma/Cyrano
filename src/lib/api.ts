@@ -96,6 +96,12 @@ export const api = {
   deleteQueuedReply: (id: number, queueId: number) =>
     req<{ ok: boolean }>(`/api/conversations/${id}/queue/${queueId}`, { method: "DELETE" }),
 
+  updateMessage: (id: number, messageId: number, content: string) =>
+    req<Message>(`/api/conversations/${id}/messages/${messageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+    }),
+
   deleteMessage: (id: number, messageId: number) =>
     req<{ ok: boolean }>(`/api/conversations/${id}/messages/${messageId}`, {
       method: "DELETE",
@@ -103,7 +109,14 @@ export const api = {
 
   suggest: (
     id: number,
-    opts: { incoming?: string; count?: number; steer?: string; targetMessageIds?: number[] } = {},
+    opts: {
+      incoming?: string;
+      count?: number;
+      steer?: string;
+      targetMessageIds?: number[];
+      avoid?: string[];
+      extractFacts?: boolean;
+    } = {},
   ) =>
     req<SuggestResponse>(`/api/conversations/${id}/suggest`, {
       method: "POST",

@@ -203,6 +203,22 @@ export function deleteMessage(conversationId: number, messageId: number): boolea
   return res.changes > 0;
 }
 
+export function updateMessage(
+  conversationId: number,
+  messageId: number,
+  content: string,
+): Message | undefined {
+  const trimmed = content.trim();
+  if (!trimmed) return undefined;
+  getDb()
+    .prepare(`UPDATE messages SET content = ? WHERE id = ? AND conversation_id = ?`)
+    .run(trimmed, messageId, conversationId);
+  touchConversation(conversationId);
+  return getDb()
+    .prepare(`SELECT * FROM messages WHERE id = ? AND conversation_id = ?`)
+    .get(messageId, conversationId) as unknown as Message | undefined;
+}
+
 /* ---------------------------------- facts ---------------------------------- */
 
 export function getFacts(conversationId: number): Fact[] {

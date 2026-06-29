@@ -11,6 +11,7 @@ import {
   IconClose,
   IconCompass,
   IconCopy,
+  IconEdit,
   IconImport,
   IconRefresh,
   IconReply,
@@ -44,8 +45,10 @@ export function ConversationView({
   onAddMessage,
   onUseOption,
   onQueueOption,
+  onRegenerateOne,
   onDismissSuggestions,
   onDeleteMessage,
+  onEditMessage,
   onDeleteConversation,
   onDeleteQueued,
   onSendQueued,
@@ -61,8 +64,10 @@ export function ConversationView({
   onAddMessage: (role: Role, content: string) => void;
   onUseOption: (texts: string[]) => void;
   onQueueOption: (texts: string[], tone: string, targetId: number | null) => void;
+  onRegenerateOne: (index: number, steer: string, targetIds: number[]) => Promise<void>;
   onDismissSuggestions: () => void;
   onDeleteMessage: (messageId: number) => void;
+  onEditMessage: (messageId: number, content: string) => Promise<void>;
   onDeleteConversation: () => void;
   onDeleteQueued: (queueId: number) => void;
   onSendQueued: (q: QueuedReply) => void;
@@ -75,6 +80,9 @@ export function ConversationView({
   const [copied, setCopied] = useState<string | null>(null);
   const [targets, setTargets] = useState<number[]>([]);
   const [queueOpen, setQueueOpen] = useState(true);
+  const [regenIndex, setRegenIndex] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const messageById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
@@ -126,6 +134,31 @@ export function ConversationView({
     } catch {
       /* clipboard not available */
     }
+  }
+
+  async function regenerateOne(index: number) {
+    setRegenIndex(index);
+    try {
+      await onRegenerateOne(index, steer, targets);
+    } finally {
+      setRegenIndex(null);
+    }
+  }
+
+  function startEdit(id: number, content: string) {
+    setEditingId(id);
+    setEditText(content);
+  }
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText("");
+  }
+  async function saveEdit(id: number) {
+    const t = editText.trim();
+    if (!t) return;
+    await onEditMessage(id, t);
+    setEditingId(null);
+    setEditText("");
   }
 
   return (
@@ -192,6 +225,88 @@ export function ConversationView({
 
           {messages.map((m) => {
             const isTarget = m.role === "them" && targets.includes(m.id);
+
+            if (editingId === m.id) {
+              return (
+                <div
+                  key={m.id}
+                  className={cx("flex", m.role === "me" ? "justify-end" : "justify-start")}
+                >
+                  <div className="w-full max-w-[80%]">
+                    <textarea
+                      autoFocus
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void saveEdit(m.id);
+                        } else if (e.key === "Escape") {
+                          cancelEdit();
+                        }
+                      }}
+                      rows={2}
+                      className="w-full resize-none rounded-xl border border-accent/40 bg-black/40 px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-accent/20"
+                    />
+                    <div className="mt-1 flex justify-end gap-2">
+                      <button
+                        onClick={cancelEdit}
+                        className="rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:text-zinc-200"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => void saveEdit(m.id)}
+                        disabled={!editText.trim()}
+                        className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-zinc-950 transition hover:bg-accent-strong disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            const actions = (
+              <div
+                className={cx(
+                  "mb-0.5 flex flex-col gap-1 transition",
+                  isTarget ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                )}
+              >
+                {m.role === "them" && (
+                  <button
+                    onClick={() => toggleTarget(m.id)}
+                    aria-label={isTarget ? "Stop replying to this" : "Reply to this message"}
+                    title={isTarget ? "Stop replying to this" : "Reply to this message"}
+                    className={cx(
+                      "transition",
+                      isTarget ? "text-accent" : "text-zinc-600 hover:text-zinc-300",
+                    )}
+                  >
+                    <IconReply size={14} />
+                  </button>
+                )}
+                <button
+                  onClick={() => startEdit(m.id, m.content)}
+                  aria-label="Edit message"
+                  title="Edit message"
+                  className="text-zinc-600 transition hover:text-zinc-300"
+                >
+                  <IconEdit size={13} />
+                </button>
+                <button
+                  onClick={() => onDeleteMessage(m.id)}
+                  aria-label="Delete message"
+                  title="Delete message"
+                  className="text-zinc-700 transition hover:text-red-400"
+                >
+                  <IconTrash size={13} />
+                </button>
+              </div>
+            );
+
             return (
               <div
                 key={m.id}
@@ -200,15 +315,7 @@ export function ConversationView({
                   m.role === "me" ? "justify-end" : "justify-start",
                 )}
               >
-                {m.role === "me" && (
-                  <button
-                    onClick={() => onDeleteMessage(m.id)}
-                    aria-label="Delete message"
-                    className="mb-1 text-zinc-700 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
-                  >
-                    <IconTrash size={13} />
-                  </button>
-                )}
+                {m.role === "me" && actions}
                 <div
                   className={cx(
                     "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
@@ -221,33 +328,7 @@ export function ConversationView({
                 >
                   <span className="whitespace-pre-wrap break-words">{m.content}</span>
                 </div>
-                {m.role === "them" && (
-                  <div
-                    className={cx(
-                      "mb-0.5 flex flex-col gap-1 transition",
-                      isTarget ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                    )}
-                  >
-                    <button
-                      onClick={() => toggleTarget(m.id)}
-                      aria-label={isTarget ? "Stop replying to this" : "Reply to this message"}
-                      title={isTarget ? "Stop replying to this" : "Reply to this message"}
-                      className={cx(
-                        "transition",
-                        isTarget ? "text-accent" : "text-zinc-600 hover:text-zinc-300",
-                      )}
-                    >
-                      <IconReply size={14} />
-                    </button>
-                    <button
-                      onClick={() => onDeleteMessage(m.id)}
-                      aria-label="Delete message"
-                      className="text-zinc-700 transition hover:text-red-400"
-                    >
-                      <IconTrash size={13} />
-                    </button>
-                  </div>
-                )}
+                {m.role === "them" && actions}
               </div>
             );
           })}
@@ -307,70 +388,85 @@ export function ConversationView({
 
               {!suggesting && suggestions && (
                 <div className="space-y-2">
-                  {suggestions.map((opt, i) => (
-                    <div
-                      key={i}
-                      className="animate-fade-up rounded-xl border border-white/5 bg-white/[0.03] p-3 transition hover:border-white/10 hover:bg-white/[0.05]"
-                      style={{ animationDelay: `${i * 0.04}s` }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={cx(
-                            "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1",
-                            toneStyle(opt.tone),
-                          )}
-                        >
-                          {opt.tone}
-                          {opt.texts.length > 1 && (
-                            <span className="ml-1 normal-case text-zinc-500">
-                              · {opt.texts.length} texts
-                            </span>
-                          )}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => copyValue(opt.texts.join("\n"), `opt-${i}`)}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
-                          >
-                            {copied === `opt-${i}` ? (
-                              <>
-                                <IconCheck size={13} /> Copied
-                              </>
-                            ) : (
-                              <>
-                                <IconCopy size={13} /> Copy
-                              </>
+                  {suggestions.map((opt, i) => {
+                    const busy = regenIndex === i;
+                    return (
+                      <div
+                        key={i}
+                        className="animate-fade-up rounded-xl border border-white/5 bg-white/[0.03] p-3 transition hover:border-white/10 hover:bg-white/[0.05]"
+                        style={{ animationDelay: `${i * 0.04}s` }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={cx(
+                              "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1",
+                              toneStyle(opt.tone),
                             )}
-                          </button>
-                          <button
-                            onClick={() => onQueueOption(opt.texts, opt.tone, primaryTargetId)}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
                           >
-                            <IconClock size={13} /> Queue
-                          </button>
-                          <button
-                            onClick={() => {
-                              void copyValue(opt.texts.join("\n"), `opt-${i}`);
-                              onUseOption(opt.texts);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-md bg-accent/90 px-2.5 py-1 text-xs font-medium text-zinc-950 transition hover:bg-accent"
-                          >
-                            <IconSend size={13} /> Use
-                          </button>
+                            {opt.tone}
+                            {opt.texts.length > 1 && (
+                              <span className="ml-1 normal-case text-zinc-500">
+                                · {opt.texts.length} texts
+                              </span>
+                            )}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => regenerateOne(i)}
+                              disabled={regenIndex !== null}
+                              title="Regenerate just this one"
+                              aria-label="Regenerate this reply"
+                              className="inline-flex items-center rounded-md px-1.5 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {busy ? <Spinner size={13} /> : <IconRefresh size={13} />}
+                            </button>
+                            <button
+                              onClick={() => copyValue(opt.texts.join("\n"), `opt-${i}`)}
+                              disabled={busy}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
+                            >
+                              {copied === `opt-${i}` ? (
+                                <>
+                                  <IconCheck size={13} /> Copied
+                                </>
+                              ) : (
+                                <>
+                                  <IconCopy size={13} /> Copy
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => onQueueOption(opt.texts, opt.tone, primaryTargetId)}
+                              disabled={busy}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-50"
+                            >
+                              <IconClock size={13} /> Queue
+                            </button>
+                            <button
+                              onClick={() => {
+                                void copyValue(opt.texts.join("\n"), `opt-${i}`);
+                                onUseOption(opt.texts);
+                              }}
+                              disabled={busy}
+                              className="inline-flex items-center gap-1 rounded-md bg-accent/90 px-2.5 py-1 text-xs font-medium text-zinc-950 transition hover:bg-accent disabled:opacity-50"
+                            >
+                              <IconSend size={13} /> Use
+                            </button>
+                          </div>
+                        </div>
+                        <div className={cx("mt-2 space-y-1 transition", busy && "opacity-40")}>
+                          {opt.texts.map((t, j) => (
+                            <p
+                              key={j}
+                              className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-sm leading-relaxed text-zinc-100"
+                            >
+                              {t}
+                            </p>
+                          ))}
                         </div>
                       </div>
-                      <div className="mt-2 space-y-1">
-                        {opt.texts.map((t, j) => (
-                          <p
-                            key={j}
-                            className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-sm leading-relaxed text-zinc-100"
-                          >
-                            {t}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <p className="px-1 pt-1 text-[11px] text-zinc-600">
                     “Use” sends now (logs to the thread); “Queue” saves it as a draft for later.
                   </p>

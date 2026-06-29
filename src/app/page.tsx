@@ -231,6 +231,41 @@ export default function Home() {
     }
   }
 
+  async function handleRegenerateOne(index: number, steer: string, targetIds: number[]) {
+    if (selectedId === null || !suggestions) return;
+    const id = selectedId;
+    const avoid = suggestions.flatMap((o) => o.texts);
+    try {
+      const res = await api.suggest(id, {
+        count: 1,
+        avoid,
+        steer: steer || undefined,
+        targetMessageIds: targetIds.length ? targetIds : undefined,
+        extractFacts: false,
+      });
+      const replacement = res.options[0];
+      if (replacement) {
+        setSuggestions((prev) =>
+          prev ? prev.map((o, i) => (i === index ? replacement : o)) : prev,
+        );
+      }
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
+  async function handleEditMessage(messageId: number, content: string) {
+    if (selectedId === null) return;
+    const id = selectedId;
+    try {
+      await api.updateMessage(id, messageId, content);
+      await loadDetail(id, { silent: true });
+      await refreshList();
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
   async function handleQueue(texts: string[], tone: string, targetId: number | null) {
     if (selectedId === null) return;
     const id = selectedId;
@@ -385,11 +420,13 @@ export default function Home() {
                 onAddMessage={handleAddMessage}
                 onUseOption={handleUseOption}
                 onQueueOption={handleQueue}
+                onRegenerateOne={handleRegenerateOne}
                 onDismissSuggestions={() => {
                   setSuggestions(null);
                   setSuggestError(null);
                 }}
                 onDeleteMessage={handleDeleteMessage}
+                onEditMessage={handleEditMessage}
                 onDeleteConversation={handleDeleteConversation}
                 onDeleteQueued={handleDeleteQueued}
                 onSendQueued={handleSendQueued}
