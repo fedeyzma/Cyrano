@@ -4,14 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ConversationView } from "@/components/ConversationView";
 import { FactsPanel } from "@/components/FactsPanel";
 import { IconHeart, IconMenu, IconSparkles } from "@/components/icons";
+import { ImportThreadModal } from "@/components/ImportThreadModal";
 import { NewConversationModal } from "@/components/NewConversationModal";
 import { Sidebar } from "@/components/Sidebar";
 import { ApiError, api } from "@/lib/api";
 import { cx } from "@/lib/cx";
+import type { ParsedMessage } from "@/lib/parseThread";
 import type {
   ConversationDetail,
   ConversationListItem,
   ReplyOption,
+  Role,
 } from "@/lib/types";
 
 type Toast = { id: number; message: string; kind: "info" | "error" };
@@ -33,6 +36,10 @@ export default function Home() {
 
   const [mobileNav, setMobileNav] = useState(false);
   const [factsOpen, setFactsOpen] = useState(false);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,6 +104,7 @@ export default function Home() {
     setSuggestions(null);
     setSuggestError(null);
     setFactsOpen(false);
+    setImportOpen(false);
     if (selectedId === null) {
       setDetail(null);
       return;
@@ -170,15 +178,33 @@ export default function Home() {
     }
   }
 
-  async function handleAddThem(content: string) {
+  async function handleAddMessage(role: Role, content: string) {
     if (selectedId === null) return;
     const id = selectedId;
     try {
-      await api.addMessage(id, "them", content);
+      await api.addMessage(id, role, content);
       await loadDetail(id, { silent: true });
       await refreshList();
     } catch (e) {
       handleError(e);
+    }
+  }
+
+  async function handleImport(messages: ParsedMessage[]) {
+    if (selectedId === null) return;
+    const id = selectedId;
+    setImporting(true);
+    setImportError(null);
+    try {
+      const created = await api.addMessagesBulk(id, messages);
+      setImportOpen(false);
+      await loadDetail(id, { silent: true });
+      await refreshList();
+      showToast(`Imported ${created.length} ${created.length === 1 ? "message" : "messages"}`);
+    } catch (e) {
+      setImportError(e instanceof ApiError ? e.message : "Could not import the thread");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -298,7 +324,7 @@ export default function Home() {
                 suggestError={suggestError}
                 factsCount={factsCount}
                 onSuggest={handleSuggest}
-                onAddThem={handleAddThem}
+                onAddMessage={handleAddMessage}
                 onUseOption={handleUseOption}
                 onRegenerate={() => handleSuggest("")}
                 onDismissSuggestions={() => {
@@ -307,6 +333,7 @@ export default function Home() {
                 }}
                 onDeleteMessage={handleDeleteMessage}
                 onDeleteConversation={handleDeleteConversation}
+                onOpenImport={() => setImportOpen(true)}
                 onOpenFacts={() => setFactsOpen(true)}
               />
             ) : (
@@ -369,6 +396,15 @@ export default function Home() {
         error={createError}
         onClose={() => setModalOpen(false)}
         onCreate={handleCreate}
+      />
+
+      <ImportThreadModal
+        open={importOpen}
+        importing={importing}
+        error={importError}
+        conversationName={detail?.conversation.name ?? "them"}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImport}
       />
 
       {toast && (

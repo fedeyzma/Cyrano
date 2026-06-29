@@ -105,6 +105,13 @@ export const IconUser = (p: IconProps) => (
   </Icon>
 );
 
+export const IconImport = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
+    <path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+  </Icon>
+);
+
 export const IconHeart = (p: IconProps) => (
   <Icon {...p}>
     <path d="M12 20s-7-4.3-9.5-8.6C1 8.5 2.4 5.5 5.5 5.5c1.9 0 3.2 1 4.5 2.6C11.3 6.5 12.6 5.5 14.5 5.5c3.1 0 4.5 3 3 5.9C19 15.7 12 20 12 20Z" />

@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { clockTime } from "@/lib/time";
-import type { ConversationDetail, ReplyOption } from "@/lib/types";
+import type { ConversationDetail, ReplyOption, Role } from "@/lib/types";
 import {
   IconBrain,
   IconCheck,
   IconCopy,
+  IconImport,
   IconRefresh,
   IconSend,
   IconSparkles,
@@ -36,12 +37,13 @@ export function ConversationView({
   suggestError,
   factsCount,
   onSuggest,
-  onAddThem,
+  onAddMessage,
   onUseOption,
   onRegenerate,
   onDismissSuggestions,
   onDeleteMessage,
   onDeleteConversation,
+  onOpenImport,
   onOpenFacts,
 }: {
   detail: ConversationDetail;
@@ -50,12 +52,13 @@ export function ConversationView({
   suggestError: string | null;
   factsCount: number;
   onSuggest: (incoming: string) => void;
-  onAddThem: (content: string) => void;
+  onAddMessage: (role: Role, content: string) => void;
   onUseOption: (text: string) => void;
   onRegenerate: () => void;
   onDismissSuggestions: () => void;
   onDeleteMessage: (messageId: number) => void;
   onDeleteConversation: () => void;
+  onOpenImport: () => void;
   onOpenFacts: () => void;
 }) {
   const { conversation, messages } = detail;
@@ -81,10 +84,10 @@ export function ConversationView({
     }
   }
 
-  function handleAddThem() {
+  function addAs(role: Role) {
     const t = text.trim();
     if (!t) return;
-    onAddThem(t);
+    onAddMessage(role, t);
     setText("");
   }
 
@@ -120,6 +123,13 @@ export function ConversationView({
         </div>
         <div className="flex items-center gap-1.5">
           <button
+            onClick={onOpenImport}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300 transition hover:border-accent/40 hover:text-accent"
+          >
+            <IconImport size={15} />
+            <span className="hidden sm:inline">Import</span>
+          </button>
+          <button
             onClick={onOpenFacts}
             className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-300 transition hover:border-accent/40 hover:text-accent xl:hidden"
           >
@@ -149,6 +159,12 @@ export function ConversationView({
                 Paste what {conversation.name} said in the box below and hit Generate — Cyrano
                 will hand you a few ways to reply.
               </p>
+              <button
+                onClick={onOpenImport}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-accent/40 hover:text-accent"
+              >
+                <IconImport size={14} /> Import an existing thread
+              </button>
             </div>
           )}
 
@@ -318,13 +334,22 @@ export function ConversationView({
               className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-relaxed outline-none placeholder:text-zinc-600"
             />
             <div className="flex items-center justify-between gap-2 px-1 pt-1">
-              <button
-                onClick={handleAddThem}
-                disabled={!text.trim()}
-                className="rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Add to thread
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => addAs("me")}
+                  disabled={!text.trim()}
+                  className="rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Add as me
+                </button>
+                <button
+                  onClick={() => addAs("them")}
+                  disabled={!text.trim()}
+                  className="rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Add as them
+                </button>
+              </div>
               <button
                 onClick={handleGenerate}
                 disabled={!canGenerate || suggesting}

@@ -71,6 +71,12 @@ export const api = {
       body: JSON.stringify({ role, content }),
     }),
 
+  addMessagesBulk: (id: number, messages: Array<{ role: Role; content: string }>) =>
+    req<Message[]>(`/api/conversations/${id}/messages/bulk`, {
+      method: "POST",
+      body: JSON.stringify({ messages }),
+    }),
+
   deleteMessage: (id: number, messageId: number) =>
     req<{ ok: boolean }>(`/api/conversations/${id}/messages/${messageId}`, {
       method: "DELETE",

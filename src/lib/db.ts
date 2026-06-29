@@ -153,6 +153,36 @@ export function addMessage(conversationId: number, role: Role, content: string):
     .get(Number(res.lastInsertRowid)) as unknown as Message;
 }
 
+/** Insert many messages in order, in a single transaction. */
+export function addMessages(
+  conversationId: number,
+  items: Array<{ role: Role; content: string }>,
+): Message[] {
+  const db = getDb();
+  const insert = db.prepare(
+    `INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)`,
+  );
+  const select = db.prepare(`SELECT * FROM messages WHERE id = ?`);
+  const created: Message[] = [];
+  const base = now();
+  db.exec("BEGIN");
+  try {
+    items.forEach((m, i) => {
+      const content = m.content.trim();
+      if (!content) return;
+      // base + i keeps display timestamps in insert order
+      const res = insert.run(conversationId, m.role, content, base + i);
+      created.push(select.get(Number(res.lastInsertRowid)) as unknown as Message);
+    });
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+  if (created.length > 0) touchConversation(conversationId, base + created.length);
+  return created;
+}
+
 export function deleteMessage(conversationId: number, messageId: number): boolean {
   const res = getDb()
     .prepare(`DELETE FROM messages WHERE id = ? AND conversation_id = ?`)
