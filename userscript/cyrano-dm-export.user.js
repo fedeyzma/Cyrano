@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cyrano DM Exporter
 // @namespace    cyrano.local
-// @version      1.4.0
+// @version      1.5.0
 // @description  Transcribe the open DM conversation into a clean text transcript — copy or download.
 // @author       Fred
 // @match        *://*.instagram.com/*
@@ -170,9 +170,22 @@
     }
     return best;
   }
+  // The element that actually carries the bubble background (blue for me, grey
+  // for them) — used for reliable left/right alignment. Falls back to the leaf.
+  function bubbleRect(leaf, container) {
+    let node = leaf;
+    for (let i = 0; i < 6 && node && node !== container; i++) {
+      const bg = (getComputedStyle(node).backgroundColor || "").replace(/\s+/g, "");
+      if (bg && bg !== "transparent" && bg !== "rgba(0,0,0,0)") {
+        return node.getBoundingClientRect();
+      }
+      node = node.parentElement;
+    }
+    return leaf.getBoundingClientRect();
+  }
+
   function extractStructured(container) {
     const cr = container.getBoundingClientRect();
-    const center = cr.left + cr.width / 2;
     const seen = new Set();
     const raw = [];
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, {
@@ -191,7 +204,8 @@
       if (seen.has(key)) continue;
       seen.add(key);
       const fs = parseFloat(getComputedStyle(node).fontSize) || 0;
-      raw.push({ top: r.top, cx: (r.left + r.right) / 2, text, fs });
+      const b = bubbleRect(node, container);
+      raw.push({ top: r.top, left: b.left, right: b.right, text, fs });
     }
 
     // Reply-quote previews (and sender-name/labels) render in a SMALLER font
@@ -226,7 +240,8 @@
       if (prev && (prev.text.includes(it.text) || it.text.includes(prev.text))) {
         if (it.text.length > prev.text.length) {
           prev.text = it.text;
-          prev.cx = it.cx;
+          prev.left = it.left;
+          prev.right = it.right;
         }
         continue;
       }
@@ -248,7 +263,21 @@
       seenNorm.push(n);
       deduped.push(m);
     }
-    return deduped.map((m) => ({ role: m.cx > center ? "me" : "them", content: m.text }));
+    // Classify side from the message COLUMN's own extent (robust to container
+    // padding/offset): a bubble hugging the right edge is mine, the left is theirs.
+    let colLeft = Infinity;
+    let colRight = -Infinity;
+    for (const m of deduped) {
+      if (m.left < colLeft) colLeft = m.left;
+      if (m.right > colRight) colRight = m.right;
+    }
+    const colW = Math.max(1, colRight - colLeft);
+    return deduped.map((m) => {
+      const leftGap = m.left - colLeft;
+      const rightGap = colRight - m.right;
+      const role = leftGap > rightGap + colW * 0.08 ? "me" : "them";
+      return { role, content: m.text };
+    });
   }
   function extractRaw(container) {
     return (container.innerText || "")
@@ -336,9 +365,10 @@
     );
 
     const row2 = el("div", "display:flex;gap:6px");
+    const bSwap = el("button", BTN, { textContent: "Swap sides" });
+    const bDl = el("button", BTN, { textContent: "Download" });
     const bCopy = el("button", PRIMARY, { textContent: "Copy" });
-    const bDl = el("button", BTN, { textContent: "Download .txt" });
-    row2.append(bCopy, bDl);
+    row2.append(bSwap, bDl, bCopy);
 
     const st = el("div", "font-size:11px;color:#8a8a93;min-height:14px");
     panel.append(hd, row, ta, row2, st);
@@ -374,6 +404,15 @@
         panel.style.display = "";
         capture();
       });
+    };
+    bSwap.onclick = () => {
+      ta.value = ta.value
+        .split("\n")
+        .map((l) =>
+          l.startsWith("Me: ") ? "Them: " + l.slice(4) : l.startsWith("Them: ") ? "Me: " + l.slice(6) : l,
+        )
+        .join("\n");
+      status("Swapped Me / Them.");
     };
     bCopy.onclick = () => {
       if (!ta.value.trim()) return status("Capture first.");
