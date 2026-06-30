@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cyrano DM Exporter
 // @namespace    cyrano.local
-// @version      1.1.0
+// @version      1.2.0
 // @description  Transcribe the open DM conversation into a clean text transcript — copy or download.
 // @author       Fred
 // @match        *://*.instagram.com/*
@@ -148,7 +148,23 @@
       }
       msgs.push(it);
     }
-    return msgs.map((m) => ({ role: m.cx > center ? "me" : "them", content: m.text }));
+    // Drop reply-quote previews: Instagram (and others) show a small quoted
+    // snippet of the message being replied to, which otherwise duplicates it.
+    // Skip a bubble whose text repeats an earlier message — either an exact
+    // duplicate, or a truncated quote (ends with …/...) that prefixes an earlier one.
+    const norm = (s) => s.replace(/[…]+$|\.{3,}$/g, "").trim().toLowerCase();
+    const seenNorm = [];
+    const deduped = [];
+    for (const m of msgs) {
+      const n = norm(m.text);
+      const truncated = /[…]$|\.{3,}$/.test(m.text.trim());
+      const isQuote =
+        n.length >= 8 && seenNorm.some((s) => s === n || (truncated && s.startsWith(n)));
+      if (isQuote) continue;
+      seenNorm.push(n);
+      deduped.push(m);
+    }
+    return deduped.map((m) => ({ role: m.cx > center ? "me" : "them", content: m.text }));
   }
   function extractRaw(container) {
     return (container.innerText || "")
