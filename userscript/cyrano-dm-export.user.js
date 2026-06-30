@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cyrano DM Exporter
 // @namespace    cyrano.local
-// @version      1.3.1
+// @version      1.4.0
 // @description  Transcribe the open DM conversation into a clean text transcript — copy or download.
 // @author       Fred
 // @match        *://*.instagram.com/*
@@ -190,8 +190,35 @@
       const key = Math.round(r.top) + "|" + text;
       if (seen.has(key)) continue;
       seen.add(key);
-      raw.push({ top: r.top, cx: (r.left + r.right) / 2, text });
+      const fs = parseFloat(getComputedStyle(node).fontSize) || 0;
+      raw.push({ top: r.top, cx: (r.left + r.right) / 2, text, fs });
     }
+
+    // Reply-quote previews (and sender-name/labels) render in a SMALLER font
+    // than real message bubbles. Keep only bubbles at/above the dominant
+    // message font size — this catches quotes even when their original isn't
+    // in the captured window (and fixes the wrong-side label that follows).
+    if (raw.length > 4) {
+      const counts = new Map();
+      for (const it of raw) {
+        const k = Math.round(it.fs);
+        counts.set(k, (counts.get(k) || 0) + 1);
+      }
+      let dom = 0;
+      let domN = 0;
+      for (const [k, n] of counts) {
+        if (n > domN) {
+          domN = n;
+          dom = k;
+        }
+      }
+      const filtered = raw.filter((it) => it.fs >= dom - 1);
+      if (filtered.length >= 2) {
+        raw.length = 0;
+        raw.push(...filtered);
+      }
+    }
+
     raw.sort((a, b) => a.top - b.top);
     const msgs = [];
     for (const it of raw) {
