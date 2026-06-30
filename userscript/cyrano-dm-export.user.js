@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cyrano DM Exporter
 // @namespace    cyrano.local
-// @version      1.2.0
+// @version      1.3.0
 // @description  Transcribe the open DM conversation into a clean text transcript — copy or download.
 // @author       Fred
 // @match        *://*.instagram.com/*
@@ -89,28 +89,83 @@
   }
   function isNoise(t) {
     if (!t) return true;
-    if (/^(today|yesterday|active now|seen|delivered|sent|read|now|online|typing\.{0,3})$/i.test(t)) return true;
-    if (/^\d{1,2}:\d{2}\s?([ap]\.?m\.?)?$/i.test(t)) return true;
-    if (/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/i.test(t) && t.length < 16) return true;
-    if (/^[•·\-—]+$/.test(t)) return true;
+    const x = t.trim();
+    if (!x) return true;
+    if (/^\d{1,2}:\d{2}\s?([ap]\.?m\.?)?$/i.test(x)) return true; // 9:42, 9:42 PM
+    if (/^\d+\s?[smhdw]$/i.test(x)) return true; // 1h, 3h, 22h, 5m, 2d, 1w (inbox times)
+    if (/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/i.test(x) && x.length < 16) return true;
+    if (/^(today|yesterday|active|seen|delivered|sent|read|now|online|typing)/i.test(x)) return true;
+    if (/^(unread|new message|\d+\s+new messages?)$/i.test(x)) return true;
+    if (/^(liked a message|reacted|you reacted|sent an attachment|you sent an attachment)/i.test(x)) return true;
+    if (/^[•·\-—]+$/.test(x)) return true;
     return false;
   }
+
+  // Profile a candidate: how many text bubbles sit left vs right of its centre.
+  // A real thread has BOTH (my replies are right-aligned); the inbox list does not.
+  function profileSides(container) {
+    const cr = container.getBoundingClientRect();
+    const center = cr.left + cr.width / 2;
+    let left = 0;
+    let right = 0;
+    let total = 0;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, {
+      acceptNode(node) {
+        return [...node.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_SKIP;
+      },
+    });
+    let node;
+    let scanned = 0;
+    while ((node = walker.nextNode()) && scanned < 900) {
+      scanned++;
+      const r = node.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      const t = vis(node);
+      if (!t || t.length > 1200 || isNoise(t)) continue;
+      total++;
+      if ((r.left + r.right) / 2 > center + 16) right++;
+      else left++;
+    }
+    return { left, right, total };
+  }
+
   function findContainer() {
     if (picked && document.contains(picked)) return picked;
-    let best = document.body;
-    let bestScore = 0;
-    document.querySelectorAll("div, main, section, ul").forEach((node) => {
-      const s = getComputedStyle(node);
-      if (!/(auto|scroll)/.test(s.overflowY)) return;
-      if (node.scrollHeight <= node.clientHeight + 40) return;
-      const r = node.getBoundingClientRect();
-      if (r.width < 220 || r.height < 220) return;
-      const score = node.querySelectorAll("*").length;
-      if (score > bestScore) {
-        bestScore = score;
-        best = node;
+    const collect = (minW, minH) => {
+      const out = [];
+      document.querySelectorAll("div, main, section, ul").forEach((node) => {
+        const s = getComputedStyle(node);
+        if (!/(auto|scroll)/.test(s.overflowY)) return;
+        if (node.scrollHeight <= node.clientHeight + 40) return;
+        const r = node.getBoundingClientRect();
+        if (r.width < minW || r.height < minH) return;
+        out.push(node);
+      });
+      return out;
+    };
+    let cands = collect(300, 240);
+    if (!cands.length) cands = collect(200, 200);
+    if (!cands.length) return document.body;
+
+    // Rank: two-sided (real thread) first, then rightmost pane, then most messages.
+    let best = cands[0];
+    let bestKey = [-1, -1, -1];
+    for (const c of cands) {
+      const p = profileSides(c);
+      const r = c.getBoundingClientRect();
+      const key = [Math.min(p.left, p.right), Math.round(r.left), p.total];
+      for (let i = 0; i < key.length; i++) {
+        if (key[i] !== bestKey[i]) {
+          if (key[i] > bestKey[i]) {
+            best = c;
+            bestKey = key;
+          }
+          break;
+        }
       }
-    });
+    }
     return best;
   }
   function extractStructured(container) {
