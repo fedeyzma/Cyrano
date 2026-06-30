@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cyrano DM Exporter
 // @namespace    cyrano.local
-// @version      1.3.0
+// @version      1.3.1
 // @description  Transcribe the open DM conversation into a clean text transcript — copy or download.
 // @author       Fred
 // @match        *://*.instagram.com/*
@@ -97,6 +97,8 @@
     if (/^(today|yesterday|active|seen|delivered|sent|read|now|online|typing)/i.test(x)) return true;
     if (/^(unread|new message|\d+\s+new messages?)$/i.test(x)) return true;
     if (/^(liked a message|reacted|you reacted|sent an attachment|you sent an attachment)/i.test(x)) return true;
+    if (/^you replied to\b/i.test(x)) return true; // "You replied to <name>"
+    if (/\breplied to you$/i.test(x)) return true; // "<name> replied to you"
     if (/^[•·\-—]+$/.test(x)) return true;
     return false;
   }
