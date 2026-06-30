@@ -15,6 +15,7 @@ import type { ParsedMessage } from "@/lib/parseThread";
 import type {
   ConversationDetail,
   ConversationListItem,
+  Fact,
   QueuedReply,
   ReplyOption,
   Role,
@@ -262,12 +263,17 @@ export default function Home() {
   async function handleEditMessage(messageId: number, content: string) {
     if (selectedId === null) return;
     const id = selectedId;
+    const trimmed = content.trim();
+    patchDetail(id, (d) => ({
+      ...d,
+      messages: d.messages.map((m) => (m.id === messageId ? { ...m, content: trimmed } : m)),
+    }));
     try {
-      await api.updateMessage(id, messageId, content);
-      await loadDetail(id, { silent: true });
+      await api.updateMessage(id, messageId, trimmed);
       await refreshList();
     } catch (e) {
       handleError(e);
+      await loadDetail(id, { silent: true });
     }
   }
 
@@ -290,11 +296,12 @@ export default function Home() {
   async function handleDeleteQueued(queueId: number) {
     if (selectedId === null) return;
     const id = selectedId;
+    patchDetail(id, (d) => ({ ...d, queued: d.queued.filter((q) => q.id !== queueId) }));
     try {
       await api.deleteQueuedReply(id, queueId);
-      await loadDetail(id, { silent: true });
     } catch (e) {
       handleError(e);
+      await loadDetail(id, { silent: true });
     }
   }
 
@@ -323,22 +330,44 @@ export default function Home() {
   async function handleDeleteMessage(messageId: number) {
     if (selectedId === null) return;
     const id = selectedId;
+    patchDetail(id, (d) => ({ ...d, messages: d.messages.filter((m) => m.id !== messageId) }));
     try {
       await api.deleteMessage(id, messageId);
-      await loadDetail(id, { silent: true });
       await refreshList();
     } catch (e) {
       handleError(e);
+      await loadDetail(id, { silent: true });
     }
   }
+
+  // Optimistic helper: patch the current conversation's detail in place.
+  const patchDetail = useCallback(
+    (id: number, fn: (d: ConversationDetail) => ConversationDetail) => {
+      setDetail((prev) => (prev && prev.conversation.id === id ? fn(prev) : prev));
+    },
+    [],
+  );
 
   async function handleAddFact(content: string) {
     if (selectedId === null) return;
     const id = selectedId;
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    const tempId = -Date.now();
+    const temp: Fact = {
+      id: tempId,
+      conversation_id: id,
+      content: trimmed,
+      pinned: 0,
+      source: "user",
+      created_at: Date.now(),
+    };
+    patchDetail(id, (d) => ({ ...d, facts: [...d.facts, temp] })); // show instantly
     try {
-      await api.addFact(id, content);
-      await loadDetail(id, { silent: true });
+      const real = await api.addFact(id, trimmed);
+      patchDetail(id, (d) => ({ ...d, facts: d.facts.map((f) => (f.id === tempId ? real : f)) }));
     } catch (e) {
+      patchDetail(id, (d) => ({ ...d, facts: d.facts.filter((f) => f.id !== tempId) }));
       handleError(e);
     }
   }
@@ -346,22 +375,27 @@ export default function Home() {
   async function handleDeleteFact(factId: number) {
     if (selectedId === null) return;
     const id = selectedId;
+    patchDetail(id, (d) => ({ ...d, facts: d.facts.filter((f) => f.id !== factId) }));
     try {
       await api.deleteFact(id, factId);
-      await loadDetail(id, { silent: true });
     } catch (e) {
       handleError(e);
+      await loadDetail(id, { silent: true }); // reconcile on failure
     }
   }
 
   async function handleTogglePin(factId: number, pinned: boolean) {
     if (selectedId === null) return;
     const id = selectedId;
+    patchDetail(id, (d) => ({
+      ...d,
+      facts: d.facts.map((f) => (f.id === factId ? { ...f, pinned: pinned ? 1 : 0 } : f)),
+    }));
     try {
       await api.setFactPinned(id, factId, pinned);
-      await loadDetail(id, { silent: true });
     } catch (e) {
       handleError(e);
+      await loadDetail(id, { silent: true });
     }
   }
 
