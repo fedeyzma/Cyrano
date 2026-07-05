@@ -2,15 +2,19 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type {
+  Backup,
+  BackupConversation,
   Conversation,
   ConversationListItem,
   Fact,
   FactCategory,
   FactSource,
+  ImportResult,
   Message,
   MessageRole,
   QueuedReply,
 } from "./types";
+import { BACKUP_VERSION, normalizeFactCategory } from "./types";
 
 // Reuse a single connection across hot reloads in dev.
 declare global {
@@ -376,4 +380,158 @@ export function deleteQueuedReply(conversationId: number, queueId: number): bool
     .prepare(`DELETE FROM queued_replies WHERE id = ? AND conversation_id = ?`)
     .run(queueId, conversationId);
   return res.changes > 0;
+}
+
+/* --------------------------------- backup ---------------------------------- */
+
+/** Dump every conversation with its messages, facts, and queue as a portable
+ *  object (ids stripped; queue targets referenced by message index). */
+export function exportAll(): Backup {
+  const db = getDb();
+  const conversations = db
+    .prepare(`SELECT * FROM conversations ORDER BY id ASC`)
+    .all() as unknown as Conversation[];
+
+  const out: BackupConversation[] = conversations.map((c) => {
+    const messages = getMessages(c.id);
+    const facts = getFacts(c.id);
+    const queued = getQueuedReplies(c.id);
+    const idToIndex = new Map<number, number>();
+    messages.forEach((m, i) => idToIndex.set(m.id, i));
+    return {
+      name: c.name,
+      platform: c.platform,
+      notes: c.notes,
+      created_at: c.created_at,
+      updated_at: c.updated_at,
+      messages: messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        created_at: m.created_at,
+      })),
+      facts: facts.map((f) => ({
+        content: f.content,
+        category: f.category,
+        pinned: f.pinned,
+        source: f.source,
+        created_at: f.created_at,
+      })),
+      queued: queued.map((q) => ({
+        content: q.content,
+        tone: q.tone,
+        created_at: q.created_at,
+        target_message_index:
+          q.target_message_id != null && idToIndex.has(q.target_message_id)
+            ? idToIndex.get(q.target_message_id)!
+            : null,
+      })),
+    };
+  });
+
+  return { version: BACKUP_VERSION, exported_at: now(), conversations: out };
+}
+
+/**
+ * Ingest a backup, preserving timestamps, in one transaction. A conversation
+ * is skipped if one with the same name AND created_at already exists, so
+ * re-importing the same backup is idempotent while genuinely new people still
+ * come in. Message ids are remapped, so queued-reply targets are re-linked by
+ * their exported message index.
+ */
+export function importBackup(backup: {
+  conversations: Array<{
+    name: string;
+    platform?: string | null;
+    notes?: string | null;
+    created_at: number;
+    updated_at: number;
+    messages: Array<{ role: MessageRole; content: string; created_at: number }>;
+    facts: Array<{
+      content: string;
+      category?: string;
+      pinned?: 0 | 1;
+      source?: FactSource;
+      created_at: number;
+    }>;
+    queued: Array<{
+      content: string;
+      tone?: string | null;
+      created_at: number;
+      target_message_index?: number | null;
+    }>;
+  }>;
+}): ImportResult {
+  const db = getDb();
+  const result: ImportResult = {
+    importedConversations: 0,
+    skippedConversations: 0,
+    importedMessages: 0,
+    importedFacts: 0,
+    importedQueued: 0,
+  };
+
+  const existsStmt = db.prepare(
+    `SELECT id FROM conversations WHERE name = ? AND created_at = ? LIMIT 1`,
+  );
+  const insConv = db.prepare(
+    `INSERT INTO conversations (name, platform, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+  );
+  const insMsg = db.prepare(
+    `INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)`,
+  );
+  const insFact = db.prepare(
+    `INSERT INTO facts (conversation_id, content, category, pinned, source, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  const insQueued = db.prepare(
+    `INSERT INTO queued_replies (conversation_id, target_message_id, content, tone, created_at) VALUES (?, ?, ?, ?, ?)`,
+  );
+
+  db.exec("BEGIN");
+  try {
+    for (const c of backup.conversations) {
+      const dup = existsStmt.get(c.name, c.created_at) as unknown as
+        | { id: number }
+        | undefined;
+      if (dup) {
+        result.skippedConversations++;
+        continue;
+      }
+
+      const convId = Number(
+        insConv.run(c.name, c.platform ?? null, c.notes ?? null, c.created_at, c.updated_at)
+          .lastInsertRowid,
+      );
+      result.importedConversations++;
+
+      const newMsgIds: number[] = [];
+      for (const m of c.messages) {
+        newMsgIds.push(Number(insMsg.run(convId, m.role, m.content, m.created_at).lastInsertRowid));
+        result.importedMessages++;
+      }
+      for (const f of c.facts) {
+        insFact.run(
+          convId,
+          f.content,
+          normalizeFactCategory(f.category),
+          f.pinned ?? 0,
+          f.source ?? "ai",
+          f.created_at,
+        );
+        result.importedFacts++;
+      }
+      for (const q of c.queued) {
+        const idx = q.target_message_index;
+        const targetId =
+          idx != null && idx >= 0 && idx < newMsgIds.length ? newMsgIds[idx] : null;
+        insQueued.run(convId, targetId, q.content, q.tone ?? null, q.created_at);
+        result.importedQueued++;
+      }
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+
+  return result;
 }

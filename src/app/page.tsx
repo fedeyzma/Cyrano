@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { ConversationView } from "@/components/ConversationView";
 import { FactsPanel } from "@/components/FactsPanel";
 import { IconHeart, IconMenu, IconSparkles } from "@/components/icons";
@@ -433,6 +433,61 @@ export default function Home() {
     }
   }
 
+  // Backup export/import (dev → prod migration and general backups).
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleExport() {
+    try {
+      const backup = await api.exportBackup();
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `cyrano-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      const n = backup.conversations.length;
+      showToast(`Exported ${n} ${n === 1 ? "conversation" : "conversations"}`);
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
+  function handleImportClick() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // let the same file be re-picked later
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      const res = await api.importBackup(data);
+      const list = await refreshList();
+      if (selectedIdRef.current !== null) {
+        await loadDetail(selectedIdRef.current, { silent: true });
+      } else if (list.length > 0) {
+        setSelected(list[0].id);
+      }
+      const parts: string[] = [];
+      if (res.importedConversations > 0) {
+        parts.push(
+          `${res.importedConversations} ${res.importedConversations === 1 ? "person" : "people"} added`,
+        );
+      }
+      if (res.skippedConversations > 0) parts.push(`${res.skippedConversations} already here`);
+      showToast(parts.length > 0 ? `Import: ${parts.join(", ")}` : "Nothing new to import");
+    } catch (e) {
+      handleError(
+        e instanceof SyntaxError ? new Error("That file isn't a valid backup (bad JSON).") : e,
+      );
+    }
+  }
+
   async function handleScanFacts() {
     if (selectedId === null) return;
     const id = selectedId;
@@ -579,6 +634,8 @@ export default function Home() {
           onView={setView}
           onSelect={selectConversation}
           onNew={() => setModalOpen(true)}
+          onExport={handleExport}
+          onImport={handleImportClick}
         />
       </aside>
 
@@ -702,10 +759,24 @@ export default function Home() {
                 setMobileNav(false);
                 setModalOpen(true);
               }}
+              onExport={handleExport}
+              onImport={() => {
+                setMobileNav(false);
+                handleImportClick();
+              }}
             />
           </Drawer>
         )}
       </AnimatePresence>
+
+      {/* Hidden picker for backup import (triggered from either Sidebar) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        onChange={handleImportFile}
+        className="hidden"
+      />
 
       {/* Facts drawer (below xl) */}
       <AnimatePresence>

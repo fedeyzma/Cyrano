@@ -173,3 +173,19 @@ export const IconSort = (p: IconProps) => (
     <path d="M17 5v14m0 0 3-3m-3 3-3-3" opacity={0.6} />
   </Icon>
 );
+
+export const IconDownload = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3v12" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M5 21h14" />
+  </Icon>
+);
+
+export const IconUpload = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 21V9" />
+    <path d="m7 14 5-5 5 5" />
+    <path d="M5 3h14" />
+  </Icon>
+);

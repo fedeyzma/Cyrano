@@ -1,9 +1,11 @@
 import type {
+  Backup,
   Conversation,
   ConversationDetail,
   ConversationListItem,
   Fact,
   FactCategory,
+  ImportResult,
   Message,
   MessageRole,
   QueuedReply,
@@ -169,6 +171,11 @@ export const api = {
     avoid?: string[];
   }) =>
     req<ProfileScanResult>("/api/scan", { method: "POST", body: JSON.stringify(data) }),
+
+  exportBackup: () => req<Backup>("/api/backup"),
+
+  importBackup: (data: unknown) =>
+    req<ImportResult>("/api/backup", { method: "POST", body: JSON.stringify(data) }),
 };
 
 export interface ProfileScanResult {

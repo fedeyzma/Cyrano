@@ -13,7 +13,17 @@ import {
 import { cx } from "@/lib/cx";
 import { relativeTime } from "@/lib/time";
 import type { ConversationListItem } from "@/lib/types";
-import { IconCards, IconChat, IconClose, IconHeart, IconPlus, IconScan, IconSearch } from "./icons";
+import {
+  IconCards,
+  IconChat,
+  IconClose,
+  IconDownload,
+  IconHeart,
+  IconPlus,
+  IconScan,
+  IconSearch,
+  IconUpload,
+} from "./icons";
 
 type SortKey = "recent" | "name" | "messages";
 
@@ -31,6 +41,8 @@ export function Sidebar({
   onView,
   onSelect,
   onNew,
+  onExport,
+  onImport,
   idPrefix = "inline",
 }: {
   conversations: ConversationListItem[];
@@ -40,6 +52,8 @@ export function Sidebar({
   onView: (view: "replies" | "prompts" | "scan") => void;
   onSelect: (id: number) => void;
   onNew: () => void;
+  onExport?: () => void;
+  onImport?: () => void;
   /** Namespaces the shared layoutIds — page.tsx mounts two Sidebars at once
    *  (inline aside + mobile drawer) and layoutId is app-global in motion. */
   idPrefix?: string;
@@ -272,18 +286,44 @@ export function Sidebar({
         )}
       </div>
 
-      <footer className="shrink-0 border-t border-line px-4 py-2 text-meta text-ink-muted">
-        {query.trim() && visible.length !== conversations.length ? (
-          <>
-            <span className="tabular-nums">{visible.length}</span> of{" "}
-            <span className="tabular-nums">{conversations.length}</span>{" "}
-            {conversations.length === 1 ? "person" : "people"}
-          </>
-        ) : (
-          <>
-            <span className="tabular-nums">{conversations.length}</span>{" "}
-            {conversations.length === 1 ? "person" : "people"} · stored locally
-          </>
+      <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line px-4 py-2 text-meta text-ink-muted">
+        <span>
+          {query.trim() && visible.length !== conversations.length ? (
+            <>
+              <span className="tabular-nums">{visible.length}</span> of{" "}
+              <span className="tabular-nums">{conversations.length}</span>{" "}
+              {conversations.length === 1 ? "person" : "people"}
+            </>
+          ) : (
+            <>
+              <span className="tabular-nums">{conversations.length}</span>{" "}
+              {conversations.length === 1 ? "person" : "people"} · stored locally
+            </>
+          )}
+        </span>
+        {(onExport || onImport) && (
+          <div className="flex items-center gap-0.5">
+            {onExport && (
+              <MotionButton
+                onClick={onExport}
+                aria-label="Export a backup"
+                title="Export all conversations as a backup file"
+                className="rounded p-1 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                <IconDownload size={14} />
+              </MotionButton>
+            )}
+            {onImport && (
+              <MotionButton
+                onClick={onImport}
+                aria-label="Import a backup"
+                title="Import conversations from a backup file"
+                className="rounded p-1 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                <IconUpload size={14} />
+              </MotionButton>
+            )}
+          </div>
         )}
       </footer>
     </div>

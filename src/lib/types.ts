@@ -110,3 +110,47 @@ export interface SuggestResult {
   extractedFacts: Fact[];
   addedMessages: Message[];
 }
+
+/* --------------------------------- backup ---------------------------------- */
+
+export const BACKUP_VERSION = 1;
+
+/** One conversation with all its data, ids stripped (portable across instances). */
+export interface BackupConversation {
+  name: string;
+  platform: string | null;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+  messages: Array<{ role: MessageRole; content: string; created_at: number }>;
+  facts: Array<{
+    content: string;
+    category: FactCategory;
+    pinned: 0 | 1;
+    source: FactSource;
+    created_at: number;
+  }>;
+  queued: Array<{
+    content: string;
+    tone: string | null;
+    created_at: number;
+    /** Index into this conversation's `messages` array, or null. Re-linked on import. */
+    target_message_index: number | null;
+  }>;
+}
+
+/** A full portable dump of every conversation — the export/import payload. */
+export interface Backup {
+  version: number;
+  exported_at: number;
+  conversations: BackupConversation[];
+}
+
+/** What an import reports back. */
+export interface ImportResult {
+  importedConversations: number;
+  skippedConversations: number;
+  importedMessages: number;
+  importedFacts: number;
+  importedQueued: number;
+}

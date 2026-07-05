@@ -1,6 +1,50 @@
 import { z } from "zod";
 import { FACT_CATEGORIES } from "./types";
 
+/* --------------------------------- backup ---------------------------------- */
+
+const backupMessageSchema = z.object({
+  role: z.enum(["them", "me", "context"]),
+  content: z.string(),
+  created_at: z.number(),
+});
+
+const backupFactSchema = z.object({
+  content: z.string(),
+  // Categories are normalized on import, so accept any string here.
+  category: z.string().optional(),
+  pinned: z.union([z.literal(0), z.literal(1)]).optional(),
+  source: z.enum(["ai", "user"]).optional(),
+  created_at: z.number(),
+});
+
+const backupQueuedSchema = z.object({
+  content: z.string(),
+  tone: z.string().nullable().optional(),
+  created_at: z.number(),
+  target_message_index: z.number().int().nullable().optional(),
+});
+
+const backupConversationSchema = z.object({
+  name: z.string(),
+  platform: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  created_at: z.number(),
+  updated_at: z.number(),
+  messages: z.array(backupMessageSchema).default([]),
+  facts: z.array(backupFactSchema).default([]),
+  queued: z.array(backupQueuedSchema).default([]),
+});
+
+/** Import payload — lenient on optional fields, strict on the essentials. */
+export const backupSchema = z.object({
+  version: z.number(),
+  exported_at: z.number().optional(),
+  conversations: z.array(backupConversationSchema),
+});
+
+export type ParsedBackup = z.infer<typeof backupSchema>;
+
 /**
  * One extracted fact for the per-person library. Cami has no structured-output
  * guarantee, so accept either {fact, category} or a bare string (legacy shape)
