@@ -3,7 +3,9 @@ services:
     build: .
     container_name: cyrano
     ports:
-      - "3000:3000"
+      # Host port is configurable (set CYRANO_PORT in .env) so this can share a
+      # host with other apps without colliding; container stays on 3000.
+      - "${CYRANO_PORT:-3000}:3000"
     environment:
       # Cami lives on the LAN; the container must be able to route to that IP.
       # (A LAN IP like 192.168.x.x works from the default bridge network — no
