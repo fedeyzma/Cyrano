@@ -7,9 +7,12 @@ import {
   promptAnswersSchema,
   SUGGESTION_JSON_EXAMPLE,
   suggestionSchema,
+  THREAD_FACTS_JSON_EXAMPLE,
+  threadFactsSchema,
   type ProfileScan,
   type PromptAnswers,
   type Suggestion,
+  type ThreadFacts,
 } from "./schema";
 import type { Role } from "./types";
 
@@ -95,7 +98,7 @@ async function chat(
  * tool use / notifications. We retry once if the first response isn't parseable.
  */
 export async function generateSuggestions(system: string, prompt: string): Promise<Suggestion> {
-  const jsonInstruction = `\n\nThis is a pure text-generation task. Do NOT use any tools, do NOT notify anyone, do NOT ask questions. Return ONLY a single valid JSON object — no markdown, no code fences, no commentary before or after it — in exactly this shape:\n${SUGGESTION_JSON_EXAMPLE}\nEach option's "text" is the message to send (clean, no surrounding quotes). "tone" is one of: dry, playful, curious, flirty, sincere, bold.`;
+  const jsonInstruction = `\n\nThis is a pure text-generation task. Do NOT use any tools, do NOT notify anyone, do NOT ask questions. Return ONLY a single valid JSON object — no markdown, no code fences, no commentary before or after it — in exactly this shape:\n${SUGGESTION_JSON_EXAMPLE}\nEach option's "text" is the message to send (clean, no surrounding quotes). "tone" is one of: dry, playful, curious, flirty, sincere, bold. Each extractedFacts item is {"fact","category"} with "category" one of: basics, people, interests, tastes, plans, stories, jokes, other.`;
   const sys = system + jsonInstruction;
 
   let lastParseError: unknown;
@@ -131,6 +134,29 @@ export async function generatePromptAnswers(
     }
   }
   throw new LlmError("Cami did not return usable prompt answers. Try again.", lastParseError);
+}
+
+/** Scan a whole thread and return new library facts (strict JSON, with retry). */
+export async function extractFactLibrary(system: string, userMsg: string): Promise<ThreadFacts> {
+  const jsonInstruction = `\n\nThis is a pure extraction task. Do NOT use tools, notify anyone, or ask questions. Return ONLY a single valid JSON object — no markdown, no commentary — exactly:\n${THREAD_FACTS_JSON_EXAMPLE}\n"category" is one of: basics, people, interests, tastes, plans, stories, jokes, other.`;
+  const sys = system + jsonInstruction;
+
+  let lastParseError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    // Re-emitting a whole library needs a big output budget; keep it
+    // near-deterministic and allow extra time for long threads.
+    const raw = await chat(sys, userMsg, {
+      maxTokens: 4000,
+      temperature: 0.3,
+      timeoutMs: 90000,
+    });
+    try {
+      return threadFactsSchema.parse(extractJson(raw));
+    } catch (err) {
+      lastParseError = err;
+    }
+  }
+  throw new LlmError("Cami couldn't scan that thread for details. Try again.", lastParseError);
 }
 
 /** Read profile screenshot(s) and return a hook + openers (strict JSON, with retry). */

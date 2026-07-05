@@ -1,6 +1,54 @@
+/** Reply-relevant speaker: only these two take part in suggestion targeting. */
 export type Role = "them" | "me";
 
+/**
+ * How a row in the thread is stored. `context` is a situational note the user
+ * drops in for Cyrano to read as background — it is never a message from
+ * either party and is never a reply target. Reply/targeting code stays on
+ * {@link Role} (them|me) so context is excluded by construction.
+ */
+export type MessageRole = Role | "context";
+
 export type FactSource = "ai" | "user";
+
+/** Fixed category set for the per-person fact library. Order = display order. */
+export const FACT_CATEGORIES = [
+  "basics",
+  "people",
+  "interests",
+  "tastes",
+  "plans",
+  "stories",
+  "jokes",
+  "other",
+] as const;
+
+export type FactCategory = (typeof FACT_CATEGORIES)[number];
+
+export const FACT_CATEGORY_LABELS: Record<FactCategory, string> = {
+  basics: "Basics",
+  people: "People & pets",
+  interests: "Interests",
+  tastes: "Likes & dislikes",
+  plans: "Plans & follow-ups",
+  stories: "Stories",
+  jokes: "Inside jokes",
+  other: "Other",
+};
+
+/** Map a free-form category string (from the model or an old row) onto the fixed set. */
+export function normalizeFactCategory(raw: string | null | undefined): FactCategory {
+  const r = (raw ?? "").trim().toLowerCase();
+  if ((FACT_CATEGORIES as readonly string[]).includes(r)) return r as FactCategory;
+  if (/job|work|career|school|stud|city|home|live|from|origin|age|basic|bio/.test(r)) return "basics";
+  if (/famil|friend|pet|dog|cat|people|sister|brother|parent|roommate/.test(r)) return "people";
+  if (/interest|hobb|music|show|movie|sport|book|game|art|passion/.test(r)) return "interests";
+  if (/taste|like|dislike|food|drink|prefer|favorite|favourite|hate|opinion/.test(r)) return "tastes";
+  if (/plan|date|trip|travel|event|upcoming|follow|goal/.test(r)) return "plans";
+  if (/stor|anecdote|happen|past|memor|life/.test(r)) return "stories";
+  if (/joke|banter|bit|tease|callback|humor|humour|running/.test(r)) return "jokes";
+  return "other";
+}
 
 export interface Conversation {
   id: number;
@@ -20,7 +68,7 @@ export interface ConversationListItem extends Conversation {
 export interface Message {
   id: number;
   conversation_id: number;
-  role: Role;
+  role: MessageRole;
   content: string;
   created_at: number;
 }
@@ -29,6 +77,7 @@ export interface Fact {
   id: number;
   conversation_id: number;
   content: string;
+  category: FactCategory;
   pinned: 0 | 1;
   source: FactSource;
   created_at: number;

@@ -3,7 +3,9 @@ import type {
   ConversationDetail,
   ConversationListItem,
   Fact,
+  FactCategory,
   Message,
+  MessageRole,
   QueuedReply,
   ReplyOption,
   Role,
@@ -66,7 +68,7 @@ export const api = {
   deleteConversation: (id: number) =>
     req<{ ok: boolean }>(`/api/conversations/${id}`, { method: "DELETE" }),
 
-  addMessage: (id: number, role: Role, content: string) =>
+  addMessage: (id: number, role: MessageRole, content: string) =>
     req<Message>(`/api/conversations/${id}/messages`, {
       method: "POST",
       body: JSON.stringify({ role, content }),
@@ -123,10 +125,15 @@ export const api = {
       body: JSON.stringify(opts),
     }),
 
-  addFact: (id: number, content: string) =>
+  addFact: (id: number, content: string, category?: FactCategory) =>
     req<Fact>(`/api/conversations/${id}/facts`, {
       method: "POST",
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, category }),
+    }),
+
+  scanFacts: (id: number) =>
+    req<{ facts: Fact[]; refiled: number }>(`/api/conversations/${id}/facts/scan`, {
+      method: "POST",
     }),
 
   setFactPinned: (id: number, factId: number, pinned: boolean) =>
@@ -169,5 +176,5 @@ export interface ProfileScanResult {
   read: string;
   pick: { target: string; type: string; reason: string };
   openers: Array<{ text: string; tone: string }>;
-  extractedFacts: string[];
+  extractedFacts: Array<{ fact: string; category?: string }>;
 }

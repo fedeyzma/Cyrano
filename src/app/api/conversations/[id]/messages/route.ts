@@ -1,6 +1,6 @@
 import { addMessage, getConversation } from "@/lib/db";
 import { json, parseId, readJson } from "@/lib/http";
-import type { Role } from "@/lib/types";
+import type { MessageRole } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,9 +15,10 @@ export async function POST(req: Request, { params }: Ctx) {
   const body = await readJson<{ role?: string; content?: string }>(req);
   if (!body) return json({ error: "Invalid JSON" }, 400);
 
-  const role: Role | null = body.role === "me" || body.role === "them" ? body.role : null;
+  const role: MessageRole | null =
+    body.role === "me" || body.role === "them" || body.role === "context" ? body.role : null;
   const content = typeof body.content === "string" ? body.content.trim() : "";
-  if (!role) return json({ error: "role must be 'me' or 'them'" }, 400);
+  if (!role) return json({ error: "role must be 'me', 'them', or 'context'" }, 400);
   if (!content) return json({ error: "content is required" }, 400);
 
   return json(addMessage(id, role, content), 201);

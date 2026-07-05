@@ -1,14 +1,29 @@
 "use client";
 
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConversationView } from "@/components/ConversationView";
 import { FactsPanel } from "@/components/FactsPanel";
 import { IconHeart, IconMenu, IconSparkles } from "@/components/icons";
 import { ImportThreadModal } from "@/components/ImportThreadModal";
 import { NewConversationModal } from "@/components/NewConversationModal";
+import { PersonDossier } from "@/components/PersonDossier";
+import { ProfileModal } from "@/components/ProfileModal";
 import { ProfileScan } from "@/components/ProfileScan";
 import { PromptsLab } from "@/components/PromptsLab";
 import { Sidebar } from "@/components/Sidebar";
+import {
+  MotionButton,
+  SPRING_MICRO,
+  ViewFade,
+  drawerVariants,
+  fadeUp,
+  listContainer,
+  rm,
+  scrimVariants,
+  toastVariants,
+  useAppReducedMotion,
+} from "@/components/motion";
 import { ApiError, api } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import type { ParsedMessage } from "@/lib/parseThread";
@@ -16,23 +31,50 @@ import type {
   ConversationDetail,
   ConversationListItem,
   Fact,
+  FactCategory,
+  MessageRole,
   QueuedReply,
   ReplyOption,
   Role,
 } from "@/lib/types";
+import { normalizeFactCategory } from "@/lib/types";
 
 type Toast = { id: number; message: string; kind: "info" | "error" };
 
 export default function Home() {
+  const reduced = useAppReducedMotion();
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  const [suggestions, setSuggestions] = useState<ReplyOption[] | null>(null);
-  const [suggesting, setSuggesting] = useState(false);
-  const [suggestError, setSuggestError] = useState<string | null>(null);
+  // Mirrors selectedId synchronously so in-flight requests can tell whether
+  // the user has switched conversations before applying their result.
+  const selectedIdRef = useRef<number | null>(null);
+  const setSelected = useCallback((id: number | null) => {
+    selectedIdRef.current = id;
+    setSelectedId(id);
+  }, []);
+
+  // Suggestion state is kept per conversation: a generation that finishes
+  // after switching tabs lands on the conversation it belongs to.
+  const [suggestionsByConv, setSuggestionsByConv] = useState<
+    Record<number, ReplyOption[] | undefined>
+  >({});
+  const [suggestingIds, setSuggestingIds] = useState<number[]>([]);
+  const [suggestErrorByConv, setSuggestErrorByConv] = useState<
+    Record<number, string | undefined>
+  >({});
+
+  const suggestions = selectedId !== null ? (suggestionsByConv[selectedId] ?? null) : null;
+  const suggesting = selectedId !== null && suggestingIds.includes(selectedId);
+  const suggestError = selectedId !== null ? (suggestErrorByConv[selectedId] ?? null) : null;
+
+  const clearSuggestions = useCallback((id: number) => {
+    setSuggestionsByConv((prev) => ({ ...prev, [id]: undefined }));
+    setSuggestErrorByConv((prev) => ({ ...prev, [id]: undefined }));
+  }, []);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -40,10 +82,17 @@ export default function Home() {
 
   const [mobileNav, setMobileNav] = useState(false);
   const [factsOpen, setFactsOpen] = useState(false);
+  const [dossierOpen, setDossierOpen] = useState(false);
+  // Thread scans are slow (self-hosted model); track per conversation like suggestions.
+  const [scanningFactsIds, setScanningFactsIds] = useState<number[]>([]);
 
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [view, setView] = useState<"replies" | "prompts" | "scan">("replies");
 
@@ -85,11 +134,14 @@ export default function Home() {
       if (!opts?.silent) setLoadingDetail(true);
       try {
         const d = await api.getConversation(id);
+        // Drop stale responses: never paint another conversation's data
+        // over the one the user is currently viewing.
+        if (selectedIdRef.current !== id) return;
         setDetail(d);
       } catch (e) {
-        handleError(e);
+        if (selectedIdRef.current === id) handleError(e);
       } finally {
-        if (!opts?.silent) setLoadingDetail(false);
+        if (!opts?.silent && selectedIdRef.current === id) setLoadingDetail(false);
       }
     },
     [handleError],
@@ -101,18 +153,20 @@ export default function Home() {
       setLoadingList(true);
       const list = await refreshList();
       setLoadingList(false);
-      if (list.length > 0) setSelectedId((cur) => cur ?? list[0].id);
+      if (list.length > 0 && selectedIdRef.current === null) setSelected(list[0].id);
     })();
-  }, [refreshList]);
+  }, [refreshList, setSelected]);
 
   // Load detail whenever the selection changes; reset transient state.
   useEffect(() => {
-    setSuggestions(null);
-    setSuggestError(null);
     setFactsOpen(false);
+    setDossierOpen(false);
     setImportOpen(false);
+    setProfileOpen(false);
+    setProfileError(null);
     if (selectedId === null) {
       setDetail(null);
+      setLoadingDetail(false);
       return;
     }
     setDetail(null);
@@ -120,7 +174,7 @@ export default function Home() {
   }, [selectedId, loadDetail]);
 
   function selectConversation(id: number) {
-    setSelectedId(id);
+    setSelected(id);
     setView("replies");
     setMobileNav(false);
   }
@@ -132,7 +186,7 @@ export default function Home() {
       const conv = await api.createConversation(data);
       await refreshList();
       setModalOpen(false);
-      setSelectedId(conv.id);
+      setSelected(conv.id);
     } catch (e) {
       setCreateError(e instanceof ApiError ? e.message : "Could not create conversation");
     } finally {
@@ -148,7 +202,7 @@ export default function Home() {
     try {
       await api.deleteConversation(id);
       const list = await refreshList();
-      setSelectedId(list.length > 0 ? list[0].id : null);
+      setSelected(list.length > 0 ? list[0].id : null);
       showToast("Conversation deleted");
     } catch (e) {
       handleError(e);
@@ -158,19 +212,22 @@ export default function Home() {
   async function handleSuggest(incoming: string, steer: string, targetIds: number[]) {
     if (selectedId === null) return;
     const id = selectedId;
-    setSuggesting(true);
-    setSuggestError(null);
-    setSuggestions(null);
+    const name = detail?.conversation.name;
+    setSuggestingIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setSuggestErrorByConv((prev) => ({ ...prev, [id]: undefined }));
+    setSuggestionsByConv((prev) => ({ ...prev, [id]: undefined }));
     try {
       const res = await api.suggest(id, {
         incoming: incoming || undefined,
         steer: steer || undefined,
         targetMessageIds: targetIds.length ? targetIds : undefined,
       });
-      setSuggestions(res.options);
+      setSuggestionsByConv((prev) => ({ ...prev, [id]: res.options }));
       await loadDetail(id, { silent: true });
       await refreshList();
-      if (res.extractedFacts.length > 0) {
+      if (selectedIdRef.current !== id) {
+        showToast(`Replies for ${name ?? "them"} are ready`);
+      } else if (res.extractedFacts.length > 0) {
         showToast(
           `Remembered ${res.extractedFacts.length} new ${
             res.extractedFacts.length === 1 ? "detail" : "details"
@@ -178,18 +235,19 @@ export default function Home() {
         );
       }
     } catch (e) {
-      setSuggestError(
-        e instanceof ApiError ? e.message : "Could not reach the LLM endpoint.",
-      );
+      setSuggestErrorByConv((prev) => ({
+        ...prev,
+        [id]: e instanceof ApiError ? e.message : "Could not reach the LLM endpoint.",
+      }));
       // The incoming message may have been saved server-side; refresh to show it.
       await loadDetail(id, { silent: true });
       await refreshList();
     } finally {
-      setSuggesting(false);
+      setSuggestingIds((prev) => prev.filter((x) => x !== id));
     }
   }
 
-  async function handleAddMessage(role: Role, content: string) {
+  async function handleAddMessage(role: MessageRole, content: string) {
     if (selectedId === null) return;
     const id = selectedId;
     try {
@@ -227,8 +285,7 @@ export default function Home() {
         id,
         texts.map((t) => ({ role: "me" as Role, content: t })),
       );
-      setSuggestions(null);
-      setSuggestError(null);
+      clearSuggestions(id);
       await loadDetail(id, { silent: true });
       await refreshList();
       showToast(texts.length > 1 ? `Sent ${texts.length} messages` : "Sent & logged");
@@ -251,9 +308,12 @@ export default function Home() {
       });
       const replacement = res.options[0];
       if (replacement) {
-        setSuggestions((prev) =>
-          prev ? prev.map((o, i) => (i === index ? replacement : o)) : prev,
-        );
+        setSuggestionsByConv((prev) => {
+          const cur = prev[id];
+          return cur
+            ? { ...prev, [id]: cur.map((o, i) => (i === index ? replacement : o)) }
+            : prev;
+        });
       }
     } catch (e) {
       handleError(e);
@@ -348,7 +408,7 @@ export default function Home() {
     [],
   );
 
-  async function handleAddFact(content: string) {
+  async function handleAddFact(content: string, category: FactCategory) {
     if (selectedId === null) return;
     const id = selectedId;
     const trimmed = content.trim();
@@ -358,17 +418,43 @@ export default function Home() {
       id: tempId,
       conversation_id: id,
       content: trimmed,
+      category,
       pinned: 0,
       source: "user",
       created_at: Date.now(),
     };
     patchDetail(id, (d) => ({ ...d, facts: [...d.facts, temp] })); // show instantly
     try {
-      const real = await api.addFact(id, trimmed);
+      const real = await api.addFact(id, trimmed, category);
       patchDetail(id, (d) => ({ ...d, facts: d.facts.map((f) => (f.id === tempId ? real : f)) }));
     } catch (e) {
       patchDetail(id, (d) => ({ ...d, facts: d.facts.filter((f) => f.id !== tempId) }));
       handleError(e);
+    }
+  }
+
+  async function handleScanFacts() {
+    if (selectedId === null) return;
+    const id = selectedId;
+    const name = detail?.conversation.name;
+    setScanningFactsIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    try {
+      const res = await api.scanFacts(id);
+      await loadDetail(id, { silent: true });
+      const parts: string[] = [];
+      if (res.facts.length > 0) {
+        parts.push(
+          `Filed ${res.facts.length} new ${res.facts.length === 1 ? "detail" : "details"} about ${name ?? "them"}`,
+        );
+      }
+      if (res.refiled > 0) {
+        parts.push(`organized ${res.refiled} existing`);
+      }
+      showToast(parts.length > 0 ? parts.join(", ") : "Nothing new to file — the library is up to date");
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setScanningFactsIds((prev) => prev.filter((x) => x !== id));
     }
   }
 
@@ -414,10 +500,32 @@ export default function Home() {
     }
   }
 
+  async function handleSaveProfile(patch: {
+    name: string;
+    platform: string | null;
+    notes: string | null;
+  }) {
+    if (selectedId === null) return;
+    const id = selectedId;
+    setSavingProfile(true);
+    setProfileError(null);
+    try {
+      await api.updateConversation(id, patch);
+      await loadDetail(id, { silent: true });
+      await refreshList();
+      setProfileOpen(false);
+      showToast("Profile updated");
+    } catch (e) {
+      setProfileError(e instanceof ApiError ? e.message : "Could not update the profile");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
   async function handleStartFromScan(data: {
     name: string;
     platform: string;
-    facts: string[];
+    facts: Array<{ fact: string; category?: string }>;
     opener: string;
   }) {
     try {
@@ -427,14 +535,14 @@ export default function Home() {
       });
       for (const f of data.facts) {
         try {
-          await api.addFact(conv.id, f);
+          await api.addFact(conv.id, f.fact, normalizeFactCategory(f.category));
         } catch {
           /* skip duplicates */
         }
       }
       await refreshList();
       setView("replies");
-      setSelectedId(conv.id);
+      setSelected(conv.id);
       try {
         await navigator.clipboard.writeText(data.opener);
       } catch {
@@ -447,6 +555,17 @@ export default function Home() {
   }
 
   const factsCount = detail?.facts.length ?? 0;
+
+  // Crossfade key for the main region: distinguishes the three views, each
+  // open conversation, and the empty/loading state (purely presentational).
+  const viewKey =
+    view === "scan"
+      ? "scan"
+      : view === "prompts"
+        ? "prompts"
+        : detail
+          ? `replies-${detail.conversation.id}`
+          : "replies-empty";
 
   return (
     <div className="app-backdrop flex h-dvh overflow-hidden text-ink">
@@ -466,70 +585,95 @@ export default function Home() {
       {/* Center + right */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-3 md:hidden">
-          <button
+        <div className="glass-header flex h-12 shrink-0 items-center gap-2 border-b border-line px-3 md:hidden">
+          <MotionButton
             onClick={() => setMobileNav(true)}
             aria-label="Open conversations"
             className="rounded-md p-1.5 text-ink-secondary transition-colors duration-150 hover:bg-fill-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <IconMenu size={20} />
-          </button>
+          </MotionButton>
+          {/* Inter here — Fraunces WONK-1 wordmark lives in the sidebar only (spec §4) */}
           <span className="flex items-center gap-1.5 text-title">
             <IconHeart size={16} className="text-accent" /> Cyrano
           </span>
         </div>
 
         <div className="flex min-h-0 flex-1">
-          <main className="flex min-w-0 flex-1 flex-col">
-            {view === "scan" ? (
-              <ProfileScan onScan={(d) => api.scanProfile(d)} onStart={handleStartFromScan} />
-            ) : view === "prompts" ? (
-              <PromptsLab
-                onGenerate={async (data) => {
-                  const res = await api.suggestPrompt(data);
-                  return res.options;
-                }}
-              />
-            ) : detail ? (
-              <ConversationView
-                key={detail.conversation.id}
-                detail={detail}
-                suggestions={suggestions}
-                suggesting={suggesting}
-                suggestError={suggestError}
-                factsCount={factsCount}
-                onSuggest={handleSuggest}
-                onAddMessage={handleAddMessage}
-                onUseOption={handleUseOption}
-                onQueueOption={handleQueue}
-                onRegenerateOne={handleRegenerateOne}
-                onDismissSuggestions={() => {
-                  setSuggestions(null);
-                  setSuggestError(null);
-                }}
-                onDeleteMessage={handleDeleteMessage}
-                onEditMessage={handleEditMessage}
-                onDeleteConversation={handleDeleteConversation}
-                onDeleteQueued={handleDeleteQueued}
-                onSendQueued={handleSendQueued}
-                onOpenImport={() => setImportOpen(true)}
-                onOpenFacts={() => setFactsOpen(true)}
-              />
-            ) : (
-              <EmptyMain
-                loading={loadingDetail || (loadingList && conversations.length > 0)}
-                hasConversations={conversations.length > 0}
-                onNew={() => setModalOpen(true)}
-              />
-            )}
+          <main className="relative flex min-w-0 flex-1 flex-col">
+            <ViewFade viewKey={viewKey} className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {view === "scan" ? (
+                <ProfileScan onScan={(d) => api.scanProfile(d)} onStart={handleStartFromScan} />
+              ) : view === "prompts" ? (
+                <PromptsLab
+                  onGenerate={async (data) => {
+                    const res = await api.suggestPrompt(data);
+                    return res.options;
+                  }}
+                />
+              ) : detail ? (
+                <ConversationView
+                  key={detail.conversation.id}
+                  detail={detail}
+                  suggestions={suggestions}
+                  suggesting={suggesting}
+                  suggestError={suggestError}
+                  factsCount={factsCount}
+                  onSuggest={handleSuggest}
+                  onAddMessage={handleAddMessage}
+                  onUseOption={handleUseOption}
+                  onQueueOption={handleQueue}
+                  onRegenerateOne={handleRegenerateOne}
+                  onDismissSuggestions={() => {
+                    if (selectedId !== null) clearSuggestions(selectedId);
+                  }}
+                  onDeleteMessage={handleDeleteMessage}
+                  onEditMessage={handleEditMessage}
+                  onDeleteConversation={handleDeleteConversation}
+                  onDeleteQueued={handleDeleteQueued}
+                  onSendQueued={handleSendQueued}
+                  onOpenImport={() => setImportOpen(true)}
+                  onOpenFacts={() => setFactsOpen(true)}
+                  onOpenProfile={() => setDossierOpen(true)}
+                />
+              ) : (
+                <EmptyMain
+                  loading={loadingDetail || (loadingList && conversations.length > 0)}
+                  hasConversations={conversations.length > 0}
+                  onNew={() => setModalOpen(true)}
+                />
+              )}
+            </ViewFade>
+
+            {/* Person dossier — full-region overlay over the chat (§ plan) */}
+            <AnimatePresence>
+              {view === "replies" && detail && dossierOpen && (
+                <PersonDossier
+                  key={`dossier-${detail.conversation.id}`}
+                  detail={detail}
+                  scanning={selectedId !== null && scanningFactsIds.includes(selectedId)}
+                  onAddFact={handleAddFact}
+                  onScanFacts={handleScanFacts}
+                  onDeleteFact={handleDeleteFact}
+                  onTogglePin={handleTogglePin}
+                  onEditProfile={() => {
+                    setProfileError(null);
+                    setProfileOpen(true);
+                  }}
+                  onClose={() => setDossierOpen(false)}
+                />
+              )}
+            </AnimatePresence>
           </main>
 
-          {/* Inline facts (xl+) */}
-          {view === "replies" && detail && (
+          {/* Inline facts (xl+) — hidden while the dossier covers the chat */}
+          {view === "replies" && detail && !dossierOpen && (
             <aside className="hidden w-80 shrink-0 border-l border-line xl:flex">
               <FactsPanel
                 detail={detail}
+                scanning={selectedId !== null && scanningFactsIds.includes(selectedId)}
                 onAddFact={handleAddFact}
+                onScanFacts={handleScanFacts}
                 onDeleteFact={handleDeleteFact}
                 onTogglePin={handleTogglePin}
                 onUpdateConversation={handleUpdateConversation}
@@ -540,39 +684,55 @@ export default function Home() {
       </div>
 
       {/* Mobile sidebar drawer */}
-      {mobileNav && (
-        <Drawer side="left" onClose={() => setMobileNav(false)}>
-          <Sidebar
-            conversations={conversations}
-            selectedId={selectedId}
-            loading={loadingList}
-            view={view}
-            onView={(v) => {
-              setView(v);
-              setMobileNav(false);
-            }}
-            onSelect={selectConversation}
-            onNew={() => {
-              setMobileNav(false);
-              setModalOpen(true);
-            }}
-          />
-        </Drawer>
-      )}
+      <AnimatePresence>
+        {mobileNav && (
+          <Drawer key="mobile-nav" side="left" onClose={() => setMobileNav(false)}>
+            <Sidebar
+              idPrefix="drawer"
+              conversations={conversations}
+              selectedId={selectedId}
+              loading={loadingList}
+              view={view}
+              onView={(v) => {
+                setView(v);
+                setMobileNav(false);
+              }}
+              onSelect={selectConversation}
+              onNew={() => {
+                setMobileNav(false);
+                setModalOpen(true);
+              }}
+            />
+          </Drawer>
+        )}
+      </AnimatePresence>
 
       {/* Facts drawer (below xl) */}
-      {factsOpen && detail && (
-        <Drawer side="right" onClose={() => setFactsOpen(false)}>
-          <FactsPanel
-            detail={detail}
-            onAddFact={handleAddFact}
-            onDeleteFact={handleDeleteFact}
-            onTogglePin={handleTogglePin}
-            onUpdateConversation={handleUpdateConversation}
-            onClose={() => setFactsOpen(false)}
-          />
-        </Drawer>
-      )}
+      <AnimatePresence>
+        {factsOpen && detail && (
+          <Drawer key="facts" side="right" onClose={() => setFactsOpen(false)}>
+            <FactsPanel
+              detail={detail}
+              scanning={selectedId !== null && scanningFactsIds.includes(selectedId)}
+              onAddFact={handleAddFact}
+              onScanFacts={handleScanFacts}
+              onDeleteFact={handleDeleteFact}
+              onTogglePin={handleTogglePin}
+              onUpdateConversation={handleUpdateConversation}
+              onClose={() => setFactsOpen(false)}
+            />
+          </Drawer>
+        )}
+      </AnimatePresence>
+
+      <ProfileModal
+        open={profileOpen}
+        conversation={detail?.conversation ?? null}
+        saving={savingProfile}
+        error={profileError}
+        onClose={() => setProfileOpen(false)}
+        onSave={handleSaveProfile}
+      />
 
       <NewConversationModal
         open={modalOpen}
@@ -587,6 +747,7 @@ export default function Home() {
         importing={importing}
         error={importError}
         conversationName={detail?.conversation.name ?? "them"}
+        existingMessages={detail?.messages ?? []}
         onClose={() => setImportOpen(false)}
         onImport={handleImport}
         onAiParse={async (raw) => {
@@ -596,20 +757,25 @@ export default function Home() {
         }}
       />
 
-      {toast && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
-          <div
-            className={cx(
-              "animate-fade-up rounded-full border px-4 py-2 text-sm shadow-md backdrop-blur",
-              toast.kind === "error"
-                ? "border-danger/30 bg-danger-soft text-danger"
-                : "border-line bg-surface-high/90 text-ink",
-            )}
-          >
-            {toast.message}
-          </div>
-        </div>
-      )}
+      <div className="pointer-events-none fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
+        <AnimatePresence mode="popLayout">
+          {toast && (
+            <motion.div
+              key={toast.id}
+              variants={rm(reduced, toastVariants)}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              className={cx(
+                "glass-toast rounded-full border px-4 py-2 text-sm shadow-md",
+                toast.kind === "error" ? "border-danger/30 text-danger" : "border-line text-ink",
+              )}
+            >
+              {toast.message}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
@@ -623,20 +789,32 @@ function Drawer({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const reduced = useAppReducedMotion();
   return (
     <div className={cx("fixed inset-0 z-40", side === "left" ? "md:hidden" : "xl:hidden")}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div
+      <motion.div
+        variants={rm(reduced, scrimVariants)}
+        initial="initial"
+        animate="enter"
+        exit="exit"
+        className="absolute inset-0 bg-black/65 backdrop-blur-[6px]"
+        onClick={onClose}
+      />
+      <motion.div
         role="dialog"
         aria-modal="true"
+        variants={rm(reduced, drawerVariants(side))}
+        initial="initial"
+        animate="enter"
+        exit="exit"
         className={cx(
-          "absolute inset-y-0 w-[86%] max-w-xs animate-fade-up bg-surface",
+          "glass-drawer absolute inset-y-0 w-[86%] max-w-xs",
           side === "left" ? "left-0 border-r" : "right-0 border-l",
           "border-line-strong shadow-lg",
         )}
       >
         {children}
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -650,34 +828,50 @@ function EmptyMain({
   hasConversations: boolean;
   onNew: () => void;
 }) {
+  const reduced = useAppReducedMotion();
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">
+      <div className="flex flex-1 items-center justify-center text-sm text-ink-muted">
         <span>Loading…</span>
       </div>
     );
   }
+  // The drop cap stamps in first (SPRING_MICRO); heading body + copy + CTA
+  // follow 80ms apart (§6.3 "The drop-cap welcome").
+  const stamp = rm(reduced, {
+    initial: { opacity: 0, scale: 1.12 },
+    enter: { opacity: 1, scale: 1, transition: SPRING_MICRO },
+  });
+  const item = rm(reduced, fadeUp(6));
   return (
     <div className="flex flex-1 items-center justify-center p-6">
-      <div className="max-w-sm text-center">
-        <span className="mx-auto grid h-14 w-14 place-items-center rounded-xl bg-accent-soft text-accent">
-          <IconSparkles size={26} />
-        </span>
-        <h2 className="mt-4 text-display text-ink">
+      <motion.div
+        variants={rm(reduced, listContainer(80))}
+        initial="initial"
+        animate="enter"
+        className="max-w-sm"
+      >
+        <motion.h2
+          variants={stamp}
+          style={{ transformOrigin: "left bottom" }}
+          className="font-display drop-cap text-display text-ink"
+        >
           {hasConversations ? "Pick a conversation" : "Welcome to Cyrano"}
-        </h2>
-        <p className="mt-1.5 text-sm leading-normal text-ink-secondary">
+        </motion.h2>
+        <motion.p variants={item} className="mt-3 text-sm leading-normal text-ink-secondary">
           {hasConversations
             ? "Choose someone from the left, paste their latest message, and get a few natural ways to reply."
             : "Your private reply copilot. Add the first person you're talking to, paste what they said, and get dry, natural replies — with a memory for the details."}
-        </p>
-        <button
-          onClick={onNew}
-          className="mt-5 inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-        >
-          <IconSparkles size={16} /> New conversation
-        </button>
-      </div>
+        </motion.p>
+        <motion.div variants={item} className="mt-6">
+          <MotionButton
+            onClick={onNew}
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-press transition-colors duration-150 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          >
+            <IconSparkles size={16} /> New conversation
+          </MotionButton>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

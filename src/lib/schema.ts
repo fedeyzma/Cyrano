@@ -1,4 +1,26 @@
 import { z } from "zod";
+import { FACT_CATEGORIES } from "./types";
+
+/**
+ * One extracted fact for the per-person library. Cami has no structured-output
+ * guarantee, so accept either {fact, category} or a bare string (legacy shape)
+ * and normalize to the object; the category string is mapped onto the fixed
+ * set later via normalizeFactCategory.
+ */
+export const extractedFactSchema = z
+  .union([
+    z.string(),
+    z.object({
+      fact: z.string().describe("one short third-person detail about them"),
+      category: z
+        .string()
+        .optional()
+        .describe(`one of: ${FACT_CATEGORIES.join(", ")}`),
+    }),
+  ])
+  .transform((v) => (typeof v === "string" ? { fact: v, category: undefined } : v));
+
+export type ExtractedFact = z.infer<typeof extractedFactSchema>;
 
 export const replyOptionSchema = z.object({
   texts: z
@@ -19,9 +41,9 @@ export const suggestionSchema = z.object({
     .min(1)
     .describe("a few distinct reply options, each with a slightly different angle"),
   extractedFacts: z
-    .array(z.string())
+    .array(extractedFactSchema)
     .describe(
-      "new, durable facts learned about the other person from their latest message(s); empty array if nothing new",
+      "new durable details learned about the other person from their latest message(s), each with a category; empty array if nothing new",
     ),
 });
 
@@ -29,7 +51,23 @@ export type Suggestion = z.infer<typeof suggestionSchema>;
 
 /** A compact example of the expected JSON, used in the text-mode fallback. */
 export const SUGGESTION_JSON_EXAMPLE =
-  '{"options":[{"texts":["..."],"tone":"dry"},{"texts":["wait","actually no"],"tone":"playful"}],"extractedFacts":["..."]}';
+  '{"options":[{"texts":["..."],"tone":"dry"},{"texts":["wait","actually no"],"tone":"playful"}],"extractedFacts":[{"fact":"has a corgi named Biscuit","category":"people"}]}';
+
+/** Full-thread fact scan: every durable detail about them, categorized. */
+export const threadFactsSchema = z.object({
+  facts: z
+    .array(extractedFactSchema)
+    .describe("every new durable detail about them found in the thread; empty if none"),
+  refiled: z
+    .array(z.object({ id: z.number(), category: z.string() }))
+    .optional()
+    .describe("category assignments for the saved-but-unfiled facts listed by id"),
+});
+
+export type ThreadFacts = z.infer<typeof threadFactsSchema>;
+
+export const THREAD_FACTS_JSON_EXAMPLE =
+  '{"facts":[{"fact":"works as an ICU nurse","category":"basics"},{"fact":"her cat is named Miso","category":"people"}],"refiled":[{"id":12,"category":"interests"}]}';
 
 /** Shape returned when the LLM parses a raw pasted thread into messages. */
 export const importedThreadSchema = z.object({
@@ -89,11 +127,13 @@ export const profileScanSchema = z.object({
     .min(1)
     .describe("a few distinct opener options that reference the hook"),
   extractedFacts: z
-    .array(z.string())
-    .describe("durable facts about HER from the profile (job, hometown, interests, pet); empty if none"),
+    .array(extractedFactSchema)
+    .describe(
+      "durable facts about HER from the profile (job, hometown, interests, pet), each with a category; empty if none",
+    ),
 });
 
 export type ProfileScan = z.infer<typeof profileScanSchema>;
 
 export const PROFILE_SCAN_JSON_EXAMPLE =
-  '{"name":"","read":"...","pick":{"target":"...","type":"prompt","reason":"..."},"openers":[{"text":"...","tone":"playful"}],"extractedFacts":["..."]}';
+  '{"name":"","read":"...","pick":{"target":"...","type":"prompt","reason":"..."},"openers":[{"text":"...","tone":"playful"}],"extractedFacts":[{"fact":"...","category":"interests"}]}';

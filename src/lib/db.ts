@@ -5,10 +5,11 @@ import type {
   Conversation,
   ConversationListItem,
   Fact,
+  FactCategory,
   FactSource,
   Message,
+  MessageRole,
   QueuedReply,
-  Role,
 } from "./types";
 
 // Reuse a single connection across hot reloads in dev.
@@ -33,7 +34,7 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS messages (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id INTEGER NOT NULL,
-    role            TEXT    NOT NULL CHECK (role IN ('them', 'me')),
+    role            TEXT    NOT NULL CHECK (role IN ('them', 'me', 'context')),
     content         TEXT    NOT NULL,
     created_at      INTEGER NOT NULL,
     FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
@@ -43,6 +44,7 @@ const SCHEMA = `
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id INTEGER NOT NULL,
     content         TEXT    NOT NULL,
+    category        TEXT    NOT NULL DEFAULT 'other',
     pinned          INTEGER NOT NULL DEFAULT 0,
     source          TEXT    NOT NULL DEFAULT 'ai' CHECK (source IN ('ai', 'user')),
     created_at      INTEGER NOT NULL,
@@ -70,7 +72,56 @@ function createDb(): DatabaseSync {
   mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec(SCHEMA);
+  // CREATE TABLE IF NOT EXISTS doesn't touch existing tables, so pre-category
+  // databases need the column added by hand.
+  const factCols = db.prepare(`PRAGMA table_info(facts)`).all() as unknown as Array<{
+    name: string;
+  }>;
+  if (!factCols.some((c) => c.name === "category")) {
+    db.exec(`ALTER TABLE facts ADD COLUMN category TEXT NOT NULL DEFAULT 'other'`);
+  }
+  migrateMessagesRoleCheck(db);
   return db;
+}
+
+/**
+ * Older databases carry `CHECK (role IN ('them','me'))` on messages, which
+ * rejects the newer `context` role. CHECK constraints can't be altered in
+ * place, so rebuild the table (ids preserved, so queued_replies FKs stay
+ * valid) when the old constraint is still present.
+ */
+function migrateMessagesRoleCheck(db: DatabaseSync): void {
+  const row = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'messages'`)
+    .get() as unknown as { sql?: string } | undefined;
+  const sql = row?.sql ?? "";
+  if (!sql || sql.includes("'context'")) return; // fresh schema already allows context
+
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN");
+  try {
+    db.exec(`
+      CREATE TABLE messages_new (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER NOT NULL,
+        role            TEXT    NOT NULL CHECK (role IN ('them', 'me', 'context')),
+        content         TEXT    NOT NULL,
+        created_at      INTEGER NOT NULL,
+        FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
+      );
+      INSERT INTO messages_new (id, conversation_id, role, content, created_at)
+        SELECT id, conversation_id, role, content, created_at FROM messages;
+      DROP TABLE messages;
+      ALTER TABLE messages_new RENAME TO messages;
+      CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages (conversation_id);
+    `);
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
 }
 
 export function getDb(): DatabaseSync {
@@ -153,7 +204,7 @@ export function getMessages(conversationId: number): Message[] {
     .all(conversationId) as unknown as Message[];
 }
 
-export function addMessage(conversationId: number, role: Role, content: string): Message {
+export function addMessage(conversationId: number, role: MessageRole, content: string): Message {
   const ts = now();
   const res = getDb()
     .prepare(
@@ -169,7 +220,7 @@ export function addMessage(conversationId: number, role: Role, content: string):
 /** Insert many messages in order, in a single transaction. */
 export function addMessages(
   conversationId: number,
-  items: Array<{ role: Role; content: string }>,
+  items: Array<{ role: MessageRole; content: string }>,
 ): Message[] {
   const db = getDb();
   const insert = db.prepare(
@@ -234,6 +285,7 @@ export function addFact(
   conversationId: number,
   content: string,
   source: FactSource,
+  category: FactCategory = "other",
 ): Fact | null {
   const trimmed = content.trim();
   if (!trimmed) return null;
@@ -246,13 +298,26 @@ export function addFact(
   const ts = now();
   const res = getDb()
     .prepare(
-      `INSERT INTO facts (conversation_id, content, pinned, source, created_at)
-       VALUES (?, ?, 0, ?, ?)`,
+      `INSERT INTO facts (conversation_id, content, category, pinned, source, created_at)
+       VALUES (?, ?, ?, 0, ?, ?)`,
     )
-    .run(conversationId, trimmed, source, ts);
+    .run(conversationId, trimmed, category, source, ts);
   return getDb()
     .prepare(`SELECT * FROM facts WHERE id = ?`)
     .get(Number(res.lastInsertRowid)) as unknown as Fact;
+}
+
+export function setFactCategory(
+  conversationId: number,
+  factId: number,
+  category: FactCategory,
+): Fact | undefined {
+  getDb()
+    .prepare(`UPDATE facts SET category = ? WHERE id = ? AND conversation_id = ?`)
+    .run(category, factId, conversationId);
+  return getDb()
+    .prepare(`SELECT * FROM facts WHERE id = ? AND conversation_id = ?`)
+    .get(factId, conversationId) as unknown as Fact | undefined;
 }
 
 export function setFactPinned(

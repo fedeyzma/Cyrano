@@ -1,57 +1,70 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Font ───────────────────────────────────────────── */
-  --font-sans: var(--font-inter, ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif);
+  /* ── Fonts ─────────────────────────────────────────────── */
+  --font-sans:    var(--font-inter, ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif);
+  --font-display: var(--font-fraunces, Georgia, "Times New Roman", serif);
 
-  /* ── Surfaces: opaque elevation ladder (must cover) ──── */
-  --color-canvas:        #09090b;  /* app base — keep brand black */
-  --color-surface:       #131316;  /* raised: modal, drawer, popover, composer interior */
-  --color-surface-high:  #1b1b20;  /* overlay on raised: toast, menu */
+  /* ── Surfaces: opaque elevation ladder (must cover) ────── */
+  --color-canvas:        #0b0a0e;   /* violet-black "night"; also viewport themeColor */
+  --color-canvas-deep:   #050507;   /* bottom of the body gradient; never #000 */
+  --color-surface:       #16131a;   /* modal, drawer, popover, composer interior */
+  --color-surface-high:  #201c26;   /* toast, menu */
 
-  /* ── Fills: translucent (backdrop glow reads through) ── */
-  --color-fill:          rgb(255 255 255 / 0.04);  /* resting card / list row */
-  --color-fill-hover:    rgb(255 255 255 / 0.07);
-  --color-fill-active:   rgb(255 255 255 / 0.10);  /* selected row */
+  /* ── Glass fills (used WITH backdrop-blur; chrome only) ── */
+  --color-glass:         rgb(22 19 26 / 0.72);   /* headers, composer dock */
+  --color-glass-heavy:   rgb(22 19 26 / 0.86);   /* modals, drawers */
 
-  /* ── Hairlines ───────────────────────────────────────── */
-  --color-line:          rgb(255 255 255 / 0.07);
-  --color-line-strong:   rgb(255 255 255 / 0.13);
+  /* ── Fills: translucent, candle-warmed rose-white ──────── */
+  --color-fill:          rgb(244 228 236 / 0.045);
+  --color-fill-hover:    rgb(244 228 236 / 0.075);
+  --color-fill-active:   rgb(244 228 236 / 0.11);
 
-  /* ── Ink (info-bearing text clears 4.5:1 on canvas) ──── */
-  --color-ink:            #f4f4f5;  /* primary ~17:1 */
-  --color-ink-secondary:  #b4b4bb;  /* body secondary ~9:1 */
-  --color-ink-muted:      #8a8a93;  /* labels, meta, placeholders ~5.4:1 */
-  --color-ink-faint:      #62626b;  /* decorative / disabled ONLY */
+  /* ── Hairlines ─────────────────────────────────────────── */
+  --color-line:          rgb(255 255 255 / 0.08);
+  --color-line-strong:   rgb(255 255 255 / 0.14);
+  --color-line-accent:   rgb(251 113 133 / 0.28);  /* rose rules + focused chrome */
 
-  /* ── Rose accent (identity kept) ─────────────────────── */
+  /* ── Ink (verified against darkest stop #050507) ───────── */
+  --color-ink:            #f5f3f7;  /* ~17.5:1 */
+  --color-ink-secondary:  #b6b1bd;  /* ~9:1 */
+  --color-ink-muted:      #8d8896;  /* ~5.5:1 — labels, meta, placeholders */
+  --color-ink-faint:      #645f6d;  /* decorative / disabled ONLY */
+
+  /* ── Rose accent (identity kept) ───────────────────────── */
   --color-accent:        #fb7185;
   --color-accent-strong: #f43f5e;
+  --color-accent-deep:   #9f1239;  /* pressed/:active fills; never text on canvas */
   --color-accent-soft:   color-mix(in oklch, #fb7185 15%, transparent);
   --color-accent-faint:  color-mix(in oklch, #fb7185 8%, transparent);
-  --color-on-accent:     #1c0a0e;  /* text on accent fills ~6.6:1 */
+  --color-on-accent:     #1c0a0e;
 
-  /* ── Semantic ────────────────────────────────────────── */
+  /* ── Ember (the ONE support text tone; shimmer only) ───── */
+  --color-ember:         #d4a574;  /* "thinking" shimmer gradient + blob C. Never controls/borders/body text */
+
+  /* ── Semantic ──────────────────────────────────────────── */
   --color-danger:        #f87171;
   --color-danger-soft:   color-mix(in oklch, #f87171 14%, transparent);
   --color-success:       #34d399;
   --color-success-soft:  color-mix(in oklch, #34d399 14%, transparent);
 
-  /* ── Radius (by altitude) ────────────────────────────── */
-  --radius-sm:  6px;
-  --radius-md:  10px;
-  --radius-lg:  14px;
-  --radius-xl:  20px;
-  --radius-2xl: 24px;
+  /* ── Radius (one notch softer for the romance) ─────────── */
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;    /* cards: suggestions, queue items, empty states */
+  --radius-xl:  22px;    /* modals */
+  --radius-2xl: 28px;
 
-  /* ── Elevation (one ladder, by altitude not vibe) ────── */
+  /* ── Elevation ─────────────────────────────────────────── */
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.30);
   --shadow-sm: 0 2px 8px -2px rgb(0 0 0 / 0.40);
   --shadow-md: 0 10px 28px -8px rgb(0 0 0 / 0.55);
-  --shadow-lg: 0 24px 60px -16px rgb(0 0 0 / 0.65);
-  --shadow-highlight: inset 0 1px 0 0 rgb(255 255 255 / 0.05);  /* signature top-light */
+  --shadow-lg: 0 32px 80px -20px rgb(0 0 0 / 0.75);          /* deepened: glass needs drop vs glowing backdrop */
+  --shadow-highlight: inset 0 1px 0 0 rgb(255 255 255 / 0.05); /* signature top-light — keep on every raised surface */
+  --shadow-glow:  0 0 24px -6px rgb(251 113 133 / 0.45);      /* the "flame". Generate button ONLY */
+  --shadow-press: inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 -1px 0 rgb(0 0 0 / 0.25); /* letterpress primary buttons */
 
-  /* ── Type scale ──────────────────────────────────────── */
+  /* ── Type scale (Inter tiers unchanged; Fraunces tiers added) ── */
   --text-meta:    0.6875rem;            /* 11px */
   --text-meta--line-height: 1rem;
   --text-meta--font-weight: 500;
@@ -66,20 +79,35 @@
   --text-heading--line-height: 1.5rem;
   --text-heading--font-weight: 600;
   --text-heading--letter-spacing: -0.01em;
-  --text-display: 1.375rem;             /* 22px */
-  --text-display--line-height: 1.75rem;
-  --text-display--font-weight: 700;
-  --text-display--letter-spacing: -0.02em;
+  --text-display: 1.625rem;             /* 26px — Fraunces empty-state headings */
+  --text-display--line-height: 2rem;
+  --text-display--font-weight: 560;
+  --text-display--letter-spacing: -0.01em;
+  --text-scene:   1.5rem;               /* 24px — Fraunces view titles (PromptsLab/ProfileScan) */
+  --text-scene--line-height: 1.875rem;
+  --text-scene--font-weight: 500;
+  --text-scene--letter-spacing: -0.015em;
+  --text-modal:   1.3125rem;            /* 21px — Fraunces modal titles */
+  --text-modal--line-height: 1.75rem;
+  --text-modal--font-weight: 520;
+  --text-persona: 1.25rem;              /* 20px — Fraunces conversation-header name */
+  --text-persona--line-height: 1.55rem;
+  --text-persona--font-weight: 520;
+  --text-persona--letter-spacing: -0.015em;
 
-  /* ── Motion ──────────────────────────────────────────── */
+  /* ── Motion ────────────────────────────────────────────── */
   --ease-out-soft:    cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-fade:        cubic-bezier(0.16, 1, 0.3, 1);   /* canonical fade ease */
 }
 
 :root { color-scheme: dark; }
 html, body { height: 100%; }
 
+/* Canvas: fixed vertical falloff — warm/lit at top, sinking to near-black.
+   --color-canvas remains the flat token for ring-offsets / themeColor. */
 body {
+  background: linear-gradient(180deg, #0b0a0e 0%, #08070a 55%, #050507 100%) fixed;
   background-color: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
@@ -87,33 +115,231 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Single on-brand light source — indigo dropped, rose lowered to ~5% */
-.app-backdrop {
-  background:
-    radial-gradient(1200px 600px at 15% -10%, var(--color-accent-faint), transparent 60%),
-    var(--color-canvas);
+/* ── Fraunces contexts (two voices, no third) ──────────────
+   .font-display — the Cyrano display voice (unlayered, so it wins over
+   the theme-generated utility while keeping the same name).
+   .font-wonk — the wordmark ONLY (WONK 1 in exactly one place). */
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+}
+.font-wonk { font-variation-settings: "SOFT" 50, "WONK" 1; }
+
+/* ── Ambient glow — exactly three blobs, transform-only ────
+   .app-backdrop is the app root container (page.tsx), so the blobs live on
+   its two pseudo-elements plus body::before ("pseudo-elements + one child").
+   position:fixed escapes the container's overflow-hidden; z-index:-1 sinks
+   them behind all content but above the body gradient. Ambient only —
+   these colors never appear on controls. */
+.app-backdrop { position: relative; }
+
+.app-backdrop::before,
+.app-backdrop::after,
+body::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 9999px;
+  filter: blur(70px);
+  will-change: transform;
 }
 
-/* Scrollbars — thumb matches the hairline system */
-* { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.13) transparent; }
+/* Blob A — rose, hero. Gradient carries 0.16 alpha; resting opacity 0.625
+   nets the spec'd 0.10, and .speaking lifts it to the full 0.16 —
+   "the room brightens when Cyrano speaks" (opacity-only transition). */
+.app-backdrop::before {
+  width: 900px; height: 600px; top: -8%; left: 15%;
+  background: radial-gradient(closest-side, rgb(251 113 133 / 0.16), transparent 60%);
+  opacity: 0.625;
+  transition: opacity 800ms var(--ease-in-out-soft);
+  animation: cyrano-blob-a 38s var(--ease-in-out-soft) infinite alternate;
+}
+.app-backdrop.speaking::before { opacity: 1; }
+
+/* Blob B — violet, support */
+.app-backdrop::after {
+  width: 700px; height: 700px; top: 30%; right: -10%;
+  background: radial-gradient(closest-side, rgb(139 92 246 / 0.06), transparent 65%);
+  animation: cyrano-blob-b 47s var(--ease-in-out-soft) infinite alternate;
+}
+
+/* Blob C — ember, low */
+body::before {
+  width: 1000px; height: 500px; bottom: -12%; left: 45%;
+  background: radial-gradient(closest-side, rgb(245 158 11 / 0.05), transparent 55%);
+  animation: cyrano-blob-c 55s var(--ease-in-out-soft) infinite alternate;
+}
+
+@keyframes cyrano-blob-a {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(3%, 4%) scale(1.06); }
+}
+@keyframes cyrano-blob-b {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-4%, -3%) scale(1.06); }
+}
+@keyframes cyrano-blob-c {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-3%, 3%) scale(1.05); }
+}
+
+/* ── Glass recipes (blur is chrome-only; ≤5 blurred layers) ── */
+.glass-header {
+  background: var(--color-glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: var(--shadow-highlight);
+}
+.glass-dock {
+  /* ≥0.72 alpha — §7: glass fills under text must hold contrast regardless
+     of what scrolls behind (a rose me-bubble under 0.55 sank ink-muted
+     to ~2.3:1). */
+  background: var(--color-glass);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+}
+.glass-modal {
+  background: var(--color-glass-heavy);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+}
+.glass-drawer {
+  background: var(--color-glass-heavy);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+.glass-toast {
+  background: rgb(32 28 38 / 0.80);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+/* ── Section kicker — 20×2px rose bar above uppercase labels
+   (replaces full-width top borders; magazine-rule detail) ── */
+.kicker { position: relative; padding-top: 10px; }
+.kicker::before {
+  content: "";
+  position: absolute; top: 0; left: 0;
+  width: 20px; height: 2px; border-radius: 1px;
+  background: var(--color-line-accent);
+}
+
+/* ── Rose rule — 2px top rule fading to transparent at the ends
+   (suggestions panel: the thread where magic arrives).
+   Add .drawing to replay the scaleX draw-in (§6.1). ── */
+.rose-rule { position: relative; }
+.rose-rule::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; border-radius: 1px;
+  background: linear-gradient(90deg, transparent, rgb(251 113 133 / 0.28), transparent);
+}
+@keyframes cyrano-rule-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.rose-rule.drawing::before {
+  transform-origin: center;
+  animation: cyrano-rule-in 260ms var(--ease-fade) both;
+}
+
+/* ── Drop cap (§6.3) — two-line float cap, Fraunces 560 in accent
+   (accent-deep fails contrast as text on canvas — §7 invariant wins)
+   with a rose hairline beneath. .drop-cap-sm = accent-tinted first letter,
+   no giant cap ("No messages yet"). ── */
+.drop-cap::first-letter {
+  float: left;
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+  font-size: 56px;
+  line-height: 46px;
+  font-weight: 560;
+  color: var(--color-accent);
+  padding: 2px 10px 3px 0;
+  margin-right: 2px;
+  border-bottom: 1px solid var(--color-line-accent);
+}
+.drop-cap-sm::first-letter { color: var(--color-accent); }
+
+/* ── "Her name in ink" (§6.2) — pen-stroke clip reveal ── */
+@keyframes cyrano-ink {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+.animate-ink { animation: cyrano-ink 420ms var(--ease-fade) both; }
+
+/* ── Scrollbars — thumb matches the hairline system ── */
+* { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.14) transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb {
-  background-color: rgb(255 255 255 / 0.13);
+  background-color: rgb(255 255 255 / 0.14);
   border-radius: 9999px; border: 3px solid transparent; background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover { background-color: rgb(255 255 255 / 0.22); }
 
-/* ── Keyframes ─────────────────────────────────────────── */
+/* ── Keyframes / animation utilities ───────────────────── */
 @keyframes cyrano-fade-up {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-up { animation: cyrano-fade-up 0.2s var(--ease-out-soft) both; }
+.animate-fade-up { animation: cyrano-fade-up 0.22s var(--ease-fade) both; }
 
-@keyframes cyrano-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
-.animate-thinking { animation: cyrano-pulse 1.1s ease-in-out infinite; }  /* text label ONLY */
+/* "The lit wick" (§6.4) — Cyrano is thinking… Fraunces italic 13px with a
+   candlelight sheen sweeping through ember. The only place ember moves. */
+@keyframes cyrano-wick { to { background-position: -200% 0; } }
+.animate-thinking {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 13px;
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+  background: linear-gradient(
+    90deg,
+    var(--color-ink-muted),
+    var(--color-ember) 45%,
+    var(--color-accent) 50%,
+    var(--color-ember) 55%,
+    var(--color-ink-muted)
+  );
+  background-size: 200% 100%;
+  background-position: 200% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: cyrano-wick 2.2s linear infinite;
+}
 
-/* Shimmer skeleton — replaces opacity-pulse loaders */
+/* Conic wick ring — burns around the Generate button while suggesting.
+   Apply .wick-ring to the (relatively rounded) button. */
+@property --cyrano-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes cyrano-ring-spin { to { --cyrano-angle: 360deg; } }
+.wick-ring { position: relative; }
+.wick-ring::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--cyrano-angle),
+    var(--color-accent),
+    var(--color-ember),
+    var(--color-accent)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: cyrano-ring-spin 2.4s linear infinite;
+}
+
+/* Shimmer skeleton — gradient warmed to candlelit rose-white */
 @keyframes cyrano-shimmer { 100% { transform: translateX(100%); } }
 .skeleton {
   position: relative; overflow: hidden;
@@ -121,7 +347,7 @@ body {
 }
 .skeleton::after {
   content: ""; position: absolute; inset: 0; transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.05), transparent);
+  background: linear-gradient(90deg, transparent, rgb(244 228 236 / 0.05), transparent);
   animation: cyrano-shimmer 1.4s var(--ease-in-out-soft) infinite;
 }
 
@@ -139,7 +365,7 @@ body {
 :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 4px; }
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 
-/* Reduced motion */
+/* ── Reduced motion — CSS backstop (motion/react is gated in JS) ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -147,4 +373,18 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  /* Blobs stay as static glow */
+  .app-backdrop::before,
+  .app-backdrop::after,
+  body::before { animation: none !important; }
+  /* Wick text goes static secondary ink; ring is extinguished */
+  .animate-thinking {
+    animation: none !important;
+    background: none;
+    color: var(--color-ink-secondary);
+    -webkit-text-fill-color: currentColor;
+  }
+  .wick-ring::after { display: none; }
+  /* Skeletons rest matte */
+  .skeleton::after { animation: none !important; }
 }

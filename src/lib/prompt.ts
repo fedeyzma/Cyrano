@@ -1,4 +1,5 @@
-import type { ConversationDetail } from "./types";
+import type { Conversation, ConversationDetail, Fact, Message } from "./types";
+import { FACT_CATEGORIES, FACT_CATEGORY_LABELS, normalizeFactCategory } from "./types";
 
 /**
  * The behaviour + voice rules. WHO the user is (their background and texting
@@ -46,7 +47,16 @@ You may be given remembered facts about her. Use one only when it fits effortles
 For each option, return a tone label from exactly this set: dry, playful, curious, flirty, sincere, bold. It is UI metadata only — never let it appear in the reply text. The sendable text stays clean: no labels, no quotation marks.
 
 # Extracting facts (separate from the replies)
-Alongside the replies, return extractedFacts: durable facts about HER only (never about me) worth remembering for next time — job, hometown, interests, plans, pets, running jokes, strong preferences. Each is ONE short third-person sentence, e.g. "works as an ICU nurse", "hates cilantro". Skip transient small talk. If nothing durable, return an empty array. Never invent.
+Alongside the replies, return extractedFacts: the small durable details about HER only (never about me) from her latest message(s), to file in her memory library. Be generous — a good library is lots of small specific things: names of people and pets, her job, where she's from, foods she loves or hates, shows, plans she mentioned, a story she told, a running joke being born. Each is ONE short third-person sentence with a category:
+- basics: job, school, where she lives / is from, age
+- people: family, friends, pets
+- interests: hobbies, music, shows, sports
+- tastes: likes, dislikes, food, strong preferences
+- plans: upcoming events, trips, anything to follow up on later
+- stories: anecdotes and things that happened to her
+- jokes: inside jokes and running bits between us
+- other: anything durable that fits nowhere else
+Specific beats vague: "her cat is named Miso" beats "has a cat". Skip pure filler with no detail in it, never repeat the remembered facts you were given, never invent. Empty array if nothing new.
 
 # Self-check before returning
 - Am I being interested, or trying to be interesting? Lean interested.
@@ -160,7 +170,7 @@ Choose the most engaging, openable item: usually a prompt answer with personalit
 - Return a few DISTINCT options with different tones.
 
 # Facts
-Also extract durable facts about HER from the profile (job, hometown, interests, pet, what she's into) for remembering later. And return her first name if it's visible, else an empty string.`;
+Also extract durable facts about HER from the profile (job, hometown, interests, pet, what she's into) for remembering later — each with a category from exactly this set: basics, people, interests, tastes, plans, stories, jokes, other. And return her first name if it's visible, else an empty string.`;
 
 export function buildScanSystem(userContext?: string): string {
   return compose(SCAN_SYSTEM, userContext);
@@ -194,7 +204,31 @@ export function assembleScanRequest(
 }
 
 const MAX_MESSAGES = 24;
-const MAX_FACTS = 40;
+const MAX_FACTS = 80;
+
+/**
+ * Render the fact library grouped by category (pinned first) — a structured
+ * library reads better to the model than a flat 80-line list.
+ */
+function renderFactLibrary(facts: Fact[], lines: string[]): void {
+  const factList = facts.slice(0, MAX_FACTS);
+  if (factList.length === 0) return;
+  lines.push("");
+  lines.push("REMEMBERED FACTS ABOUT THEM (the library — callbacks only when natural):");
+  const pinned = factList.filter((f) => f.pinned === 1);
+  if (pinned.length > 0) {
+    lines.push("Pinned (most important):");
+    for (const f of pinned) lines.push(`- ${f.content}`);
+  }
+  for (const cat of FACT_CATEGORIES) {
+    const items = factList.filter(
+      (f) => f.pinned !== 1 && normalizeFactCategory(f.category) === cat,
+    );
+    if (items.length === 0) continue;
+    lines.push(`${FACT_CATEGORY_LABELS[cat]}:`);
+    for (const f of items) lines.push(`- ${f.content}`);
+  }
+}
 
 export function assemblePrompt(
   detail: ConversationDetail,
@@ -210,12 +244,7 @@ export function assemblePrompt(
   if (conversation.platform) lines.push(`Where we matched: ${conversation.platform}`);
   if (conversation.notes) lines.push(`My own notes: ${conversation.notes}`);
 
-  const factList = facts.slice(0, MAX_FACTS);
-  if (factList.length > 0) {
-    lines.push("");
-    lines.push("REMEMBERED FACTS ABOUT THEM:");
-    for (const f of factList) lines.push(`- ${f.content}`);
-  }
+  renderFactLibrary(facts, lines);
 
   lines.push("");
   if (messages.length === 0) {
@@ -230,12 +259,16 @@ export function assemblePrompt(
         : "CONVERSATION SO FAR (oldest first):",
     );
     for (const m of recent) {
-      lines.push(`${m.role === "them" ? "Them" : "Me"}: ${m.content}`);
+      if (m.role === "context") {
+        lines.push(`(context: ${m.content})`);
+      } else {
+        lines.push(`${m.role === "them" ? "Them" : "Me"}: ${m.content}`);
+      }
     }
 
     const targets =
       targetIds && targetIds.length > 0
-        ? messages.filter((m) => targetIds.includes(m.id))
+        ? messages.filter((m) => m.role === "them" && targetIds.includes(m.id))
         : (() => {
             const lt = [...recent].reverse().find((m) => m.role === "them");
             return lt ? [lt] : [];
@@ -272,5 +305,77 @@ export function assemblePrompt(
     `Write exactly ${optionCount} reply options i could send next, each a genuinely different move with a one-word tone label. Each option is 1-3 short texts (usually 1; use 2-3 only when a real back-to-back burst fits). Then list any new durable facts worth remembering about them.`,
   );
 
+  return lines.join("\n");
+}
+
+/**
+ * Persona for the full-thread fact scan: build/refresh the per-person memory
+ * library. Pure extraction — no voice or humanization rules needed, so it
+ * does not go through compose().
+ */
+export const FACT_SCAN_SYSTEM = `You build a memory library about someone the user is dating, from their chat thread. Read the ENTIRE conversation and pull out every durable detail about THEM (the "Them" side) worth remembering — never about the user ("Me" side).
+
+Collect generously; a good library is lots of small specific things. Categories:
+- basics: job, studies, where they live / are from, age
+- people: family, friends, pets — with names when given
+- interests: hobbies, music, shows, sports, what they're into
+- tastes: likes, dislikes, foods, strong preferences and opinions
+- plans: upcoming events, trips, things they said they'd do — anything to follow up on later
+- stories: anecdotes they told, things that happened to them
+- jokes: inside jokes and running bits between the two of them
+- other: anything durable that fits nowhere else
+
+Rules:
+- Each fact is ONE short, specific third-person sentence, e.g. "works as an ICU nurse", "her cat is named Miso", "hates cilantro".
+- Specific beats vague: "ran the Lisbon half marathon in May" beats "likes running".
+- Skip pure small talk with no detail in it, and skip everything about the user.
+- Never invent or embellish — only what the thread actually says.
+- You are given the facts already saved. Do NOT repeat them or return near-duplicates; return only genuinely NEW facts. If nothing new, return an empty list.
+- If a SAVED BUT UNFILED list is given, also assign each of those facts a category, returned in "refiled" as {id, category} using the id shown in brackets. Do not rewrite their text.`;
+
+const MAX_SCAN_MESSAGES = 400;
+
+/** Build the user message for the full-thread fact scan. */
+export function assembleFactScanRequest(
+  conversation: Conversation,
+  messages: Message[],
+  existingFacts: Fact[],
+): string {
+  const lines: string[] = [];
+  lines.push(`MATCH: ${conversation.name}`);
+  if (conversation.platform) lines.push(`Where we matched: ${conversation.platform}`);
+
+  if (existingFacts.length > 0) {
+    lines.push("");
+    lines.push("ALREADY SAVED (do not repeat these or near-duplicates):");
+    for (const f of existingFacts) lines.push(`- ${f.content}`);
+  }
+
+  const unfiled = existingFacts.filter((f) => normalizeFactCategory(f.category) === "other");
+  if (unfiled.length > 0) {
+    lines.push("");
+    lines.push('SAVED BUT UNFILED (assign each a category, returned in "refiled" by id):');
+    for (const f of unfiled) lines.push(`- [${f.id}] ${f.content}`);
+  }
+
+  const recent = messages.slice(-MAX_SCAN_MESSAGES);
+  lines.push("");
+  lines.push(
+    recent.length < messages.length
+      ? `FULL CONVERSATION (last ${recent.length} messages, oldest first):`
+      : "FULL CONVERSATION (oldest first):",
+  );
+  for (const m of recent) {
+    if (m.role === "context") {
+      lines.push(`(context: ${m.content})`);
+    } else {
+      lines.push(`${m.role === "them" ? "Them" : "Me"}: ${m.content}`);
+    }
+  }
+
+  lines.push("");
+  lines.push(
+    "Extract every NEW durable detail about them from this thread, each with a category. Small specific things are exactly what I want.",
+  );
   return lines.join("\n");
 }

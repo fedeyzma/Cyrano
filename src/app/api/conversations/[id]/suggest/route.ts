@@ -3,7 +3,7 @@ import { json, parseId, readJson } from "@/lib/http";
 import { generateSuggestions, LlmError } from "@/lib/llm";
 import { assemblePrompt, buildSystemPrompt } from "@/lib/prompt";
 import { getUserContext } from "@/lib/userContext";
-import type { Fact, Message } from "@/lib/types";
+import { normalizeFactCategory, type Fact, type Message } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,7 +81,7 @@ export async function POST(req: Request, { params }: Ctx) {
   const newFacts: Fact[] = [];
   if (persistFacts) {
     for (const f of suggestion.extractedFacts ?? []) {
-      const added = addFact(id, f, "ai");
+      const added = addFact(id, f.fact, "ai", normalizeFactCategory(f.category));
       if (added) newFacts.push(added);
     }
   }

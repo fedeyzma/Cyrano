@@ -1,9 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  AnimatePresence,
+  motion,
+  type TargetAndTransition,
+  type Transition,
+  type Variants,
+} from "motion/react";
+import {
+  DUR,
+  EASE_FADE,
+  MotionButton,
+  SPRING_MICRO,
+  SPRING_MODAL,
+  SPRING_SETTLE,
+  bubbleVariants,
+  collapseVariants,
+  fadeUp,
+  rm,
+  suggestionCardVariants,
+  useAppReducedMotion,
+} from "@/components/motion";
 import { cx } from "@/lib/cx";
 import { clockTime } from "@/lib/time";
-import type { ConversationDetail, QueuedReply, ReplyOption, Role } from "@/lib/types";
+import type { ConversationDetail, MessageRole, QueuedReply, ReplyOption, Role } from "@/lib/types";
 import {
   IconBrain,
   IconCheck,
@@ -35,6 +56,74 @@ function toneStyle(tone: string): string {
   return TONE_STYLES[tone.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong";
 }
 
+/* ── Shared class recipes (tokens only) ─────────────────── */
+
+/** Primary rose button — letterpress press (DESIGN.md §3): resting
+ *  --shadow-press, :active inverts the insets and sinks toward accent-deep. */
+const PRIMARY_BTN =
+  "inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-press transition-colors duration-150 hover:bg-accent-strong active:bg-[color-mix(in_oklch,var(--color-accent-strong)_85%,var(--color-accent-deep))] active:shadow-[inset_0_-1px_0_rgb(255_255_255/0.22),inset_0_1px_0_rgb(0_0_0/0.25)] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
+
+const GHOST_BTN =
+  "inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-fill hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
+
+/* ── Local variants (composed from the canonical springs) ── */
+
+/** Suggestions panel: fadeUp(12) on SPRING_MODAL; dismiss exit per §5. */
+const panelVariants: Variants = {
+  initial: { opacity: 0, y: 12 },
+  enter: { opacity: 1, y: 0, transition: SPRING_MODAL },
+  exit: { opacity: 0, y: 8, scale: 0.98, transition: { duration: 0.17, ease: EASE_FADE } },
+};
+
+/** Old card leaving during a per-card regenerate (§5: 120ms blur fade). */
+const cardBlurExit: TargetAndTransition = {
+  opacity: 0,
+  filter: "blur(2px)",
+  transition: { duration: 0.12, ease: EASE_FADE },
+};
+
+/** Deal-out cards (first arrival of a set) — §6.1, custom={i}. */
+const dealCardVariants: Variants = { ...suggestionCardVariants, exit: cardBlurExit };
+
+/** Swapped-in card after a per-card regenerate. */
+const swapCardVariants: Variants = {
+  initial: { opacity: 0, y: 4 },
+  enter: { opacity: 1, y: 0, transition: { duration: 0.18, ease: EASE_FADE } },
+  exit: cardBlurExit,
+};
+
+/** Queue items: listItem-style enter; "Mark sent" leaves toward the thread. */
+const queueItemVariants: Variants = {
+  initial: { opacity: 0, y: 6 },
+  enter: { opacity: 1, y: 0, transition: SPRING_SETTLE },
+  exit: { opacity: 0, x: 24, transition: { duration: 0.18, ease: EASE_FADE } },
+};
+
+/** Targeting-bar chips. */
+const chipVariants: Variants = {
+  initial: { opacity: 0, scale: 0.9 },
+  enter: { opacity: 1, scale: 1, transition: SPRING_MICRO },
+  exit: { opacity: 0, scale: 0.9, transition: { duration: 0.14, ease: EASE_FADE } },
+};
+
+/** Context note: settles straight down (no left/right slide — it's not a speaker). */
+const contextNoteVariants: Variants = {
+  initial: { opacity: 0, y: -4, scale: 0.98 },
+  enter: { opacity: 1, y: 0, scale: 1, transition: SPRING_SETTLE },
+  exit: { opacity: 0, scale: 0.96, transition: { duration: 0.14, ease: EASE_FADE } },
+};
+
+/** Adds a stagger delay to a variants object's enter transition (mount cascade). */
+function withEnterDelay(variants: Variants, delay: number): Variants {
+  const enter = variants.enter;
+  if (!enter || typeof enter !== "object") return variants;
+  const target = enter as TargetAndTransition;
+  return {
+    ...variants,
+    enter: { ...target, transition: { ...(target.transition as Transition | undefined), delay } },
+  };
+}
+
 export function ConversationView({
   detail,
   suggestions,
@@ -54,6 +143,7 @@ export function ConversationView({
   onSendQueued,
   onOpenImport,
   onOpenFacts,
+  onOpenProfile,
 }: {
   detail: ConversationDetail;
   suggestions: ReplyOption[] | null;
@@ -61,7 +151,7 @@ export function ConversationView({
   suggestError: string | null;
   factsCount: number;
   onSuggest: (incoming: string, steer: string, targetIds: number[]) => void;
-  onAddMessage: (role: Role, content: string) => void;
+  onAddMessage: (role: MessageRole, content: string) => void;
   onUseOption: (texts: string[]) => void;
   onQueueOption: (texts: string[], tone: string, targetId: number | null) => void;
   onRegenerateOne: (index: number, steer: string, targetIds: number[]) => Promise<void>;
@@ -73,6 +163,7 @@ export function ConversationView({
   onSendQueued: (q: QueuedReply) => void;
   onOpenImport: () => void;
   onOpenFacts: () => void;
+  onOpenProfile: () => void;
 }) {
   const { conversation, messages, queued } = detail;
   const [text, setText] = useState("");
@@ -84,6 +175,52 @@ export function ConversationView({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const reduced = useAppReducedMotion();
+
+  /* Mount-cascade bookkeeping (§5 Thread messages): on conversation mount the
+     last 8 messages cascade in; everything older renders instantly; messages
+     appended after mount animate individually. `seen` ids never re-animate,
+     so a long thread does not re-stagger on unrelated state changes. */
+  const mountedRef = useRef(false);
+  const cascadeStartRef = useRef(Math.max(0, messages.length - 8));
+  const seenRef = useRef<Set<number> | null>(null);
+  if (seenRef.current === null) {
+    seenRef.current = new Set(
+      messages.slice(0, Math.max(0, messages.length - 8)).map((m) => m.id),
+    );
+  }
+  const seen = seenRef.current;
+
+  useEffect(() => {
+    mountedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    for (const m of messages) seen.add(m.id);
+  }, [messages, seen]);
+
+  /* §6.1 — distinguishes the full deal-out (fresh set) from a per-card swap. */
+  const dealtRef = useRef(false);
+  useEffect(() => {
+    if (suggesting) dealtRef.current = false;
+    else if (suggestions) dealtRef.current = true;
+  }, [suggesting, suggestions]);
+
+  /* §6.1(4) — "the room brightens when Cyrano speaks": pulse Blob A via the
+     `.speaking` hook on the app backdrop for 1.6s when results arrive.
+     Purely visual (CSS opacity transition); skipped under reduced motion. */
+  useEffect(() => {
+    if (reduced || suggesting || !suggestions) return;
+    const el = document.querySelector(".app-backdrop");
+    if (!el) return;
+    el.classList.add("speaking");
+    const t = window.setTimeout(() => el.classList.remove("speaking"), 1600);
+    return () => {
+      window.clearTimeout(t);
+      el.classList.remove("speaking");
+    };
+  }, [reduced, suggesting, suggestions]);
 
   const messageById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
 
@@ -119,7 +256,7 @@ export function ConversationView({
     onSuggest("", steer, targets);
   }
 
-  function addAs(role: Role) {
+  function addAs(role: MessageRole) {
     const t = text.trim();
     if (!t) return;
     onAddMessage(role, t);
@@ -161,476 +298,742 @@ export function ConversationView({
     setEditText("");
   }
 
+  const rmCollapse = rm(reduced, collapseVariants);
+  const rmChip = rm(reduced, chipVariants);
+  const rmPanel = rm(reduced, panelVariants);
+  const rmHeader = rm(reduced, fadeUp(6));
+
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-line px-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent/25 to-accent-strong/10 text-title text-accent ring-1 ring-line">
+      {/* Header — sticky glass; fades up on conversation mount (§6.2) */}
+      <motion.header
+        variants={rmHeader}
+        initial="initial"
+        animate="enter"
+        className="glass-header flex h-16 shrink-0 items-center justify-between border-b border-line px-6"
+      >
+        <MotionButton
+          onClick={onOpenProfile}
+          title="Edit profile"
+          className="group/profile flex min-w-0 items-center gap-3 rounded-md px-1 py-0.5 text-left transition-colors duration-150 hover:bg-fill focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+        >
+          <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent/25 to-accent-strong/10 text-title text-accent ring-1 ring-line">
             {conversation.name.slice(0, 1).toUpperCase() || <IconUser size={16} />}
+            {/* §6.2 — the avatar ring draws once per conversation switch */}
+            <motion.svg
+              aria-hidden="true"
+              viewBox="0 0 36 36"
+              className="absolute inset-0 h-full w-full -rotate-90"
+            >
+              <motion.circle
+                cx="18"
+                cy="18"
+                r="17.25"
+                fill="none"
+                stroke="var(--color-accent)"
+                strokeOpacity={0.55}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                initial={reduced ? false : { pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.5, ease: EASE_FADE }}
+              />
+            </motion.svg>
           </span>
           <div className="min-w-0">
-            <div className="truncate text-title leading-tight text-ink">{conversation.name}</div>
+            <div className="flex items-center gap-1.5">
+              {/* §6.2 — "Her name in ink": Fraunces persona name, pen-stroke reveal */}
+              <span className="animate-ink truncate font-display text-persona text-ink">
+                {conversation.name}
+              </span>
+              <IconEdit
+                size={12}
+                className="shrink-0 text-ink-faint opacity-0 transition-opacity duration-150 group-hover/profile:opacity-100 group-focus-visible/profile:opacity-100"
+              />
+            </div>
             {conversation.platform && (
               <div className="text-meta text-ink-muted">{conversation.platform}</div>
             )}
           </div>
-        </div>
+        </MotionButton>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={onOpenImport}
-            className="inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-fill hover:text-accent motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-          >
+          <MotionButton onClick={onOpenImport} className={GHOST_BTN}>
             <IconImport size={15} />
             <span className="hidden sm:inline">Import</span>
-          </button>
-          <button
-            onClick={onOpenFacts}
-            className="inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-fill hover:text-accent motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas xl:hidden"
-          >
+          </MotionButton>
+          <MotionButton onClick={onOpenFacts} className={cx(GHOST_BTN, "xl:hidden")}>
             <IconBrain size={15} />
             {factsCount > 0 && <span className="tabular-nums">{factsCount}</span>}
-          </button>
-          <button
+          </MotionButton>
+          <MotionButton
             onClick={onDeleteConversation}
             aria-label="Delete conversation"
-            className="inline-flex items-center justify-center rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="inline-flex items-center justify-center rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <IconTrash size={16} />
-          </button>
+          </MotionButton>
         </div>
-      </header>
+      </motion.header>
 
       {/* Thread + suggestions */}
       <div className="flex-1 overflow-y-auto px-4 py-5">
-        <div className="mx-auto max-w-2xl space-y-2.5">
+        <div className="mx-auto max-w-2xl space-y-3">
           {messages.length === 0 && (
-            <div className="mx-auto mt-10 max-w-sm rounded-xl border border-dashed border-line-strong p-6 text-center">
+            <motion.div
+              variants={rm(reduced, fadeUp(6))}
+              initial="initial"
+              animate="enter"
+              className="mx-auto mt-16 max-w-sm rounded-lg border border-dashed border-line-strong p-6 text-center"
+            >
               <span className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-accent-soft text-accent">
                 <IconSparkles size={20} />
               </span>
-              <p className="mt-3 text-sm text-ink-secondary">No messages yet.</p>
+              {/* §6.3 small drop cap — accent-tinted first letter */}
+              <p className="drop-cap-sm mt-3 font-display text-display text-ink">
+                No messages yet.
+              </p>
               <p className="mt-1 text-xs leading-normal text-ink-muted">
                 Paste what {conversation.name} said in the box below and hit Generate — Cyrano
                 will hand you a few ways to reply.
               </p>
-              <button
-                onClick={onOpenImport}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-fill hover:text-accent motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-              >
+              <MotionButton onClick={onOpenImport} className={cx(GHOST_BTN, "mt-4")}>
                 <IconImport size={14} /> Import an existing thread
-              </button>
-            </div>
+              </MotionButton>
+            </motion.div>
           )}
 
-          {messages.map((m) => {
-            const isTarget = m.role === "them" && targets.includes(m.id);
+          <AnimatePresence>
+            {messages.map((m, idx) => {
+              const isTarget = m.role === "them" && targets.includes(m.id);
+              const isEditing = editingId === m.id;
+              const isNew = !seen.has(m.id);
 
-            if (editingId === m.id) {
-              return (
-                <div
-                  key={m.id}
-                  className={cx("flex", m.role === "me" ? "justify-end" : "justify-start")}
-                >
-                  <div className="w-full max-w-[80%]">
-                    <textarea
-                      autoFocus
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          void saveEdit(m.id);
-                        } else if (e.key === "Escape") {
-                          cancelEdit();
-                        }
-                      }}
-                      rows={2}
-                      className="w-full resize-none rounded-md border border-accent/50 bg-black/30 px-3 py-2 text-sm leading-normal text-ink outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
-                    />
-                    <div className="mt-1 flex justify-end gap-2">
-                      <button
-                        onClick={cancelEdit}
-                        className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => void saveEdit(m.id)}
-                        disabled={!editText.trim()}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            const actions = (
-              <div
-                className={cx(
-                  "mb-0.5 flex flex-col gap-1 transition-opacity duration-150",
-                  isTarget
-                    ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
-                )}
-              >
-                {m.role === "them" && (
-                  <button
-                    onClick={() => toggleTarget(m.id)}
-                    aria-label={isTarget ? "Stop replying to this" : "Reply to this message"}
-                    title={isTarget ? "Stop replying to this" : "Reply to this message"}
-                    className={cx(
-                      "transition-colors duration-150",
-                      isTarget ? "text-accent" : "text-ink-faint hover:text-ink",
-                    )}
+              // Context notes are situational, not a speaker: centered, muted,
+              // never a reply target. Rendered before the bubble path so the
+              // remaining role narrows to "them" | "me".
+              if (m.role === "context") {
+                return (
+                  <motion.div
+                    key={m.id}
+                    layout={reduced ? false : "position"}
+                    variants={rm(reduced, contextNoteVariants)}
+                    initial={isNew ? "initial" : false}
+                    animate="enter"
+                    exit="exit"
+                    className="group flex justify-center"
                   >
-                    <IconReply size={14} />
-                  </button>
-                )}
-                <button
-                  onClick={() => startEdit(m.id, m.content)}
-                  aria-label="Edit message"
-                  title="Edit message"
-                  className="text-ink-faint transition-colors duration-150 hover:text-ink"
-                >
-                  <IconEdit size={13} />
-                </button>
-                <button
-                  onClick={() => onDeleteMessage(m.id)}
-                  aria-label="Delete message"
-                  title="Delete message"
-                  className="text-ink-faint transition-colors duration-150 hover:text-danger"
-                >
-                  <IconTrash size={13} />
-                </button>
-              </div>
-            );
-
-            return (
-              <div
-                key={m.id}
-                className={cx(
-                  "group flex items-end gap-2",
-                  m.role === "me" ? "justify-end" : "justify-start",
-                )}
-              >
-                {m.role === "me" && actions}
-                <div
-                  className={cx(
-                    "max-w-[78%] rounded-lg px-3.5 py-2 text-sm leading-normal",
-                    m.role === "me"
-                      ? "rounded-br-sm bg-accent text-on-accent shadow-xs shadow-[inset_0_1px_0_0_rgb(255_255_255/0.20)]"
-                      : "rounded-bl-sm bg-fill text-ink ring-1 ring-line",
-                    isTarget && "ring-2 ring-accent/70",
-                  )}
-                  title={clockTime(m.created_at)}
-                >
-                  <span className="whitespace-pre-wrap break-words">{m.content}</span>
-                </div>
-                {m.role === "them" && actions}
-              </div>
-            );
-          })}
-
-          {/* Suggestions */}
-          {(suggesting || suggestions || suggestError) && (
-            <div className="!mt-6 animate-fade-up rounded-lg border border-line bg-fill p-3">
-              <div className="mb-2.5 flex items-center justify-between px-1">
-                <div className="flex items-center gap-2 text-label font-medium text-ink-secondary">
-                  <IconSparkles size={15} className="text-accent" />
-                  {suggesting ? (
-                    <span className="animate-thinking">Cyrano is thinking…</span>
-                  ) : (
-                    "Pick a reply"
-                  )}
-                </div>
-                {!suggesting && (suggestions || suggestError) && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={regenerate}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
-                    >
-                      <IconRefresh size={13} /> Regenerate
-                    </button>
-                    <button
-                      onClick={onDismissSuggestions}
-                      className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {suggesting && (
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="rounded-md border border-line bg-fill p-3">
-                      <div className="skeleton h-3 w-3/4 rounded" />
-                      <div className="skeleton mt-2 h-3 w-1/2 rounded" />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!suggesting && suggestError && (
-                <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
-                  {suggestError}
-                  <button
-                    onClick={regenerate}
-                    className="mt-2 block text-xs text-danger underline underline-offset-2 transition-colors duration-150 hover:text-ink"
-                  >
-                    Try again
-                  </button>
-                </div>
-              )}
-
-              {!suggesting && suggestions && (
-                <div className="space-y-2">
-                  {suggestions.map((opt, i) => {
-                    const busy = regenIndex === i;
-                    return (
-                      <div
-                        key={i}
-                        className="animate-fade-up rounded-md border border-line bg-fill p-3 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
-                        style={{ animationDelay: `${i * 0.04}s` }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={cx(
-                              "rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
-                              toneStyle(opt.tone),
-                            )}
+                    {isEditing ? (
+                      <div className="w-full max-w-[80%]">
+                        <textarea
+                          autoFocus
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              void saveEdit(m.id);
+                            } else if (e.key === "Escape") {
+                              cancelEdit();
+                            }
+                          }}
+                          rows={2}
+                          className="w-full resize-none rounded-md border border-accent/50 bg-black/30 px-3 py-2 text-sm leading-normal text-ink outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+                        />
+                        <div className="mt-1 flex justify-end gap-2">
+                          <MotionButton
+                            onClick={cancelEdit}
+                            className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
                           >
-                            {opt.tone}
-                            {opt.texts.length > 1 && (
-                              <span className="ml-1 normal-case tabular-nums text-ink-muted">
-                                · {opt.texts.length} texts
-                              </span>
-                            )}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => regenerateOne(i)}
-                              disabled={regenIndex !== null}
-                              title="Regenerate just this one"
-                              aria-label="Regenerate this reply"
-                              className="inline-flex items-center justify-center rounded-md p-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {busy ? <Spinner size={13} /> : <IconRefresh size={13} />}
-                            </button>
-                            <button
-                              onClick={() => copyValue(opt.texts.join("\n"), `opt-${i}`)}
-                              disabled={busy}
-                              aria-label="Copy reply"
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
-                            >
-                              {copied === `opt-${i}` ? (
-                                <>
-                                  <IconCheck size={13} /> Copied
-                                </>
-                              ) : (
-                                <>
-                                  <IconCopy size={13} /> Copy
-                                </>
-                              )}
-                            </button>
-                            <button
-                              onClick={() => onQueueOption(opt.texts, opt.tone, primaryTargetId)}
-                              disabled={busy}
-                              aria-label="Queue reply"
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
-                            >
-                              <IconClock size={13} /> Queue
-                            </button>
-                            <button
-                              onClick={() => {
-                                void copyValue(opt.texts.join("\n"), `opt-${i}`);
-                                onUseOption(opt.texts);
-                              }}
-                              disabled={busy}
-                              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                            >
-                              <IconSend size={13} /> Use
-                            </button>
-                          </div>
-                        </div>
-                        <div
-                          className={cx(
-                            "mt-2 space-y-1 transition-opacity duration-150",
-                            busy && "opacity-40",
-                          )}
-                        >
-                          {opt.texts.map((t, j) => (
-                            <p
-                              key={j}
-                              className="rounded-md bg-black/20 px-2.5 py-1.5 text-sm leading-normal text-ink"
-                            >
-                              {t}
-                            </p>
-                          ))}
+                            Cancel
+                          </MotionButton>
+                          <MotionButton
+                            onClick={() => void saveEdit(m.id)}
+                            disabled={!editText.trim()}
+                            className={PRIMARY_BTN}
+                          >
+                            Save
+                          </MotionButton>
                         </div>
                       </div>
-                    );
-                  })}
-                  <p className="px-1 pt-1 text-meta text-ink-muted">
-                    “Use” sends now (logs to the thread); “Queue” saves it as a draft for later.
-                  </p>
+                    ) : (
+                      <div className="flex max-w-[85%] items-center gap-1.5">
+                        <div
+                          className="flex items-center gap-2 rounded-md border border-line bg-fill px-3 py-1"
+                          title={clockTime(m.created_at)}
+                        >
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">
+                            context
+                          </span>
+                          <span className="whitespace-pre-wrap break-words text-xs italic leading-normal text-ink-secondary">
+                            {m.content}
+                          </span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+                          <MotionButton
+                            onClick={() => startEdit(m.id, m.content)}
+                            aria-label="Edit context"
+                            title="Edit context"
+                            className="text-ink-faint transition-colors duration-150 hover:text-ink"
+                          >
+                            <IconEdit size={13} />
+                          </MotionButton>
+                          <MotionButton
+                            onClick={() => onDeleteMessage(m.id)}
+                            aria-label="Delete context"
+                            title="Delete context"
+                            className="text-ink-faint transition-colors duration-150 hover:text-danger"
+                          >
+                            <IconTrash size={13} />
+                          </MotionButton>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              }
+
+              const cascadeDelay =
+                !mountedRef.current && isNew
+                  ? Math.max(0, idx - cascadeStartRef.current) * 0.03
+                  : 0;
+              const base = bubbleVariants(m.role);
+              const rowVariants = rm(
+                reduced,
+                cascadeDelay > 0 ? withEnterDelay(base, cascadeDelay) : base,
+              );
+
+              const actions = (
+                <div
+                  className={cx(
+                    "mb-0.5 flex flex-col gap-1 transition-[opacity,transform] duration-150",
+                    isTarget
+                      ? "opacity-100"
+                      : cx(
+                          "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+                          m.role === "me"
+                            ? "-translate-x-1 group-hover:translate-x-0 group-focus-within:translate-x-0"
+                            : "translate-x-1 group-hover:translate-x-0 group-focus-within:translate-x-0",
+                        ),
+                  )}
+                >
+                  {m.role === "them" && (
+                    <MotionButton
+                      onClick={() => toggleTarget(m.id)}
+                      aria-label={isTarget ? "Stop replying to this" : "Reply to this message"}
+                      title={isTarget ? "Stop replying to this" : "Reply to this message"}
+                      className={cx(
+                        "transition-colors duration-150",
+                        isTarget ? "text-accent" : "text-ink-faint hover:text-ink",
+                      )}
+                    >
+                      <IconReply size={14} />
+                    </MotionButton>
+                  )}
+                  <MotionButton
+                    onClick={() => startEdit(m.id, m.content)}
+                    aria-label="Edit message"
+                    title="Edit message"
+                    className="text-ink-faint transition-colors duration-150 hover:text-ink"
+                  >
+                    <IconEdit size={13} />
+                  </MotionButton>
+                  <MotionButton
+                    onClick={() => onDeleteMessage(m.id)}
+                    aria-label="Delete message"
+                    title="Delete message"
+                    className="text-ink-faint transition-colors duration-150 hover:text-danger"
+                  >
+                    <IconTrash size={13} />
+                  </MotionButton>
                 </div>
-              )}
-            </div>
-          )}
+              );
+
+              return (
+                <motion.div
+                  key={m.id}
+                  layout={reduced ? false : "position"}
+                  variants={rowVariants}
+                  initial={isNew ? "initial" : false}
+                  animate="enter"
+                  exit="exit"
+                  className={cx(
+                    "flex",
+                    m.role === "me" ? "justify-end" : "justify-start",
+                    !isEditing && "group items-end gap-2",
+                  )}
+                >
+                  {isEditing ? (
+                    <div className="w-full max-w-[80%]">
+                      <textarea
+                        autoFocus
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            void saveEdit(m.id);
+                          } else if (e.key === "Escape") {
+                            cancelEdit();
+                          }
+                        }}
+                        rows={2}
+                        className="w-full resize-none rounded-md border border-accent/50 bg-black/30 px-3 py-2 text-sm leading-normal text-ink outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
+                      />
+                      <div className="mt-1 flex justify-end gap-2">
+                        <MotionButton
+                          onClick={cancelEdit}
+                          className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
+                        >
+                          Cancel
+                        </MotionButton>
+                        <MotionButton
+                          onClick={() => void saveEdit(m.id)}
+                          disabled={!editText.trim()}
+                          className={PRIMARY_BTN}
+                        >
+                          Save
+                        </MotionButton>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {m.role === "me" && actions}
+                      {/* Bubble — target toggle-on pulses once (§5); ring stays CSS */}
+                      <motion.div
+                        animate={
+                          reduced ? undefined : { scale: isTarget ? [1, 1.015, 1] : 1 }
+                        }
+                        transition={{ duration: 0.26, ease: EASE_FADE }}
+                        className={cx(
+                          "max-w-[78%] rounded-lg px-3.5 py-2 text-sm leading-normal",
+                          m.role === "me"
+                            ? "rounded-br-sm bg-accent text-on-accent shadow-highlight"
+                            : "rounded-bl-sm bg-fill text-ink ring-1 ring-line",
+                          isTarget && "ring-2 ring-accent/70",
+                        )}
+                        title={clockTime(m.created_at)}
+                      >
+                        <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                      </motion.div>
+                      {m.role === "them" && actions}
+                    </>
+                  )}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+
+          {/* Suggestions — "the reply arrives like a letter" (§6.1) */}
+          <AnimatePresence>
+            {(suggesting || suggestions || suggestError) && (
+              <motion.div
+                key="suggestions-panel"
+                variants={rmPanel}
+                initial="initial"
+                animate="enter"
+                exit="exit"
+                className={cx(
+                  "rose-rule !mt-6 rounded-lg border border-line bg-fill p-4",
+                  !suggesting && suggestions && "drawing",
+                )}
+              >
+                <div className="mb-2.5 flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2 text-label font-medium text-ink-secondary">
+                    <IconSparkles size={15} className="text-accent" />
+                    {suggesting ? (
+                      <span className="animate-thinking">Cyrano is thinking…</span>
+                    ) : (
+                      "Pick a reply"
+                    )}
+                  </div>
+                  {!suggesting && (suggestions || suggestError) && (
+                    <div className="flex items-center gap-1">
+                      <MotionButton
+                        onClick={regenerate}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
+                      >
+                        <IconRefresh size={13} /> Regenerate
+                      </MotionButton>
+                      <MotionButton
+                        onClick={onDismissSuggestions}
+                        className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
+                      >
+                        Dismiss
+                      </MotionButton>
+                    </div>
+                  )}
+                </div>
+
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {suggesting && (
+                    <motion.div
+                      key="skeletons"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={
+                        reduced
+                          ? { opacity: 0, transition: { duration: 0.12, ease: EASE_FADE } }
+                          : {
+                              opacity: 0,
+                              filter: "blur(3px)",
+                              transition: { duration: 0.12, ease: EASE_FADE },
+                            }
+                      }
+                      transition={{ duration: DUR.fast, ease: EASE_FADE }}
+                      className="space-y-2"
+                    >
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="rounded-lg border border-line bg-fill p-3">
+                          <div className="skeleton h-3 w-3/4 rounded" />
+                          <div className="skeleton mt-2 h-3 w-1/2 rounded" />
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+
+                  {!suggesting && suggestError && (
+                    <motion.div
+                      key="error"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, transition: { duration: 0.12, ease: EASE_FADE } }}
+                      transition={{ duration: DUR.base, ease: EASE_FADE }}
+                      className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger"
+                    >
+                      {suggestError}
+                      <MotionButton
+                        onClick={regenerate}
+                        className="mt-2 block text-xs text-danger underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+                      >
+                        Try again
+                      </MotionButton>
+                    </motion.div>
+                  )}
+
+                  {!suggesting && suggestions && (
+                    <motion.div
+                      key="cards"
+                      initial={false}
+                      exit={{ opacity: 0, transition: { duration: 0.12, ease: EASE_FADE } }}
+                      className="space-y-2"
+                    >
+                      <AnimatePresence mode="popLayout">
+                        {suggestions.map((opt, i) => {
+                          const busy = regenIndex === i;
+                          const isSwap = dealtRef.current;
+                          const cardV = rm(reduced, isSwap ? swapCardVariants : dealCardVariants);
+                          const chipDelay = reduced ? 0 : isSwap ? 0.06 : i * 0.09 + 0.06;
+                          return (
+                            <motion.div
+                              key={`${i}:${opt.texts.join(" ")}`}
+                              custom={i}
+                              layout={reduced ? false : "position"}
+                              variants={cardV}
+                              initial="initial"
+                              animate="enter"
+                              exit="exit"
+                              className="rounded-lg border border-line bg-fill p-3 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
+                            >
+                              <div className="flex items-center justify-between">
+                                {/* Tone chip — the wax seal (§6.1) */}
+                                <motion.span
+                                  initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={
+                                    reduced
+                                      ? { duration: 0.12, ease: EASE_FADE }
+                                      : { ...SPRING_MICRO, delay: chipDelay }
+                                  }
+                                  className={cx(
+                                    "rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
+                                    toneStyle(opt.tone),
+                                  )}
+                                >
+                                  {opt.tone}
+                                  {opt.texts.length > 1 && (
+                                    <span className="ml-1 normal-case tabular-nums text-ink-muted">
+                                      · {opt.texts.length} texts
+                                    </span>
+                                  )}
+                                </motion.span>
+                                <div className="flex items-center gap-1">
+                                  <MotionButton
+                                    onClick={() => regenerateOne(i)}
+                                    disabled={regenIndex !== null}
+                                    title="Regenerate just this one"
+                                    aria-label="Regenerate this reply"
+                                    className="inline-flex items-center justify-center rounded-md p-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {busy ? <Spinner size={13} /> : <IconRefresh size={13} />}
+                                  </MotionButton>
+                                  <MotionButton
+                                    onClick={() => copyValue(opt.texts.join("\n"), `opt-${i}`)}
+                                    disabled={busy}
+                                    aria-label="Copy reply"
+                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
+                                  >
+                                    {copied === `opt-${i}` ? (
+                                      <>
+                                        <IconCheck size={13} /> Copied
+                                      </>
+                                    ) : (
+                                      <>
+                                        <IconCopy size={13} /> Copy
+                                      </>
+                                    )}
+                                  </MotionButton>
+                                  <MotionButton
+                                    onClick={() =>
+                                      onQueueOption(opt.texts, opt.tone, primaryTargetId)
+                                    }
+                                    disabled={busy}
+                                    aria-label="Queue reply"
+                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
+                                  >
+                                    <IconClock size={13} /> Queue
+                                  </MotionButton>
+                                  <MotionButton
+                                    onClick={() => {
+                                      void copyValue(opt.texts.join("\n"), `opt-${i}`);
+                                      onUseOption(opt.texts);
+                                    }}
+                                    disabled={busy}
+                                    className={PRIMARY_BTN}
+                                  >
+                                    <IconSend size={13} /> Use
+                                  </MotionButton>
+                                </div>
+                              </div>
+                              <div
+                                className={cx(
+                                  "mt-2 space-y-1 transition-opacity duration-150",
+                                  busy && "opacity-40",
+                                )}
+                              >
+                                {opt.texts.map((t, j) => (
+                                  <p
+                                    key={j}
+                                    className="rounded-md bg-black/20 px-2.5 py-1.5 text-sm leading-normal text-ink"
+                                  >
+                                    {t}
+                                  </p>
+                                ))}
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
+                      <p className="px-1 pt-1 text-meta text-ink-muted">
+                        “Use” sends now (logs to the thread); “Queue” saves it as a draft for
+                        later.
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div ref={bottomRef} />
         </div>
       </div>
 
-      {/* Bottom: queue + targeting + composer */}
-      <div className="shrink-0 border-t border-line bg-canvas/60 px-4 py-3 backdrop-blur">
+      {/* Bottom: queue + targeting + composer — the dock never moves */}
+      <div className="glass-dock shrink-0 border-t border-line px-4 py-3">
         {/* Queued replies */}
-        {queued.length > 0 && (
-          <div className="mx-auto mb-2 max-w-2xl rounded-lg border border-line bg-fill">
-            <button
-              onClick={() => setQueueOpen((o) => !o)}
-              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-label font-medium text-ink-secondary transition-colors duration-150"
+        <AnimatePresence initial={false}>
+          {queued.length > 0 && (
+            <motion.div
+              key="queue"
+              variants={rmCollapse}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              className="mx-auto w-full max-w-2xl overflow-hidden"
             >
-              <span className="flex items-center gap-1.5">
-                <IconClock size={14} className="text-accent" /> Queued replies ·{" "}
-                <span className="tabular-nums">{queued.length}</span>
-              </span>
-              <span className="text-ink-faint">{queueOpen ? "hide" : "show"}</span>
-            </button>
-            {queueOpen && (
-              <div className="max-h-56 space-y-1.5 overflow-y-auto px-3 pb-3">
-                {queued.map((q) => {
-                  const tm = q.target_message_id ? messageById.get(q.target_message_id) : null;
-                  const parts = q.content.split("\n").filter((l) => l.trim());
-                  return (
-                    <div
-                      key={q.id}
-                      className="animate-fade-up rounded-md border border-line bg-fill p-2.5 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
-                    >
-                      {tm && (
-                        <div className="mb-1 flex items-center gap-1 text-meta text-ink-muted">
-                          <IconReply size={11} className="shrink-0" />
-                          <span className="truncate">{tm.content}</span>
+              <div className="pb-2">
+                <div className="rounded-lg border border-line bg-fill">
+                  <MotionButton
+                    onClick={() => setQueueOpen((o) => !o)}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-label font-medium text-ink-secondary transition-colors duration-150"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <IconClock size={14} className="text-accent" /> Queued replies ·{" "}
+                      <span className="tabular-nums">{queued.length}</span>
+                    </span>
+                    <span className="text-ink-muted">{queueOpen ? "hide" : "show"}</span>
+                  </MotionButton>
+                  <AnimatePresence initial={false}>
+                    {queueOpen && (
+                      <motion.div
+                        key="queue-list"
+                        variants={rmCollapse}
+                        initial="initial"
+                        animate="enter"
+                        exit="exit"
+                        className="overflow-hidden"
+                      >
+                        <div className="max-h-56 space-y-1.5 overflow-y-auto px-3 pb-3">
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            {queued.map((q) => {
+                              const tm = q.target_message_id
+                                ? messageById.get(q.target_message_id)
+                                : null;
+                              const parts = q.content.split("\n").filter((l) => l.trim());
+                              return (
+                                <motion.div
+                                  key={q.id}
+                                  layout={reduced ? false : "position"}
+                                  variants={rm(reduced, queueItemVariants)}
+                                  initial="initial"
+                                  animate="enter"
+                                  exit="exit"
+                                  className="rounded-lg border border-line bg-fill p-2.5 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
+                                >
+                                  {tm && (
+                                    <div className="mb-1 flex items-center gap-1 text-meta text-ink-muted">
+                                      <IconReply size={11} className="shrink-0" />
+                                      <span className="truncate">{tm.content}</span>
+                                    </div>
+                                  )}
+                                  <div className="space-y-0.5">
+                                    {parts.map((p, idx) => (
+                                      <p key={idx} className="text-sm leading-normal text-ink">
+                                        {p}
+                                      </p>
+                                    ))}
+                                  </div>
+                                  <div className="mt-1.5 flex items-center gap-1">
+                                    {q.tone && (
+                                      <span
+                                        className={cx(
+                                          "mr-auto rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
+                                          toneStyle(q.tone),
+                                        )}
+                                      >
+                                        {q.tone}
+                                      </span>
+                                    )}
+                                    <MotionButton
+                                      onClick={() => copyValue(q.content, `q-${q.id}`)}
+                                      aria-label="Copy queued reply"
+                                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
+                                    >
+                                      {copied === `q-${q.id}` ? (
+                                        <>
+                                          <IconCheck size={13} /> Copied
+                                        </>
+                                      ) : (
+                                        <>
+                                          <IconCopy size={13} /> Copy
+                                        </>
+                                      )}
+                                    </MotionButton>
+                                    <MotionButton
+                                      onClick={() => onDeleteQueued(q.id)}
+                                      className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger"
+                                    >
+                                      Delete
+                                    </MotionButton>
+                                    <MotionButton
+                                      onClick={() => onSendQueued(q)}
+                                      className={PRIMARY_BTN}
+                                    >
+                                      <IconSend size={13} /> Mark sent
+                                    </MotionButton>
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
+                          </AnimatePresence>
                         </div>
-                      )}
-                      <div className="space-y-0.5">
-                        {parts.map((p, idx) => (
-                          <p key={idx} className="text-sm leading-normal text-ink">
-                            {p}
-                          </p>
-                        ))}
-                      </div>
-                      <div className="mt-1.5 flex items-center gap-1">
-                        {q.tone && (
-                          <span
-                            className={cx(
-                              "mr-auto rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
-                              toneStyle(q.tone),
-                            )}
-                          >
-                            {q.tone}
-                          </span>
-                        )}
-                        <button
-                          onClick={() => copyValue(q.content, `q-${q.id}`)}
-                          aria-label="Copy queued reply"
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
-                        >
-                          {copied === `q-${q.id}` ? (
-                            <>
-                              <IconCheck size={13} /> Copied
-                            </>
-                          ) : (
-                            <>
-                              <IconCopy size={13} /> Copy
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => onDeleteQueued(q.id)}
-                          className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => onSendQueued(q)}
-                          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                        >
-                          <IconSend size={13} /> Mark sent
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Targeting bar */}
-        {targets.length > 0 && (
-          <div className="mx-auto mb-2 flex max-w-2xl items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft px-3 py-2">
-            <IconReply size={14} className="mt-0.5 shrink-0 text-accent" />
-            <div className="min-w-0 flex-1">
-              <div className="text-label font-medium tabular-nums text-accent">
-                Replying to {targets.length} message{targets.length > 1 ? "s" : ""}
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {targets.map((tid) => {
-                  const tm = messageById.get(tid);
-                  if (!tm) return null;
-                  return (
-                    <span
-                      key={tid}
-                      className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-meta text-ink-secondary"
-                    >
-                      <span className="truncate">{tm.content}</span>
-                      <button
-                        onClick={() => toggleTarget(tid)}
-                        aria-label="Remove target"
-                        className="shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
-                      >
-                        <IconClose size={11} />
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-            <button
-              onClick={() => setTargets([])}
-              className="shrink-0 text-label text-ink-muted transition-colors duration-150 hover:text-ink"
+        <AnimatePresence initial={false}>
+          {targets.length > 0 && (
+            <motion.div
+              key="targeting"
+              variants={rmCollapse}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              className="mx-auto w-full max-w-2xl overflow-hidden"
             >
-              clear
-            </button>
-          </div>
-        )}
+              <div className="pb-2">
+                <div className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft px-3 py-2">
+                  <IconReply size={14} className="mt-0.5 shrink-0 text-accent" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-label font-medium tabular-nums text-accent">
+                      Replying to {targets.length} message{targets.length > 1 ? "s" : ""}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      <AnimatePresence initial={false}>
+                        {targets.map((tid) => {
+                          const tm = messageById.get(tid);
+                          if (!tm) return null;
+                          return (
+                            <motion.span
+                              key={tid}
+                              layout={reduced ? false : "position"}
+                              variants={rmChip}
+                              initial="initial"
+                              animate="enter"
+                              exit="exit"
+                              className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-meta text-ink-secondary"
+                            >
+                              <span className="truncate">{tm.content}</span>
+                              <MotionButton
+                                onClick={() => toggleTarget(tid)}
+                                aria-label="Remove target"
+                                className="shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
+                              >
+                                <IconClose size={11} />
+                              </MotionButton>
+                            </motion.span>
+                          );
+                        })}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                  <MotionButton
+                    onClick={() => setTargets([])}
+                    className="shrink-0 text-label text-ink-muted transition-colors duration-150 hover:text-ink"
+                  >
+                    clear
+                  </MotionButton>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Composer */}
         <div className="mx-auto max-w-2xl">
-          <div className="rounded-lg border border-line bg-fill p-2 shadow-highlight transition-colors duration-150 focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/20">
+          <div className="rounded-lg border border-line bg-fill p-2 shadow-highlight transition-colors duration-150 focus-within:border-line-accent focus-within:ring-[3px] focus-within:ring-accent/12">
             <div className="flex items-center gap-1.5 px-1 pb-1.5">
               <IconCompass size={14} className="shrink-0 text-ink-muted" />
               <input
                 value={steer}
                 onChange={(e) => setSteer(e.target.value)}
                 placeholder="optional: steer it — “be flirtier”, “ask her out”, “say something like…”"
-                className="min-w-0 flex-1 bg-transparent text-xs text-ink-secondary outline-none placeholder:text-ink-faint"
+                className="min-w-0 flex-1 bg-transparent text-xs text-ink-secondary outline-none placeholder:text-ink-muted"
               />
               {steer && (
-                <button
+                <MotionButton
                   onClick={() => setSteer("")}
                   aria-label="Clear steer"
                   className="shrink-0 text-ink-faint transition-colors duration-150 hover:text-ink"
                 >
                   <IconClose size={13} />
-                </button>
+                </MotionButton>
               )}
             </div>
             <div className="my-1 h-px bg-line" />
@@ -645,34 +1048,51 @@ export function ConversationView({
               }}
               rows={2}
               placeholder={`Paste ${conversation.name}'s latest message…`}
-              className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-normal text-ink outline-none placeholder:text-ink-faint"
+              className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-normal text-ink outline-none placeholder:text-ink-muted"
             />
             <div className="flex items-center justify-between gap-2 px-1 pt-1">
               <div className="flex items-center gap-1">
-                <button
+                <MotionButton
                   onClick={() => addAs("me")}
                   disabled={!text.trim()}
                   className="inline-flex items-center rounded-md px-2.5 py-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Add as me
-                </button>
-                <button
+                </MotionButton>
+                <MotionButton
                   onClick={() => addAs("them")}
                   disabled={!text.trim()}
                   className="inline-flex items-center rounded-md px-2.5 py-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Add as them
-                </button>
+                </MotionButton>
+                <MotionButton
+                  onClick={() => addAs("context")}
+                  disabled={!text.trim()}
+                  title="Drop in a situational note for Cyrano (not a message)"
+                  className="inline-flex items-center rounded-md px-2.5 py-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Add as context
+                </MotionButton>
               </div>
               <div className="flex items-center gap-3">
                 <span className="hidden items-center gap-1.5 text-meta text-ink-muted sm:flex">
                   <span className="kbd">↵</span> generate ·{" "}
                   <span className="kbd">⇧↵</span> newline
                 </span>
-                <button
+                {/* Generate — the only glowing control; wick ring while thinking (§6.4) */}
+                <MotionButton
                   onClick={handleGenerate}
                   disabled={!canGenerate || suggesting}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label tabular-nums text-on-accent shadow-xs transition-colors duration-150 hover:bg-accent-strong motion-safe:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  className={cx(
+                    "inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label tabular-nums text-on-accent transition-colors duration-150 hover:bg-accent-strong",
+                    "shadow-[var(--shadow-press),var(--shadow-glow)]",
+                    "active:bg-[color-mix(in_oklch,var(--color-accent-strong)_85%,var(--color-accent-deep))]",
+                    "active:shadow-[inset_0_-1px_0_rgb(255_255_255/0.22),inset_0_1px_0_rgb(0_0_0/0.25),var(--shadow-glow)]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+                    "disabled:pointer-events-none",
+                    suggesting ? "wick-ring" : "disabled:opacity-40",
+                  )}
                 >
                   {suggesting ? <Spinner size={14} /> : <IconSparkles size={15} />}
                   {targets.length > 0
@@ -680,7 +1100,7 @@ export function ConversationView({
                     : text.trim() || !canRegenerate
                       ? "Generate replies"
                       : "Regenerate"}
-                </button>
+                </MotionButton>
               </div>
             </div>
           </div>

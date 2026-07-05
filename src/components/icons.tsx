@@ -159,3 +159,17 @@ export const IconHeart = (p: IconProps) => (
     <path d="M12 20s-7-4.3-9.5-8.6C1 8.5 2.4 5.5 5.5 5.5c1.9 0 3.2 1 4.5 2.6C11.3 6.5 12.6 5.5 14.5 5.5c3.1 0 4.5 3 3 5.9C19 15.7 12 20 12 20Z" />
   </Icon>
 );
+
+export const IconSearch = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m21 21-4.3-4.3" />
+  </Icon>
+);
+
+export const IconSort = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 6h10M4 12h7M4 18h4" />
+    <path d="M17 5v14m0 0 3-3m-3 3-3-3" opacity={0.6} />
+  </Icon>
+);
