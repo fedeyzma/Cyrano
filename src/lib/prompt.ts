@@ -154,29 +154,59 @@ export function assemblePromptRequest(
   return lines.join("\n");
 }
 
-/** Persona for reading a profile screenshot and writing openers (the Scan module). */
-export const SCAN_SYSTEM = `You are shown one or more SCREENSHOTS of a dating-app profile (mostly Hinge). Read the whole profile carefully — photos, prompt answers, bio, and any visible job / hometown / age / interests. Your job: pick the single best thing to OPEN on, and write a few opener messages for the user to send. Who the user is — background, personality, voice — is in the WHO I AM section; ground the openers in it, never quote it.
+/** Persona for stage 1 of the Scan module: read the profile, map the ways in. */
+export const SCAN_ANALYZE_SYSTEM = `You are shown one or more SCREENSHOTS of a dating-app profile (mostly Hinge). Read the whole profile carefully — photos, prompt answers, bio, and any visible job / hometown / age / interests. Your job: map out the DISTINCT ways to open on this profile, so the user can pick one. Who the user is — background, personality, voice — is in the WHO I AM section; the approaches should genuinely suit him, never quote it.
 
 # How opening works (Hinge)
-You open by liking/commenting on ONE specific item — a prompt answer or a photo. The opener MUST reference that exact thing. Never a generic "hey", never a comment about her looks/attractiveness, never a pickup line.
+You open by liking/commenting on ONE specific item — a prompt answer or a photo. An opener must reference that exact thing. Never a generic "hey", never a comment about her looks/attractiveness, never a pickup line.
 
-# Pick the hook
-Choose the most engaging, openable item: usually a prompt answer with personality, an unusual or specific interest, or a photo with a real detail (an activity, a place, a pet, something with a story). Quote the prompt answer verbatim, or describe the photo precisely. Give a short reason why it's the best hook. If nothing is strong, choose the least generic thing and keep the opener light.
-
-# The openers
-- Each opener references the chosen hook and gives her an easy, low-pressure way to reply (a light question, a playful observation, a shared-interest hook).
-- Sound like ME, in the requested language, with my energy. Short — one or two lines.
-- Warm and a little playful, curious about her. No interview questions, no over-eagerness, no compliments about looks.
-- Return a few DISTINCT options with different tones.
+# The approaches
+Return 3-5 distinct approaches, each anchored to a DIFFERENT profile item — a prompt answer, a photo, or a specific detail — or a genuinely different angle on the strongest item. For each:
+- angle: a short 2-6 word label for the move (e.g. "tease the hot take").
+- target: quote the prompt answer verbatim, or describe the photo/detail precisely.
+- type: exactly one of prompt, photo, detail.
+- reason: one line on why it could land.
+Favor items with personality: a prompt answer with an opinion, an unusual or specific interest, a photo with a real detail (an activity, a place, a pet, something with a story). If the profile is thin, still return the least generic options you can find. Never an approach about her looks.
 
 # Facts
-Also extract durable facts about HER from the profile (job, hometown, interests, pet, what she's into) for remembering later — each with a category from exactly this set: basics, people, interests, tastes, plans, stories, jokes, other. And return her first name if it's visible, else an empty string.`;
+Also extract durable facts about HER from the profile (job, hometown, interests, pet, what she's into) for remembering later — each with a category from exactly this set: basics, people, interests, tastes, plans, stories, jokes, other. And return her first name if it's visible, else an empty string. Also give a 1-2 line read of who she seems to be.`;
 
-export function buildScanSystem(userContext?: string): string {
-  return compose(SCAN_SYSTEM, userContext);
+export function buildScanAnalyzeSystem(userContext?: string): string {
+  return compose(SCAN_ANALYZE_SYSTEM, userContext);
 }
 
-export function assembleScanRequest(
+export function assembleScanAnalyzeRequest(language: string, platform?: string): string {
+  const lines: string[] = [];
+  if (platform) lines.push(`PLATFORM: ${platform}`);
+  if (language.trim()) {
+    lines.push(`LANGUAGE I'LL BE WRITING IN: ${language.trim()} (angles and reasons can stay in English).`);
+  }
+  lines.push("");
+  lines.push(
+    "Read the attached profile screenshot(s) and map out 3-5 distinct approaches to open on, each anchored to a different profile item. Then give your read of her, extract durable facts about her, and her first name if visible.",
+  );
+  return lines.join("\n");
+}
+
+/** Persona for stage 2 of the Scan module: openers for one chosen approach. */
+export const SCAN_OPENERS_SYSTEM = `You are shown SCREENSHOTS of a dating-app profile (mostly Hinge) plus ONE CHOSEN APPROACH — the specific prompt answer, photo, or detail the user wants to open on. Write opener messages for that exact target. Who the user is — background, personality, voice — is in the WHO I AM section; ground the openers in it, never quote it.
+
+# The openers
+- Every opener references the chosen target — the exact prompt answer, photo, or detail given. Do not drift to other parts of the profile.
+- Each gives her an easy, low-pressure way to reply (a light question, a playful observation, a shared-interest hook).
+- Sound like ME, in the requested language, with my energy. Short — one or two lines.
+- Warm and a little playful, curious about her. No interview questions, no over-eagerness, no compliments about looks, no generic "hey", no pickup lines.
+- Return DISTINCT options with different tones — different moves, not rewordings of one line.
+
+# Tone label
+For each opener, return a tone label from exactly this set: dry, playful, curious, flirty, sincere, bold. UI metadata only — never let it appear in the opener text.`;
+
+export function buildScanOpenersSystem(userContext?: string): string {
+  return compose(SCAN_OPENERS_SYSTEM, userContext);
+}
+
+export function assembleScanOpenersRequest(
+  approach: { angle: string; target: string; type: string; reason: string },
   mood: string,
   language: string,
   count: number,
@@ -185,6 +215,10 @@ export function assembleScanRequest(
 ): string {
   const lines: string[] = [];
   if (platform) lines.push(`PLATFORM: ${platform}`);
+  lines.push("THE CHOSEN APPROACH:");
+  lines.push(`- angle: ${approach.angle}`);
+  lines.push(`- open on this (${approach.type}): "${approach.target}"`);
+  if (approach.reason.trim()) lines.push(`- why: ${approach.reason}`);
   lines.push(
     `LANGUAGE FOR THE OPENERS: ${language.trim() || "match the language of the profile"} — natural and native-sounding.`,
   );
@@ -192,13 +226,13 @@ export function assembleScanRequest(
 
   if (avoid && avoid.length > 0) {
     lines.push("");
-    lines.push("I already have these openers — give me genuinely DIFFERENT ones, not rewordings:");
+    lines.push("I already have these openers — do not repeat these, give me genuinely DIFFERENT ones:");
     for (const a of avoid) lines.push(`- "${a}"`);
   }
 
   lines.push("");
   lines.push(
-    `Read the attached profile screenshot(s), pick the single best hook to open on, and write ${count} opener options. Then extract durable facts about her and her first name if visible.`,
+    `Write ${count} distinct opener options that open on that exact target, each a different tone.`,
   );
   return lines.join("\n");
 }

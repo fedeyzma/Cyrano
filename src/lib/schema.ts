@@ -150,17 +150,37 @@ export type PromptAnswers = z.infer<typeof promptAnswersSchema>;
 export const PROMPT_ANSWERS_JSON_EXAMPLE =
   '{"options":[{"text":"...","angle":"funny"},{"text":"...","angle":"sincere"}]}';
 
-/** Result of scanning dating-profile screenshot(s) for an opener. */
-export const profileScanSchema = z.object({
+/** Stage 1 of the profile scan: read the profile and list ways to open. */
+export const profileAnalysisSchema = z.object({
   name: z.string().describe("her first name if visible in the profile, else empty string"),
   read: z.string().describe("a 1-2 line read of who she seems to be, used to ground the openers"),
-  pick: z.object({
-    target: z
-      .string()
-      .describe("the single best thing to open on — quote the prompt answer, or describe the photo/detail"),
-    type: z.string().describe("one of: prompt, photo, bio, detail"),
-    reason: z.string().describe("a short why this is the best hook"),
-  }),
+  approaches: z
+    .array(
+      z.object({
+        angle: z.string().describe("a short 2-6 word label for this way to open"),
+        target: z
+          .string()
+          .describe("the profile item to open on — quote the prompt answer verbatim, or describe the photo/detail precisely"),
+        type: z.string().describe("one of: prompt, photo, detail"),
+        reason: z.string().describe("one line on why this could land"),
+      }),
+    )
+    .min(1)
+    .describe("3-5 distinct ways to open, each anchored to a different profile item"),
+  extractedFacts: z
+    .array(extractedFactSchema)
+    .describe(
+      "durable facts about HER from the profile (job, hometown, interests, pet), each with a category; empty if none",
+    ),
+});
+
+export type ProfileAnalysis = z.infer<typeof profileAnalysisSchema>;
+
+export const PROFILE_ANALYSIS_JSON_EXAMPLE =
+  '{"name":"","read":"...","approaches":[{"angle":"tease the hot take","target":"...","type":"prompt","reason":"..."},{"angle":"ask about the trail photo","target":"...","type":"photo","reason":"..."}],"extractedFacts":[{"fact":"...","category":"interests"}]}';
+
+/** Stage 2 of the profile scan: openers for one chosen approach. */
+export const scanOpenersSchema = z.object({
   openers: z
     .array(
       z.object({
@@ -169,15 +189,10 @@ export const profileScanSchema = z.object({
       }),
     )
     .min(1)
-    .describe("a few distinct opener options that reference the hook"),
-  extractedFacts: z
-    .array(extractedFactSchema)
-    .describe(
-      "durable facts about HER from the profile (job, hometown, interests, pet), each with a category; empty if none",
-    ),
+    .describe("distinct opener options that reference the chosen approach's target"),
 });
 
-export type ProfileScan = z.infer<typeof profileScanSchema>;
+export type ScanOpeners = z.infer<typeof scanOpenersSchema>;
 
-export const PROFILE_SCAN_JSON_EXAMPLE =
-  '{"name":"","read":"...","pick":{"target":"...","type":"prompt","reason":"..."},"openers":[{"text":"...","tone":"playful"}],"extractedFacts":[{"fact":"...","category":"interests"}]}';
+export const SCAN_OPENERS_JSON_EXAMPLE =
+  '{"openers":[{"text":"...","tone":"playful"},{"text":"...","tone":"dry"}]}';

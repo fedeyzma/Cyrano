@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { ProfileScanResult } from "@/lib/api";
+import type { ProfileAnalysisResult, ScanApproach } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import {
   DUR,
@@ -58,19 +58,27 @@ async function fileToResizedDataUrl(file: File, max = 1280, quality = 0.82): Pro
 }
 
 type Img = { id: string; url: string };
+type Opener = { text: string; tone: string };
 
 export function ProfileScan({
-  onScan,
+  onAnalyze,
+  onOpeners,
   onStart,
 }: {
-  onScan: (data: {
+  onAnalyze: (data: {
     images: string[];
+    language: string;
+    platform: string;
+  }) => Promise<ProfileAnalysisResult>;
+  onOpeners: (data: {
+    images: string[];
+    approach: ScanApproach;
     mood: string;
     language: string;
     platform: string;
     count?: number;
     avoid?: string[];
-  }) => Promise<ProfileScanResult>;
+  }) => Promise<{ openers: Opener[] }>;
   onStart: (data: {
     name: string;
     platform: string;
@@ -83,12 +91,18 @@ export function ProfileScan({
   const [platform, setPlatform] = useState("Hinge");
   const [language, setLanguage] = useState("Français");
   const [mood, setMood] = useState("");
-  const [result, setResult] = useState<ProfileScanResult | null>(null);
+  const [analysis, setAnalysis] = useState<ProfileAnalysisResult | null>(null);
+  const [openers, setOpeners] = useState<Record<number, Opener[]>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<number | null>(null);
-  const [regenIndex, setRegenIndex] = useState<number | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  // "Write openers" busy per approach; regenerate-one busy per "approach:opener" key.
+  const [writing, setWriting] = useState<number[]>([]);
+  const [regenKeys, setRegenKeys] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  // Bumped on every scan; in-flight opener requests from a previous scan
+  // check it before touching state so stale responses are dropped.
+  const scanGen = useRef(0);
 
   const addFiles = useCallback(async (files: File[]) => {
     for (const f of files.filter((f) => f.type.startsWith("image/"))) {
@@ -123,11 +137,15 @@ export function ProfileScan({
 
   async function scan() {
     if (images.length === 0) return;
+    scanGen.current += 1;
     setLoading(true);
     setError(null);
-    setResult(null);
+    setAnalysis(null);
+    setOpeners({});
+    setWriting([]);
+    setRegenKeys([]);
     try {
-      setResult(await onScan({ images: images.map((i) => i.url), mood, language, platform }));
+      setAnalysis(await onAnalyze({ images: images.map((i) => i.url), language, platform }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not scan the profile.");
     } finally {
@@ -135,36 +153,71 @@ export function ProfileScan({
     }
   }
 
-  async function regenerateOne(i: number) {
-    if (!result) return;
-    setRegenIndex(i);
+  async function writeOpeners(ai: number) {
+    if (!analysis) return;
+    const approach = analysis.approaches[ai];
+    if (!approach) return;
+    const gen = scanGen.current;
+    setWriting((prev) => [...prev, ai]);
+    setError(null);
     try {
-      const res = await onScan({
+      const res = await onOpeners({
         images: images.map((x) => x.url),
+        approach,
+        mood,
+        language,
+        platform,
+        avoid: openers[ai]?.map((o) => o.text),
+      });
+      if (gen !== scanGen.current) return; // stale: a new scan replaced this analysis
+      setOpeners((prev) => ({ ...prev, [ai]: res.openers }));
+    } catch (e) {
+      if (gen !== scanGen.current) return;
+      setError(e instanceof Error ? e.message : "Could not write the openers.");
+    } finally {
+      if (gen === scanGen.current) setWriting((prev) => prev.filter((x) => x !== ai));
+    }
+  }
+
+  async function regenerateOne(ai: number, oi: number) {
+    if (!analysis) return;
+    const approach = analysis.approaches[ai];
+    const current = openers[ai];
+    if (!approach || !current) return;
+    const key = `${ai}:${oi}`;
+    const gen = scanGen.current;
+    setRegenKeys((prev) => [...prev, key]);
+    try {
+      const res = await onOpeners({
+        images: images.map((x) => x.url),
+        approach,
         mood,
         language,
         platform,
         count: 1,
-        avoid: result.openers.map((o) => o.text),
+        avoid: current.map((o) => o.text),
       });
+      if (gen !== scanGen.current) return; // stale: a new scan replaced this analysis
       const next = res.openers[0];
       if (next) {
-        setResult((prev) =>
-          prev ? { ...prev, openers: prev.openers.map((o, idx) => (idx === i ? next : o)) } : prev,
-        );
+        setOpeners((prev) => ({
+          ...prev,
+          [ai]: (prev[ai] ?? []).map((o, idx) => (idx === oi ? next : o)),
+        }));
       }
     } catch (e) {
+      if (gen !== scanGen.current) return;
       setError(e instanceof Error ? e.message : "Could not regenerate.");
     } finally {
-      setRegenIndex(null);
+      if (gen === scanGen.current) setRegenKeys((prev) => prev.filter((k) => k !== key));
     }
   }
 
-  async function copy(text: string, i: number) {
+  async function copy(text: string, key: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(i);
-      setTimeout(() => setCopied((c) => (c === i ? null : c)), 1600);
+      setCopied(key);
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), 1600);
     } catch {
       /* clipboard unavailable */
     }
@@ -183,6 +236,7 @@ export function ProfileScan({
   const cardVariants = rm(reduced, suggestionCardVariants);
   const errorVariants = rm(reduced, fadeUp(6));
   const emptyVariants = rm(reduced, fadeUp(6));
+  const openerVariants = rm(reduced, fadeUp(6));
   const skeletonVariants = rm(reduced, {
     initial: { opacity: 0, filter: "blur(0px)" },
     enter: { opacity: 1, filter: "blur(0px)", transition: { duration: DUR.base, ease: EASE_FADE } },
@@ -194,10 +248,10 @@ export function ProfileScan({
     exit: { opacity: 0, transition: { duration: DUR.exitFast, ease: EASE_FADE } },
   });
 
-  // Deal-out order across the result cards: read → hook → openers → facts.
-  const hookIdx = result?.read ? 1 : 0;
-  const openerBase = hookIdx + 1;
-  const factsIdx = openerBase + (result?.openers.length ?? 0);
+  // Deal-out order across the result cards: read → approaches → facts.
+  const approachBase = analysis?.read ? 1 : 0;
+  const factsIdx = approachBase + (analysis?.approaches.length ?? 0);
+  const anyOpeners = Object.values(openers).some((list) => list.length > 0);
 
   return (
     <div className="flex h-full flex-col">
@@ -207,7 +261,7 @@ export function ProfileScan({
         </span>
         <div className="leading-tight">
           <div className="font-display text-scene text-ink">Scan a profile</div>
-          <div className="text-meta text-ink-muted">screenshots in, the best hook + openers out</div>
+          <div className="text-meta text-ink-muted">screenshots in, ways to open + openers out</div>
         </div>
       </header>
 
@@ -358,7 +412,7 @@ export function ProfileScan({
               )}
             >
               {loading ? <Spinner size={15} /> : <IconSparkles size={16} />}
-              {result ? "Scan again" : "Find the hook + openers"}
+              {analysis ? "Scan again" : "Find the ways in"}
             </MotionButton>
           </div>
 
@@ -393,7 +447,7 @@ export function ProfileScan({
                 <div className="skeleton h-12" />
                 <div className="skeleton h-12" />
               </motion.div>
-            ) : result ? (
+            ) : analysis ? (
               <motion.div
                 key="result"
                 variants={resultVariants}
@@ -402,7 +456,7 @@ export function ProfileScan({
                 exit="exit"
                 className="space-y-4"
               >
-                {result.read && (
+                {analysis.read && (
                   <motion.p
                     custom={0}
                     variants={cardVariants}
@@ -410,143 +464,166 @@ export function ProfileScan({
                     animate="enter"
                     className="px-1 text-sm leading-normal text-ink-secondary"
                   >
-                    {result.read}
+                    {analysis.read}
                   </motion.p>
                 )}
 
-                {/* The hook */}
-                <motion.div
-                  custom={hookIdx}
-                  variants={cardVariants}
-                  initial="initial"
-                  animate="enter"
-                  className="rounded-lg border border-accent/30 bg-accent-faint p-3.5 shadow-highlight"
-                >
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="text-meta font-semibold uppercase tracking-wider text-accent">
-                      Open on this
-                    </span>
-                    <span className="rounded-full bg-fill px-2 py-0.5 text-meta uppercase tracking-wider text-ink-muted">
-                      {result.pick.type}
-                    </span>
-                  </div>
-                  <p className="text-sm leading-normal text-ink">“{result.pick.target}”</p>
-                  <p className="mt-1 text-[13px] leading-normal text-ink-muted">{result.pick.reason}</p>
-                </motion.div>
-
-                {/* Openers */}
-                <div className="space-y-2">
+                {/* Approaches */}
+                <div className="space-y-2.5">
                   <div className="px-1 text-meta font-semibold uppercase tracking-wider text-ink-muted">
-                    Openers
+                    Ways to open
                   </div>
-                  {result.openers.map((o, i) => {
-                    const busy = regenIndex === i;
+                  {analysis.approaches.map((a, ai) => {
+                    const list = openers[ai];
+                    const busy = writing.includes(ai);
+                    // Any single-opener regen in flight for this approach: block the
+                    // approach-level rewrite and the other regen buttons so concurrent
+                    // requests can't clobber each other or share a stale avoid list.
+                    const regenBusy = regenKeys.some((k) => k.startsWith(`${ai}:`));
                     return (
                       <motion.div
-                        key={i}
-                        custom={openerBase + i}
+                        key={ai}
+                        custom={approachBase + ai}
                         variants={cardVariants}
                         initial="initial"
                         animate="enter"
-                        className="rounded-md border border-line bg-fill p-3 shadow-highlight transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
+                        className="rounded-lg border border-accent/30 bg-accent-faint p-3.5 shadow-highlight"
                       >
-                        <div className="flex items-center justify-between">
-                          <motion.span
-                            initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
-                            animate={
-                              reduced
-                                ? { opacity: 1, transition: { duration: 0.12 } }
-                                : {
-                                    opacity: 1,
-                                    scale: 1,
-                                    transition: { ...SPRING_MICRO, delay: (openerBase + i) * 0.09 + 0.06 },
-                                  }
-                            }
-                            className={cx(
-                              "rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
-                              toneStyle(o.tone),
-                            )}
-                          >
-                            {o.tone}
-                          </motion.span>
-                          <div className="flex items-center gap-1">
-                            <MotionButton
-                              onClick={() => regenerateOne(i)}
-                              disabled={regenIndex !== null}
-                              aria-label="Regenerate this opener"
-                              title="Regenerate just this one"
-                              className="inline-flex items-center rounded-md p-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {busy ? <Spinner size={13} /> : <IconRefresh size={13} />}
-                            </MotionButton>
-                            <MotionButton
-                              onClick={() => copy(o.text, i)}
-                              disabled={busy}
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
-                            >
-                              {copied === i ? (
-                                <>
-                                  <IconCheck size={13} /> Copied
-                                </>
-                              ) : (
-                                <>
-                                  <IconCopy size={13} /> Copy
-                                </>
-                              )}
-                            </MotionButton>
-                            <MotionButton
-                              onClick={() =>
-                                onStart({
-                                  name: result.name,
-                                  platform,
-                                  facts: result.extractedFacts,
-                                  opener: o.text,
-                                })
-                              }
-                              disabled={busy}
-                              className="inline-flex items-center gap-1 rounded-md bg-accent/90 px-2.5 py-1 text-label font-medium text-on-accent transition-colors duration-150 hover:bg-accent disabled:opacity-50"
-                            >
-                              <IconSend size={13} /> Start
-                            </MotionButton>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="truncate text-sm font-medium text-accent">{a.angle}</span>
+                            <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 text-meta uppercase tracking-wider text-ink-muted">
+                              {a.type}
+                            </span>
                           </div>
-                        </div>
-                        <AnimatePresence mode="wait" initial={false}>
-                          <motion.p
-                            key={o.text}
-                            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 4, filter: "blur(0px)" }}
-                            animate={
-                              reduced
-                                ? { opacity: busy ? 0.4 : 1, transition: { duration: 0.12 } }
-                                : {
-                                    opacity: busy ? 0.4 : 1,
-                                    y: 0,
-                                    filter: "blur(0px)",
-                                    transition: { duration: 0.18, ease: EASE_FADE },
-                                  }
-                            }
-                            exit={
-                              reduced
-                                ? { opacity: 0, transition: { duration: 0.12 } }
-                                : {
-                                    opacity: 0,
-                                    filter: "blur(2px)",
-                                    transition: { duration: 0.12, ease: EASE_FADE },
-                                  }
-                            }
-                            className="mt-2 text-sm leading-normal text-ink"
+                          <MotionButton
+                            onClick={() => writeOpeners(ai)}
+                            disabled={busy || regenBusy}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-accent/90 px-2.5 py-1 text-label font-medium text-on-accent transition-colors duration-150 hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
                           >
-                            {o.text}
-                          </motion.p>
+                            {busy ? <Spinner size={13} /> : <IconSparkles size={13} />}
+                            {list ? "Rewrite openers" : "Write openers"}
+                          </MotionButton>
+                        </div>
+                        <p className="mt-1.5 text-sm leading-normal text-ink">“{a.target}”</p>
+                        <p className="mt-1 text-[13px] leading-normal text-ink-muted">{a.reason}</p>
+
+                        <AnimatePresence initial={false}>
+                          {list && list.length > 0 && (
+                            <motion.div
+                              key="openers"
+                              variants={openerVariants}
+                              initial="initial"
+                              animate="enter"
+                              exit="exit"
+                              className="mt-3 space-y-2"
+                            >
+                              {list.map((o, oi) => {
+                                const key = `${ai}:${oi}`;
+                                const oBusy = regenKeys.includes(key);
+                                return (
+                                  <div
+                                    key={oi}
+                                    className="rounded-md border border-line bg-fill p-3 shadow-highlight transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span
+                                        className={cx(
+                                          "rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
+                                          toneStyle(o.tone),
+                                        )}
+                                      >
+                                        {o.tone}
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        <MotionButton
+                                          onClick={() => regenerateOne(ai, oi)}
+                                          disabled={busy || regenBusy}
+                                          aria-label="Regenerate this opener"
+                                          title="Regenerate just this one"
+                                          className="inline-flex items-center rounded-md p-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                          {oBusy ? <Spinner size={13} /> : <IconRefresh size={13} />}
+                                        </MotionButton>
+                                        <MotionButton
+                                          onClick={() => copy(o.text, key)}
+                                          disabled={oBusy}
+                                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
+                                        >
+                                          {copied === key ? (
+                                            <>
+                                              <IconCheck size={13} /> Copied
+                                            </>
+                                          ) : (
+                                            <>
+                                              <IconCopy size={13} /> Copy
+                                            </>
+                                          )}
+                                        </MotionButton>
+                                        <MotionButton
+                                          onClick={() =>
+                                            onStart({
+                                              name: analysis.name,
+                                              platform,
+                                              facts: analysis.extractedFacts,
+                                              opener: o.text,
+                                            })
+                                          }
+                                          disabled={oBusy}
+                                          className="inline-flex items-center gap-1 rounded-md bg-accent/90 px-2.5 py-1 text-label font-medium text-on-accent transition-colors duration-150 hover:bg-accent disabled:opacity-50"
+                                        >
+                                          <IconSend size={13} /> Start
+                                        </MotionButton>
+                                      </div>
+                                    </div>
+                                    <AnimatePresence mode="wait" initial={false}>
+                                      <motion.p
+                                        key={o.text}
+                                        initial={
+                                          reduced ? { opacity: 0 } : { opacity: 0, y: 4, filter: "blur(0px)" }
+                                        }
+                                        animate={
+                                          reduced
+                                            ? { opacity: oBusy ? 0.4 : 1, transition: { duration: 0.12 } }
+                                            : {
+                                                opacity: oBusy ? 0.4 : 1,
+                                                y: 0,
+                                                filter: "blur(0px)",
+                                                transition: { duration: 0.18, ease: EASE_FADE },
+                                              }
+                                        }
+                                        exit={
+                                          reduced
+                                            ? { opacity: 0, transition: { duration: 0.12 } }
+                                            : {
+                                                opacity: 0,
+                                                filter: "blur(2px)",
+                                                transition: { duration: 0.12, ease: EASE_FADE },
+                                              }
+                                        }
+                                        className="mt-2 text-sm leading-normal text-ink"
+                                      >
+                                        {o.text}
+                                      </motion.p>
+                                    </AnimatePresence>
+                                  </div>
+                                );
+                              })}
+                            </motion.div>
+                          )}
                         </AnimatePresence>
                       </motion.div>
                     );
                   })}
-                  <p className="px-1 pt-1 text-meta text-ink-muted">
-                    “Start” opens a new conversation with her (facts saved, opener copied).
-                  </p>
+                  {anyOpeners && (
+                    <p className="px-1 pt-1 text-meta text-ink-muted">
+                      Start opens a new conversation with her — facts saved, opener dropped into the
+                      thread and copied.
+                    </p>
+                  )}
                 </div>
 
-                {result.extractedFacts.length > 0 && (
+                {analysis.extractedFacts.length > 0 && (
                   <motion.div
                     custom={factsIdx}
                     variants={cardVariants}
@@ -558,7 +635,7 @@ export function ProfileScan({
                       Picked up about her
                     </div>
                     <ul className="space-y-0.5">
-                      {result.extractedFacts.map((f, i) => (
+                      {analysis.extractedFacts.map((f, i) => (
                         <li key={i} className="text-[13px] leading-normal text-ink-secondary">
                           • {f.fact}
                         </li>
@@ -578,8 +655,8 @@ export function ProfileScan({
               >
                 <p className="drop-cap-sm text-sm text-ink-secondary">Add a profile, then find your in.</p>
                 <p className="mt-1 text-meta leading-normal text-ink-muted">
-                  Cami reads the prompts and photos, picks the strongest hook, and writes openers in
-                  your voice — grounded in your context file.
+                  Cami reads the prompts and photos, maps out a few ways to open, and writes openers
+                  in your voice for whichever one you pick — grounded in your context file.
                 </p>
               </motion.div>
             ) : null}

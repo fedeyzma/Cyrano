@@ -595,6 +595,14 @@ export default function Home() {
           /* skip duplicates */
         }
       }
+      // The conversation and facts already exist; if adding the opener fails,
+      // still surface the conversation instead of stranding it invisibly.
+      let openerAdded = true;
+      try {
+        await api.addMessage(conv.id, "me", data.opener);
+      } catch {
+        openerAdded = false;
+      }
       await refreshList();
       setView("replies");
       setSelected(conv.id);
@@ -603,7 +611,11 @@ export default function Home() {
       } catch {
         /* clipboard unavailable */
       }
-      showToast("Conversation started — opener copied");
+      showToast(
+        openerAdded
+          ? "Conversation started — opener added & copied"
+          : "Conversation started — opener copied, but couldn't be added to the thread",
+      );
     } catch (e) {
       handleError(e);
     }
@@ -660,7 +672,11 @@ export default function Home() {
           <main className="relative flex min-w-0 flex-1 flex-col">
             <ViewFade viewKey={viewKey} className="flex min-h-0 min-w-0 flex-1 flex-col">
               {view === "scan" ? (
-                <ProfileScan onScan={(d) => api.scanProfile(d)} onStart={handleStartFromScan} />
+                <ProfileScan
+                  onAnalyze={(d) => api.analyzeProfile(d)}
+                  onOpeners={(d) => api.scanOpeners(d)}
+                  onStart={handleStartFromScan}
+                />
               ) : view === "prompts" ? (
                 <PromptsLab
                   onGenerate={async (data) => {

@@ -162,15 +162,22 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  scanProfile: (data: {
+  analyzeProfile: (data: { images: string[]; language?: string; platform?: string }) =>
+    req<ProfileAnalysisResult>("/api/scan", { method: "POST", body: JSON.stringify(data) }),
+
+  scanOpeners: (data: {
     images: string[];
+    approach: ScanApproach;
     mood?: string;
     language?: string;
     platform?: string;
     count?: number;
     avoid?: string[];
   }) =>
-    req<ProfileScanResult>("/api/scan", { method: "POST", body: JSON.stringify(data) }),
+    req<{ openers: Array<{ text: string; tone: string }> }>("/api/scan/openers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   exportBackup: () => req<Backup>("/api/backup"),
 
@@ -178,10 +185,16 @@ export const api = {
     req<ImportResult>("/api/backup", { method: "POST", body: JSON.stringify(data) }),
 };
 
-export interface ProfileScanResult {
+export interface ScanApproach {
+  angle: string;
+  target: string;
+  type: string;
+  reason: string;
+}
+
+export interface ProfileAnalysisResult {
   name: string;
   read: string;
-  pick: { target: string; type: string; reason: string };
-  openers: Array<{ text: string; tone: string }>;
+  approaches: ScanApproach[];
   extractedFacts: Array<{ fact: string; category?: string }>;
 }

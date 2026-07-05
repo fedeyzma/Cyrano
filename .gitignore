@@ -25,6 +25,9 @@ next-env.d.ts
 .env.test.local
 .env.production.local
 
+# personal handoff / working notes (deployment specifics, not for the repo)
+/HANDOFF.md
+
 # misc
 *.log
 npm-debug.log*

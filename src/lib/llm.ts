@@ -1,16 +1,19 @@
 import {
   IMPORTED_THREAD_JSON_EXAMPLE,
   importedThreadSchema,
-  PROFILE_SCAN_JSON_EXAMPLE,
-  profileScanSchema,
+  PROFILE_ANALYSIS_JSON_EXAMPLE,
+  profileAnalysisSchema,
   PROMPT_ANSWERS_JSON_EXAMPLE,
   promptAnswersSchema,
+  SCAN_OPENERS_JSON_EXAMPLE,
+  scanOpenersSchema,
   SUGGESTION_JSON_EXAMPLE,
   suggestionSchema,
   THREAD_FACTS_JSON_EXAMPLE,
   threadFactsSchema,
-  type ProfileScan,
+  type ProfileAnalysis,
   type PromptAnswers,
+  type ScanOpeners,
   type Suggestion,
   type ThreadFacts,
 } from "./schema";
@@ -159,13 +162,13 @@ export async function extractFactLibrary(system: string, userMsg: string): Promi
   throw new LlmError("Cami couldn't scan that thread for details. Try again.", lastParseError);
 }
 
-/** Read profile screenshot(s) and return a hook + openers (strict JSON, with retry). */
-export async function generateProfileScan(
+/** Read profile screenshot(s) and return approaches + facts (strict JSON, with retry). */
+export async function analyzeProfile(
   system: string,
   userMsg: string,
   images: string[],
-): Promise<ProfileScan> {
-  const jsonInstruction = `\n\nThis is a pure analysis task. Do NOT use tools, notify anyone, or ask questions. Return ONLY a single valid JSON object — no markdown, no commentary — exactly:\n${PROFILE_SCAN_JSON_EXAMPLE}`;
+): Promise<ProfileAnalysis> {
+  const jsonInstruction = `\n\nThis is a pure analysis task. Do NOT use tools, notify anyone, or ask questions. Return ONLY a single valid JSON object — no markdown, no commentary — exactly:\n${PROFILE_ANALYSIS_JSON_EXAMPLE}\n"type" is one of: prompt, photo, detail. Each extractedFacts item is {"fact","category"} with "category" one of: basics, people, interests, tastes, plans, stories, jokes, other.`;
   const sys = system + jsonInstruction;
 
   let lastParseError: unknown;
@@ -173,16 +176,42 @@ export async function generateProfileScan(
     const raw = await chat(sys, userMsg, {
       images,
       maxTokens: 1400,
-      temperature: 0.9,
+      temperature: 0.7,
       timeoutMs: 90000,
     });
     try {
-      return profileScanSchema.parse(extractJson(raw));
+      return profileAnalysisSchema.parse(extractJson(raw));
     } catch (err) {
       lastParseError = err;
     }
   }
   throw new LlmError("Cami couldn't read that profile. Try clearer or fewer screenshots.", lastParseError);
+}
+
+/** Write openers for one chosen approach on a profile (strict JSON, with retry). */
+export async function generateScanOpeners(
+  system: string,
+  userMsg: string,
+  images: string[],
+): Promise<ScanOpeners> {
+  const jsonInstruction = `\n\nThis is a pure text task. Do NOT use tools, notify anyone, or ask questions. Return ONLY a single valid JSON object — no markdown, no commentary — exactly:\n${SCAN_OPENERS_JSON_EXAMPLE}\n"tone" is one of: dry, playful, curious, flirty, sincere, bold.`;
+  const sys = system + jsonInstruction;
+
+  let lastParseError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = await chat(sys, userMsg, {
+      images,
+      maxTokens: 900,
+      temperature: 0.9,
+      timeoutMs: 90000,
+    });
+    try {
+      return scanOpenersSchema.parse(extractJson(raw));
+    } catch (err) {
+      lastParseError = err;
+    }
+  }
+  throw new LlmError("Cami couldn't write openers for that approach. Try again.", lastParseError);
 }
 
 /** Pull the outermost JSON object out of a possibly-chatty response. */
