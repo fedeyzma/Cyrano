@@ -70,10 +70,10 @@ export const api = {
   deleteConversation: (id: number) =>
     req<{ ok: boolean }>(`/api/conversations/${id}`, { method: "DELETE" }),
 
-  addMessage: (id: number, role: MessageRole, content: string) =>
+  addMessage: (id: number, role: MessageRole, content: string, replyToMessageId?: number | null) =>
     req<Message>(`/api/conversations/${id}/messages`, {
       method: "POST",
-      body: JSON.stringify({ role, content }),
+      body: JSON.stringify({ role, content, replyToMessageId: replyToMessageId ?? undefined }),
     }),
 
   addMessagesBulk: (id: number, messages: Array<{ role: Role; content: string }>) =>
@@ -100,10 +100,16 @@ export const api = {
   deleteQueuedReply: (id: number, queueId: number) =>
     req<{ ok: boolean }>(`/api/conversations/${id}/queue/${queueId}`, { method: "DELETE" }),
 
-  updateMessage: (id: number, messageId: number, content: string) =>
+  updateMessage: (id: number, messageId: number, patch: { content?: string; role?: MessageRole }) =>
     req<Message>(`/api/conversations/${id}/messages/${messageId}`, {
       method: "PATCH",
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(patch),
+    }),
+
+  moveMessage: (id: number, messageId: number, direction: "up" | "down") =>
+    req<{ messages: Message[] }>(`/api/conversations/${id}/messages/${messageId}/move`, {
+      method: "POST",
+      body: JSON.stringify({ direction }),
     }),
 
   deleteMessage: (id: number, messageId: number) =>
@@ -120,6 +126,7 @@ export const api = {
       targetMessageIds?: number[];
       avoid?: string[];
       extractFacts?: boolean;
+      replyToMessageId?: number;
     } = {},
   ) =>
     req<SuggestResponse>(`/api/conversations/${id}/suggest`, {

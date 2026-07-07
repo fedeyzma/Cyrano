@@ -1,4 +1,4 @@
-import { addFact, addMessage, getConversation, getFacts, getMessages } from "@/lib/db";
+import { addFact, addMessage, getConversation, getFacts, getMessage, getMessages } from "@/lib/db";
 import { json, parseId, readJson } from "@/lib/http";
 import { generateSuggestions, LlmError } from "@/lib/llm";
 import { assemblePrompt, buildSystemPrompt } from "@/lib/prompt";
@@ -27,6 +27,7 @@ export async function POST(req: Request, { params }: Ctx) {
     targetMessageIds?: number[];
     avoid?: string[];
     extractFacts?: boolean;
+    replyToMessageId?: number;
   }>(req);
   const incoming = typeof body?.incoming === "string" ? body.incoming.trim() : "";
   const steer = typeof body?.steer === "string" ? body.steer.trim() : "";
@@ -43,9 +44,16 @@ export async function POST(req: Request, { params }: Ctx) {
     5,
   );
 
+  // A stale reply-to pointer shouldn't fail generation — just drop the link.
+  let replyTo: number | null = null;
+  if (body?.replyToMessageId != null && Number.isInteger(body.replyToMessageId)) {
+    const target = getMessage(id, body.replyToMessageId);
+    if (target && target.role !== "context") replyTo = body.replyToMessageId;
+  }
+
   // If the user pasted the latest incoming message, log it to the thread first.
   const addedMessages: Message[] = [];
-  if (incoming) addedMessages.push(addMessage(id, "them", incoming));
+  if (incoming) addedMessages.push(addMessage(id, "them", incoming, replyTo));
 
   const messages = getMessages(id);
   const facts = getFacts(id);

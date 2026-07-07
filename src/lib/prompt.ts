@@ -264,6 +264,58 @@ function renderFactLibrary(facts: Fact[], lines: string[]): void {
   }
 }
 
+/**
+ * Render the thread lines. When any rendered message carries a resolvable
+ * reply-to link (Instagram-style quote reply), speaker lines get [n] numbers
+ * so a reply can point at the exact message it quotes without re-quoting it.
+ * Without links the output is the classic un-numbered format, unchanged.
+ */
+function renderThread(all: Message[], recent: Message[]): { lines: string[]; hasLinks: boolean } {
+  const byId = new Map(all.map((m) => [m.id, m]));
+  const hasLinks = recent.some(
+    (m) =>
+      m.role !== "context" && m.reply_to_message_id != null && byId.has(m.reply_to_message_id),
+  );
+  const lines: string[] = [];
+
+  if (!hasLinks) {
+    for (const m of recent) {
+      lines.push(
+        m.role === "context"
+          ? `(context: ${m.content})`
+          : `${m.role === "them" ? "Them" : "Me"}: ${m.content}`,
+      );
+    }
+    return { lines, hasLinks };
+  }
+
+  const numById = new Map<number, number>();
+  let n = 0;
+  for (const m of recent) if (m.role !== "context") numById.set(m.id, ++n);
+
+  for (const m of recent) {
+    if (m.role === "context") {
+      lines.push(`(context: ${m.content})`);
+      continue;
+    }
+    let marker = "";
+    const rid = m.reply_to_message_id;
+    if (rid != null && byId.has(rid)) {
+      const quotedNum = numById.get(rid);
+      if (quotedNum != null) {
+        marker = ` (replying to [${quotedNum}])`;
+      } else {
+        // Quoted message exists but is older than the rendered window.
+        const quoted = byId.get(rid)!.content;
+        const preview = quoted.length > 60 ? `${quoted.slice(0, 60)}…` : quoted;
+        marker = ` (replying to an earlier message: "${preview}")`;
+      }
+    }
+    lines.push(`[${numById.get(m.id)}] ${m.role === "them" ? "Them" : "Me"}${marker}: ${m.content}`);
+  }
+  return { lines, hasLinks };
+}
+
 export function assemblePrompt(
   detail: ConversationDetail,
   optionCount: number,
@@ -287,18 +339,16 @@ export function assemblePrompt(
     );
   } else {
     const recent = messages.slice(-MAX_MESSAGES);
+    const thread = renderThread(messages, recent);
+    const linkNote = thread.hasLinks
+      ? "; [n] marks show which earlier message a reply quotes"
+      : "";
     lines.push(
       recent.length < messages.length
-        ? `CONVERSATION SO FAR (last ${recent.length} messages, oldest first):`
-        : "CONVERSATION SO FAR (oldest first):",
+        ? `CONVERSATION SO FAR (last ${recent.length} messages, oldest first${linkNote}):`
+        : `CONVERSATION SO FAR (oldest first${linkNote}):`,
     );
-    for (const m of recent) {
-      if (m.role === "context") {
-        lines.push(`(context: ${m.content})`);
-      } else {
-        lines.push(`${m.role === "them" ? "Them" : "Me"}: ${m.content}`);
-      }
-    }
+    lines.push(...thread.lines);
 
     const targets =
       targetIds && targetIds.length > 0
@@ -393,19 +443,15 @@ export function assembleFactScanRequest(
   }
 
   const recent = messages.slice(-MAX_SCAN_MESSAGES);
+  const thread = renderThread(messages, recent);
+  const linkNote = thread.hasLinks ? "; [n] marks show which earlier message a reply quotes" : "";
   lines.push("");
   lines.push(
     recent.length < messages.length
-      ? `FULL CONVERSATION (last ${recent.length} messages, oldest first):`
-      : "FULL CONVERSATION (oldest first):",
+      ? `FULL CONVERSATION (last ${recent.length} messages, oldest first${linkNote}):`
+      : `FULL CONVERSATION (oldest first${linkNote}):`,
   );
-  for (const m of recent) {
-    if (m.role === "context") {
-      lines.push(`(context: ${m.content})`);
-    } else {
-      lines.push(`${m.role === "them" ? "Them" : "Me"}: ${m.content}`);
-    }
-  }
+  lines.push(...thread.lines);
 
   lines.push("");
   lines.push(

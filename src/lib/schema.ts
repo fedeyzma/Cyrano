@@ -7,6 +7,7 @@ const backupMessageSchema = z.object({
   role: z.enum(["them", "me", "context"]),
   content: z.string(),
   created_at: z.number(),
+  reply_to_index: z.number().int().nullable().optional(),
 });
 
 const backupFactSchema = z.object({

@@ -1,4 +1,4 @@
-import { addMessage, getConversation } from "@/lib/db";
+import { addMessage, getConversation, getMessage } from "@/lib/db";
 import { json, parseId, readJson } from "@/lib/http";
 import type { MessageRole } from "@/lib/types";
 
@@ -12,7 +12,9 @@ export async function POST(req: Request, { params }: Ctx) {
   if (id === null) return json({ error: "Not found" }, 404);
   if (!getConversation(id)) return json({ error: "Not found" }, 404);
 
-  const body = await readJson<{ role?: string; content?: string }>(req);
+  const body = await readJson<{ role?: string; content?: string; replyToMessageId?: unknown }>(
+    req,
+  );
   if (!body) return json({ error: "Invalid JSON" }, 400);
 
   const role: MessageRole | null =
@@ -21,5 +23,18 @@ export async function POST(req: Request, { params }: Ctx) {
   if (!role) return json({ error: "role must be 'me', 'them', or 'context'" }, 400);
   if (!content) return json({ error: "content is required" }, 400);
 
-  return json(addMessage(id, role, content), 201);
+  let replyTo: number | null = null;
+  if (body.replyToMessageId != null) {
+    const rid = Number(body.replyToMessageId);
+    const target = Number.isInteger(rid) ? getMessage(id, rid) : undefined;
+    if (!target || target.role === "context") {
+      return json(
+        { error: "replyToMessageId must reference a me/them message in this conversation" },
+        400,
+      );
+    }
+    replyTo = rid;
+  }
+
+  return json(addMessage(id, role, content, replyTo), 201);
 }

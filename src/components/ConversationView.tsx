@@ -28,16 +28,20 @@ import type { ConversationDetail, MessageRole, QueuedReply, ReplyOption, Role } 
 import {
   IconBrain,
   IconCheck,
+  IconChevronDown,
+  IconChevronUp,
   IconClock,
   IconClose,
   IconCompass,
   IconCopy,
   IconEdit,
   IconImport,
+  IconQuote,
   IconRefresh,
   IconReply,
   IconSend,
   IconSparkles,
+  IconSwap,
   IconTrash,
   IconUser,
 } from "./icons";
@@ -138,6 +142,8 @@ export function ConversationView({
   onDismissSuggestions,
   onDeleteMessage,
   onEditMessage,
+  onFlipMessage,
+  onMoveMessage,
   onDeleteConversation,
   onDeleteQueued,
   onSendQueued,
@@ -150,14 +156,21 @@ export function ConversationView({
   suggesting: boolean;
   suggestError: string | null;
   factsCount: number;
-  onSuggest: (incoming: string, steer: string, targetIds: number[]) => void;
-  onAddMessage: (role: MessageRole, content: string) => void;
+  onSuggest: (
+    incoming: string,
+    steer: string,
+    targetIds: number[],
+    replyToMessageId?: number | null,
+  ) => void;
+  onAddMessage: (role: MessageRole, content: string, replyToMessageId?: number | null) => void;
   onUseOption: (texts: string[]) => void;
   onQueueOption: (texts: string[], tone: string, targetId: number | null) => void;
   onRegenerateOne: (index: number, steer: string, targetIds: number[]) => Promise<void>;
   onDismissSuggestions: () => void;
   onDeleteMessage: (messageId: number) => void;
   onEditMessage: (messageId: number, content: string) => Promise<void>;
+  onFlipMessage: (messageId: number) => void;
+  onMoveMessage: (messageId: number, direction: "up" | "down") => void;
   onDeleteConversation: () => void;
   onDeleteQueued: (queueId: number) => void;
   onSendQueued: (q: QueuedReply) => void;
@@ -170,6 +183,9 @@ export function ConversationView({
   const [steer, setSteer] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [targets, setTargets] = useState<number[]>([]);
+  /** Persisted quote link for the NEXT added message (Instagram-style reply);
+      distinct from `targets`, which only steers generation. */
+  const [replyTo, setReplyTo] = useState<number | null>(null);
   const [queueOpen, setQueueOpen] = useState(true);
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -228,9 +244,10 @@ export function ConversationView({
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, suggestions, suggesting]);
 
-  // Drop any targets whose message no longer exists.
+  // Drop any targets / quote link whose message no longer exists.
   useEffect(() => {
     setTargets((prev) => prev.filter((id) => messageById.has(id)));
+    setReplyTo((prev) => (prev !== null && messageById.has(prev) ? prev : null));
   }, [messageById]);
 
   const lastThem = [...messages].reverse().find((m) => m.role === "them");
@@ -245,8 +262,9 @@ export function ConversationView({
   function handleGenerate() {
     const t = text.trim();
     if (t) {
-      onSuggest(t, steer, targets);
+      onSuggest(t, steer, targets, replyTo);
       setText("");
+      setReplyTo(null);
     } else if (canRegenerate) {
       onSuggest("", steer, targets);
     }
@@ -259,8 +277,9 @@ export function ConversationView({
   function addAs(role: MessageRole) {
     const t = text.trim();
     if (!t) return;
-    onAddMessage(role, t);
+    onAddMessage(role, t, role === "context" ? null : replyTo);
     setText("");
+    if (role !== "context") setReplyTo(null);
   }
 
   async function copyValue(value: string, key: string) {
@@ -502,11 +521,12 @@ export function ConversationView({
                 cascadeDelay > 0 ? withEnterDelay(base, cascadeDelay) : base,
               );
 
+              const isQuoteSource = replyTo === m.id;
               const actions = (
                 <div
                   className={cx(
-                    "mb-0.5 flex flex-col gap-1 transition-[opacity,transform] duration-150",
-                    isTarget
+                    "mb-0.5 grid grid-cols-2 items-center gap-1 transition-[opacity,transform] duration-150",
+                    isTarget || isQuoteSource
                       ? "opacity-100"
                       : cx(
                           "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
@@ -516,6 +536,23 @@ export function ConversationView({
                         ),
                   )}
                 >
+                  <MotionButton
+                    onClick={() => setReplyTo((prev) => (prev === m.id ? null : m.id))}
+                    aria-label={
+                      isQuoteSource ? "Stop quoting this message" : "Next added message replies to this"
+                    }
+                    title={
+                      isQuoteSource
+                        ? "Stop quoting this message"
+                        : "Quote: the next message you add replies to this one"
+                    }
+                    className={cx(
+                      "transition-colors duration-150",
+                      isQuoteSource ? "text-accent" : "text-ink-faint hover:text-ink",
+                    )}
+                  >
+                    <IconQuote size={13} />
+                  </MotionButton>
                   {m.role === "them" && (
                     <MotionButton
                       onClick={() => toggleTarget(m.id)}
@@ -529,6 +566,32 @@ export function ConversationView({
                       <IconReply size={14} />
                     </MotionButton>
                   )}
+                  <MotionButton
+                    onClick={() => onFlipMessage(m.id)}
+                    aria-label="Flip sender (me/them)"
+                    title={`Flip sender — make this ${m.role === "me" ? `${conversation.name}'s` : "my"} message`}
+                    className="text-ink-faint transition-colors duration-150 hover:text-ink"
+                  >
+                    <IconSwap size={13} />
+                  </MotionButton>
+                  <MotionButton
+                    onClick={() => onMoveMessage(m.id, "up")}
+                    disabled={idx === 0}
+                    aria-label="Move message up"
+                    title="Move up"
+                    className="text-ink-faint transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    <IconChevronUp size={13} />
+                  </MotionButton>
+                  <MotionButton
+                    onClick={() => onMoveMessage(m.id, "down")}
+                    disabled={idx === messages.length - 1}
+                    aria-label="Move message down"
+                    title="Move down"
+                    className="text-ink-faint transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+                  >
+                    <IconChevronDown size={13} />
+                  </MotionButton>
                   <MotionButton
                     onClick={() => startEdit(m.id, m.content)}
                     aria-label="Edit message"
@@ -600,6 +663,7 @@ export function ConversationView({
                       {m.role === "me" && actions}
                       {/* Bubble — target toggle-on pulses once (§5); ring stays CSS */}
                       <motion.div
+                        id={`msg-${m.id}`}
                         animate={
                           reduced ? undefined : { scale: isTarget ? [1, 1.015, 1] : 1 }
                         }
@@ -610,9 +674,42 @@ export function ConversationView({
                             ? "rounded-br-sm bg-accent text-on-accent shadow-highlight"
                             : "rounded-bl-sm bg-fill text-ink ring-1 ring-line",
                           isTarget && "ring-2 ring-accent/70",
+                          isQuoteSource && "ring-2 ring-accent/50",
                         )}
                         title={clockTime(m.created_at)}
                       >
+                        {(() => {
+                          const quoted =
+                            m.reply_to_message_id !== null
+                              ? messageById.get(m.reply_to_message_id)
+                              : undefined;
+                          if (!quoted) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                document
+                                  .getElementById(`msg-${quoted.id}`)
+                                  ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                              }
+                              title="Jump to the quoted message"
+                              className={cx(
+                                "mb-1.5 flex w-full items-center gap-1.5 rounded-md border-l-2 px-2 py-1 text-left text-xs transition-colors duration-150",
+                                m.role === "me"
+                                  ? "border-white/50 bg-black/15 text-on-accent/85 hover:bg-black/25"
+                                  : "border-accent/60 bg-black/20 text-ink-muted hover:bg-black/30",
+                              )}
+                            >
+                              <IconQuote size={10} className="shrink-0 opacity-70" />
+                              <span className="truncate">
+                                <span className="font-medium">
+                                  {quoted.role === "me" ? "You" : conversation.name}:
+                                </span>{" "}
+                                {quoted.content}
+                              </span>
+                            </button>
+                          );
+                        })()}
                         <span className="whitespace-pre-wrap break-words">{m.content}</span>
                       </motion.div>
                       {m.role === "them" && actions}
@@ -1037,6 +1134,33 @@ export function ConversationView({
               )}
             </div>
             <div className="my-1 h-px bg-line" />
+            <AnimatePresence initial={false}>
+              {replyTo !== null && messageById.has(replyTo) && (
+                <motion.div
+                  key="quote-chip"
+                  variants={rmChip}
+                  initial="initial"
+                  animate="enter"
+                  exit="exit"
+                  className="mx-1 mb-1 flex items-center gap-1.5 rounded-md border border-accent/30 bg-accent-soft px-2 py-1"
+                >
+                  <IconQuote size={12} className="shrink-0 text-accent" />
+                  <span className="min-w-0 flex-1 truncate text-meta text-ink-secondary">
+                    <span className="font-medium text-accent">
+                      replies to {messageById.get(replyTo)!.role === "me" ? "you" : conversation.name}:
+                    </span>{" "}
+                    {messageById.get(replyTo)!.content}
+                  </span>
+                  <MotionButton
+                    onClick={() => setReplyTo(null)}
+                    aria-label="Remove quote link"
+                    className="shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
+                  >
+                    <IconClose size={12} />
+                  </MotionButton>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}

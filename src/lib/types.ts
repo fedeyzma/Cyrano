@@ -71,6 +71,10 @@ export interface Message {
   role: MessageRole;
   content: string;
   created_at: number;
+  /** Message this one was sent as a reply/quote to (Instagram reply function), or null. */
+  reply_to_message_id: number | null;
+  /** Manual ordering override; display order is COALESCE(sort_order, id). */
+  sort_order: number | null;
 }
 
 export interface Fact {
@@ -122,7 +126,13 @@ export interface BackupConversation {
   notes: string | null;
   created_at: number;
   updated_at: number;
-  messages: Array<{ role: MessageRole; content: string; created_at: number }>;
+  messages: Array<{
+    role: MessageRole;
+    content: string;
+    created_at: number;
+    /** Index into this conversation's `messages` array, or null. Re-linked on import. */
+    reply_to_index?: number | null;
+  }>;
   facts: Array<{
     content: string;
     category: FactCategory;

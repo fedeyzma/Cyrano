@@ -36,11 +36,13 @@ const SCHEMA = `
   );
 
   CREATE TABLE IF NOT EXISTS messages (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    conversation_id INTEGER NOT NULL,
-    role            TEXT    NOT NULL CHECK (role IN ('them', 'me', 'context')),
-    content         TEXT    NOT NULL,
-    created_at      INTEGER NOT NULL,
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id     INTEGER NOT NULL,
+    role                TEXT    NOT NULL CHECK (role IN ('them', 'me', 'context')),
+    content             TEXT    NOT NULL,
+    created_at          INTEGER NOT NULL,
+    reply_to_message_id INTEGER REFERENCES messages (id) ON DELETE SET NULL,
+    sort_order          INTEGER,
     FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
   );
 
@@ -85,6 +87,19 @@ function createDb(): DatabaseSync {
     db.exec(`ALTER TABLE facts ADD COLUMN category TEXT NOT NULL DEFAULT 'other'`);
   }
   migrateMessagesRoleCheck(db);
+  // Additive message columns (must run AFTER the role-check rebuild, which
+  // recreates the table without them on old databases).
+  const msgCols = db.prepare(`PRAGMA table_info(messages)`).all() as unknown as Array<{
+    name: string;
+  }>;
+  if (!msgCols.some((c) => c.name === "reply_to_message_id")) {
+    db.exec(
+      `ALTER TABLE messages ADD COLUMN reply_to_message_id INTEGER REFERENCES messages (id) ON DELETE SET NULL`,
+    );
+  }
+  if (!msgCols.some((c) => c.name === "sort_order")) {
+    db.exec(`ALTER TABLE messages ADD COLUMN sort_order INTEGER`);
+  }
   return db;
 }
 
@@ -144,8 +159,8 @@ export function listConversations(): ConversationListItem[] {
     .prepare(
       `SELECT c.*,
          (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS message_count,
-         (SELECT content    FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_message,
-         (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.id DESC LIMIT 1) AS last_message_at
+         (SELECT content    FROM messages m WHERE m.conversation_id = c.id ORDER BY COALESCE(m.sort_order, m.id) DESC, m.id DESC LIMIT 1) AS last_message,
+         (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY COALESCE(m.sort_order, m.id) DESC, m.id DESC LIMIT 1) AS last_message_at
        FROM conversations c
        ORDER BY c.updated_at DESC`,
     )
@@ -204,21 +219,70 @@ export function deleteConversation(id: number): boolean {
 
 export function getMessages(conversationId: number): Message[] {
   return getDb()
-    .prepare(`SELECT * FROM messages WHERE conversation_id = ? ORDER BY id ASC`)
+    .prepare(
+      `SELECT * FROM messages WHERE conversation_id = ? ORDER BY COALESCE(sort_order, id) ASC, id ASC`,
+    )
     .all(conversationId) as unknown as Message[];
 }
 
-export function addMessage(conversationId: number, role: MessageRole, content: string): Message {
+export function getMessage(conversationId: number, messageId: number): Message | undefined {
+  return getDb()
+    .prepare(`SELECT * FROM messages WHERE id = ? AND conversation_id = ?`)
+    .get(messageId, conversationId) as unknown as Message | undefined;
+}
+
+export function addMessage(
+  conversationId: number,
+  role: MessageRole,
+  content: string,
+  replyToMessageId?: number | null,
+): Message {
   const ts = now();
   const res = getDb()
     .prepare(
-      `INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO messages (conversation_id, role, content, created_at, reply_to_message_id)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(conversationId, role, content.trim(), ts);
+    .run(conversationId, role, content.trim(), ts, replyToMessageId ?? null);
   touchConversation(conversationId, ts);
   return getDb()
     .prepare(`SELECT * FROM messages WHERE id = ?`)
     .get(Number(res.lastInsertRowid)) as unknown as Message;
+}
+
+/**
+ * Swap a message with its display neighbor. Display order is
+ * COALESCE(sort_order, id); swapping the two effective keys keeps every other
+ * message in place and new inserts (key = fresh id) still sort last.
+ */
+export function moveMessage(
+  conversationId: number,
+  messageId: number,
+  direction: "up" | "down",
+): boolean {
+  const ordered = getMessages(conversationId);
+  const idx = ordered.findIndex((m) => m.id === messageId);
+  if (idx === -1) return false;
+  const otherIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (otherIdx < 0 || otherIdx >= ordered.length) return false;
+  const a = ordered[idx];
+  const b = ordered[otherIdx];
+  const key = (m: Message) => m.sort_order ?? m.id;
+  const db = getDb();
+  const update = db.prepare(
+    `UPDATE messages SET sort_order = ? WHERE id = ? AND conversation_id = ?`,
+  );
+  db.exec("BEGIN");
+  try {
+    update.run(key(b), a.id, conversationId);
+    update.run(key(a), b.id, conversationId);
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+  touchConversation(conversationId);
+  return true;
 }
 
 /** Insert many messages in order, in a single transaction. */
@@ -261,17 +325,18 @@ export function deleteMessage(conversationId: number, messageId: number): boolea
 export function updateMessage(
   conversationId: number,
   messageId: number,
-  content: string,
+  patch: { content?: string; role?: MessageRole },
 ): Message | undefined {
-  const trimmed = content.trim();
-  if (!trimmed) return undefined;
+  const existing = getMessage(conversationId, messageId);
+  if (!existing) return undefined;
+  const content = patch.content !== undefined ? patch.content.trim() : existing.content;
+  if (!content) return undefined;
+  const role = patch.role ?? existing.role;
   getDb()
-    .prepare(`UPDATE messages SET content = ? WHERE id = ? AND conversation_id = ?`)
-    .run(trimmed, messageId, conversationId);
+    .prepare(`UPDATE messages SET content = ?, role = ? WHERE id = ? AND conversation_id = ?`)
+    .run(content, role, messageId, conversationId);
   touchConversation(conversationId);
-  return getDb()
-    .prepare(`SELECT * FROM messages WHERE id = ? AND conversation_id = ?`)
-    .get(messageId, conversationId) as unknown as Message | undefined;
+  return getMessage(conversationId, messageId);
 }
 
 /* ---------------------------------- facts ---------------------------------- */
@@ -408,6 +473,10 @@ export function exportAll(): Backup {
         role: m.role,
         content: m.content,
         created_at: m.created_at,
+        reply_to_index:
+          m.reply_to_message_id != null && idToIndex.has(m.reply_to_message_id)
+            ? idToIndex.get(m.reply_to_message_id)!
+            : null,
       })),
       facts: facts.map((f) => ({
         content: f.content,
@@ -445,7 +514,12 @@ export function importBackup(backup: {
     notes?: string | null;
     created_at: number;
     updated_at: number;
-    messages: Array<{ role: MessageRole; content: string; created_at: number }>;
+    messages: Array<{
+      role: MessageRole;
+      content: string;
+      created_at: number;
+      reply_to_index?: number | null;
+    }>;
     facts: Array<{
       content: string;
       category?: string;
@@ -485,6 +559,7 @@ export function importBackup(backup: {
   const insQueued = db.prepare(
     `INSERT INTO queued_replies (conversation_id, target_message_id, content, tone, created_at) VALUES (?, ?, ?, ?, ?)`,
   );
+  const updReplyTo = db.prepare(`UPDATE messages SET reply_to_message_id = ? WHERE id = ?`);
 
   db.exec("BEGIN");
   try {
@@ -508,6 +583,14 @@ export function importBackup(backup: {
         newMsgIds.push(Number(insMsg.run(convId, m.role, m.content, m.created_at).lastInsertRowid));
         result.importedMessages++;
       }
+      // Second pass: re-link reply-to pointers now that every new id is known
+      // (handles forward references safely).
+      c.messages.forEach((m, i) => {
+        const idx = m.reply_to_index;
+        if (idx != null && idx >= 0 && idx < newMsgIds.length && idx !== i) {
+          updReplyTo.run(newMsgIds[idx], newMsgIds[i]);
+        }
+      });
       for (const f of c.facts) {
         insFact.run(
           convId,

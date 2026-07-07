@@ -209,7 +209,12 @@ export default function Home() {
     }
   }
 
-  async function handleSuggest(incoming: string, steer: string, targetIds: number[]) {
+  async function handleSuggest(
+    incoming: string,
+    steer: string,
+    targetIds: number[],
+    replyToMessageId?: number | null,
+  ) {
     if (selectedId === null) return;
     const id = selectedId;
     const name = detail?.conversation.name;
@@ -221,6 +226,7 @@ export default function Home() {
         incoming: incoming || undefined,
         steer: steer || undefined,
         targetMessageIds: targetIds.length ? targetIds : undefined,
+        replyToMessageId: incoming && replyToMessageId != null ? replyToMessageId : undefined,
       });
       setSuggestionsByConv((prev) => ({ ...prev, [id]: res.options }));
       await loadDetail(id, { silent: true });
@@ -247,11 +253,15 @@ export default function Home() {
     }
   }
 
-  async function handleAddMessage(role: MessageRole, content: string) {
+  async function handleAddMessage(
+    role: MessageRole,
+    content: string,
+    replyToMessageId?: number | null,
+  ) {
     if (selectedId === null) return;
     const id = selectedId;
     try {
-      await api.addMessage(id, role, content);
+      await api.addMessage(id, role, content, replyToMessageId);
       await loadDetail(id, { silent: true });
       await refreshList();
     } catch (e) {
@@ -329,7 +339,49 @@ export default function Home() {
       messages: d.messages.map((m) => (m.id === messageId ? { ...m, content: trimmed } : m)),
     }));
     try {
-      await api.updateMessage(id, messageId, trimmed);
+      await api.updateMessage(id, messageId, { content: trimmed });
+      await refreshList();
+    } catch (e) {
+      handleError(e);
+      await loadDetail(id, { silent: true });
+    }
+  }
+
+  /** Flip who sent a message (them <-> me) — for fixing mis-attributed messages. */
+  async function handleFlipMessage(messageId: number) {
+    if (selectedId === null) return;
+    const id = selectedId;
+    const current = detail?.messages.find((m) => m.id === messageId);
+    if (!current || current.role === "context") return;
+    const role: Role = current.role === "them" ? "me" : "them";
+    patchDetail(id, (d) => ({
+      ...d,
+      messages: d.messages.map((m) => (m.id === messageId ? { ...m, role } : m)),
+    }));
+    try {
+      await api.updateMessage(id, messageId, { role });
+      await refreshList();
+    } catch (e) {
+      handleError(e);
+      await loadDetail(id, { silent: true });
+    }
+  }
+
+  async function handleMoveMessage(messageId: number, direction: "up" | "down") {
+    if (selectedId === null) return;
+    const id = selectedId;
+    // Optimistic swap so the thread reorders instantly.
+    patchDetail(id, (d) => {
+      const idx = d.messages.findIndex((m) => m.id === messageId);
+      const otherIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (idx === -1 || otherIdx < 0 || otherIdx >= d.messages.length) return d;
+      const messages = [...d.messages];
+      [messages[idx], messages[otherIdx]] = [messages[otherIdx], messages[idx]];
+      return { ...d, messages };
+    });
+    try {
+      const res = await api.moveMessage(id, messageId, direction);
+      patchDetail(id, (d) => ({ ...d, messages: res.messages }));
       await refreshList();
     } catch (e) {
       handleError(e);
@@ -702,6 +754,8 @@ export default function Home() {
                   }}
                   onDeleteMessage={handleDeleteMessage}
                   onEditMessage={handleEditMessage}
+                  onFlipMessage={handleFlipMessage}
+                  onMoveMessage={handleMoveMessage}
                   onDeleteConversation={handleDeleteConversation}
                   onDeleteQueued={handleDeleteQueued}
                   onSendQueued={handleSendQueued}

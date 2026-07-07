@@ -140,6 +140,32 @@ export const IconReply = (p: IconProps) => (
   </Icon>
 );
 
+export const IconQuote = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M10 7c-3 .8-4.5 2.9-4.5 6v4H10v-5H7.8c.1-2 .8-3.3 2.2-4Z" />
+    <path d="M19 7c-3 .8-4.5 2.9-4.5 6v4H19v-5h-2.2c.1-2 .8-3.3 2.2-4Z" />
+  </Icon>
+);
+
+export const IconSwap = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 7h13m0 0-3-3m3 3-3 3" />
+    <path d="M20 17H7m0 0 3-3m-3 3 3 3" />
+  </Icon>
+);
+
+export const IconChevronUp = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m6 15 6-6 6 6" />
+  </Icon>
+);
+
+export const IconChevronDown = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </Icon>
+);
+
 export const IconClock = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="9" />
