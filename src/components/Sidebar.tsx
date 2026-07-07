@@ -137,7 +137,7 @@ export function Sidebar({
             key={key}
             onClick={() => onView(key)}
             className={cx(
-              "relative inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-label transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+              "relative inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 max-md:py-2.5 text-label transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
               view === key ? "text-ink" : "text-ink-muted hover:bg-fill hover:text-ink",
             )}
           >
@@ -174,7 +174,7 @@ export function Sidebar({
               <MotionButton
                 onClick={() => setQuery("")}
                 aria-label="Clear search"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-ink-faint transition-colors duration-150 hover:text-ink"
+                className="hit absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-ink-faint transition-colors duration-150 hover:text-ink"
               >
                 <IconClose size={13} />
               </MotionButton>
@@ -187,7 +187,7 @@ export function Sidebar({
                 onClick={() => setSort(o.key)}
                 aria-pressed={sort === o.key}
                 className={cx(
-                  "rounded-md px-2 py-1 text-meta transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+                  "hit-sm rounded-md px-2 py-1 max-md:py-2 text-meta max-md:text-label transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
                   sort === o.key
                     ? "bg-fill-active text-ink shadow-highlight"
                     : "text-ink-muted hover:bg-fill hover:text-ink",
@@ -308,7 +308,7 @@ export function Sidebar({
                 onClick={onExport}
                 aria-label="Export a backup"
                 title="Export all conversations as a backup file"
-                className="rounded p-1 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="hit rounded p-1 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 <IconDownload size={14} />
               </MotionButton>
@@ -318,7 +318,7 @@ export function Sidebar({
                 onClick={onImport}
                 aria-label="Import a backup"
                 title="Import conversations from a backup file"
-                className="rounded p-1 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="hit rounded p-1 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 <IconUpload size={14} />
               </MotionButton>

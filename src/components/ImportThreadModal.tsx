@@ -139,7 +139,7 @@ export function ImportThreadModal({
             initial="initial"
             animate="enter"
             exit="exit"
-            className="glass-modal relative flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl border border-line-strong shadow-[var(--shadow-lg),var(--shadow-highlight)]"
+            className="glass-modal relative flex max-h-[85dvh] w-full max-w-lg flex-col rounded-xl border border-line-strong shadow-[var(--shadow-lg),var(--shadow-highlight)]"
           >
             <div className="flex items-center justify-between border-b border-line p-4">
               <div>
@@ -157,7 +157,7 @@ export function ImportThreadModal({
               <MotionButton
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
+                className="hit rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
               >
                 <IconClose size={18} />
               </MotionButton>
@@ -290,7 +290,7 @@ export function ImportThreadModal({
                         <MotionButton
                           onClick={() => removeAt(i)}
                           aria-label="Remove message"
-                          className="rounded-md p-1.5 text-ink-faint opacity-0 transition-colors duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100"
+                          className="hit rounded-md p-1.5 text-ink-faint opacity-0 max-md:opacity-100 transition-colors duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100"
                         >
                           <IconClose size={13} />
                         </MotionButton>

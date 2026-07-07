@@ -706,11 +706,16 @@ export default function Home() {
       {/* Center + right */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <div className="glass-header flex h-12 shrink-0 items-center gap-2 border-b border-line px-3 md:hidden">
+        <div
+          className={cx(
+            "glass-header flex min-h-12 shrink-0 items-center gap-2 border-b border-line px-3 pt-[env(safe-area-inset-top)] md:hidden",
+            view === "replies" && detail && "hidden",
+          )}
+        >
           <MotionButton
             onClick={() => setMobileNav(true)}
             aria-label="Open conversations"
-            className="rounded-md p-1.5 text-ink-secondary transition-colors duration-150 hover:bg-fill-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="hit rounded-md p-2 text-ink-secondary transition-colors duration-150 hover:bg-fill-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <IconMenu size={20} />
           </MotionButton>
@@ -762,6 +767,7 @@ export default function Home() {
                   onOpenImport={() => setImportOpen(true)}
                   onOpenFacts={() => setFactsOpen(true)}
                   onOpenProfile={() => setDossierOpen(true)}
+                  onOpenMenu={() => setMobileNav(true)}
                 />
               ) : (
                 <EmptyMain
@@ -898,7 +904,7 @@ export default function Home() {
         }}
       />
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-50 flex justify-center px-4">
         <AnimatePresence mode="popLayout">
           {toast && (
             <motion.div
@@ -949,7 +955,7 @@ function Drawer({
         animate="enter"
         exit="exit"
         className={cx(
-          "glass-drawer absolute inset-y-0 w-[86%] max-w-xs",
+          "glass-drawer absolute inset-y-0 w-[86%] max-w-xs pb-[env(safe-area-inset-bottom)]",
           side === "left" ? "left-0 border-r" : "right-0 border-l",
           "border-line-strong shadow-lg",
         )}

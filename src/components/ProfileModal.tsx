@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -41,7 +41,7 @@ export function ProfileModal({
 
   const scrim = rm(reduced, scrimVariants);
   const panel = rm(reduced, modalVariants);
-  // The Fraunces title arrives a beat after the glass (DESIGN.md §5 Modals).
+  // The Fraunces title arrives a beat after the glass (DESIGN.md Â§5 Modals).
   const title = rm(reduced, {
     initial: { opacity: 0, y: 6 },
     enter: {
@@ -109,7 +109,7 @@ export function ProfileModal({
             initial="initial"
             animate="enter"
             exit="exit"
-            className="glass-modal relative w-full max-w-md rounded-xl border border-line-strong p-5 shadow-[var(--shadow-lg),var(--shadow-highlight)]"
+            className="glass-modal relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-xl border border-line-strong p-5 shadow-[var(--shadow-lg),var(--shadow-highlight)]"
           >
             <div className="flex items-center justify-between">
               <motion.h2
@@ -122,7 +122,7 @@ export function ProfileModal({
               <MotionButton
                 onClick={onClose}
                 aria-label="Close"
-                className="rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="hit rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 <IconClose size={18} />
               </MotionButton>
@@ -156,7 +156,7 @@ export function ProfileModal({
                   type="button"
                   onClick={() => setPlatform(platform === p ? "" : p)}
                   className={cx(
-                    "rounded-full px-3 py-1 text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+                    "rounded-full px-3 py-1 max-md:py-2 text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
                     platform === p
                       ? "bg-accent font-medium text-on-accent"
                       : "border border-line-strong text-ink-secondary hover:bg-fill hover:text-ink",
@@ -174,7 +174,7 @@ export function ProfileModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              placeholder="context only you know…"
+              placeholder="context only you knowâ€¦"
               className="mt-1 w-full resize-none rounded-md border border-line bg-black/30 px-3 py-2 text-sm text-ink placeholder:text-ink-muted outline-none transition-colors duration-150 focus:border-line-accent focus:ring-2 focus:ring-accent/20"
             />
 

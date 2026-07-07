@@ -24,6 +24,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#0b0a0e",
+  // Edge-to-edge on notched phones; safe-area insets are applied per-surface.
+  viewportFit: "cover",
+  // Soft keyboard shrinks the layout viewport so the composer dock stays visible.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

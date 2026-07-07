@@ -216,6 +216,15 @@ body::before {
   backdrop-filter: blur(16px);
 }
 
+/* ── Touch hit-slop — enlarges the tap area toward ~44px without changing the
+   visual size. Coarse-pointer only, so desktop geometry is untouched.
+   Do NOT combine with .wick-ring / .rose-rule / .kicker (own pseudo-elements). ── */
+@media (pointer: coarse) {
+  .hit, .hit-sm { position: relative; }
+  .hit::after { content: ""; position: absolute; inset: -10px; }
+  .hit-sm::after { content: ""; position: absolute; inset: -6px; }
+}
+
 /* ── Section kicker — 20×2px rose bar above uppercase labels
    (replaces full-width top borders; magazine-rule detail) ── */
 .kicker { position: relative; padding-top: 10px; }

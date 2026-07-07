@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AnimatePresence,
   motion,
@@ -19,12 +19,22 @@ import {
   collapseVariants,
   fadeUp,
   rm,
+  scrimVariants,
+  sheetVariants,
   suggestionCardVariants,
   useAppReducedMotion,
 } from "@/components/motion";
 import { cx } from "@/lib/cx";
 import { clockTime } from "@/lib/time";
-import type { ConversationDetail, MessageRole, QueuedReply, ReplyOption, Role } from "@/lib/types";
+import { useIsCoarsePointer } from "@/lib/useCoarsePointer";
+import type {
+  ConversationDetail,
+  Message,
+  MessageRole,
+  QueuedReply,
+  ReplyOption,
+  Role,
+} from "@/lib/types";
 import {
   IconBrain,
   IconCheck,
@@ -36,6 +46,7 @@ import {
   IconCopy,
   IconEdit,
   IconImport,
+  IconMenu,
   IconQuote,
   IconRefresh,
   IconReply,
@@ -59,6 +70,9 @@ const TONE_STYLES: Record<string, string> = {
 function toneStyle(tone: string): string {
   return TONE_STYLES[tone.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong";
 }
+
+/** Actions offered by the mobile message action sheet. */
+type SheetAction = "quote" | "target" | "flip" | "up" | "down" | "edit" | "delete";
 
 /* ── Shared class recipes (tokens only) ─────────────────── */
 
@@ -150,6 +164,7 @@ export function ConversationView({
   onOpenImport,
   onOpenFacts,
   onOpenProfile,
+  onOpenMenu,
 }: {
   detail: ConversationDetail;
   suggestions: ReplyOption[] | null;
@@ -177,6 +192,8 @@ export function ConversationView({
   onOpenImport: () => void;
   onOpenFacts: () => void;
   onOpenProfile: () => void;
+  /** Mobile only: opens the conversations drawer from the merged header. */
+  onOpenMenu?: () => void;
 }) {
   const { conversation, messages, queued } = detail;
   const [text, setText] = useState("");
@@ -190,9 +207,12 @@ export function ConversationView({
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
+  /** Message whose action sheet is open (touch devices only). */
+  const [sheetId, setSheetId] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const reduced = useAppReducedMotion();
+  const isCoarse = useIsCoarsePointer();
 
   /* Mount-cascade bookkeeping (§5 Thread messages): on conversation mount the
      last 8 messages cascade in; everything older renders instantly; messages
@@ -244,10 +264,11 @@ export function ConversationView({
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, suggestions, suggesting]);
 
-  // Drop any targets / quote link whose message no longer exists.
+  // Drop any targets / quote link / open sheet whose message no longer exists.
   useEffect(() => {
     setTargets((prev) => prev.filter((id) => messageById.has(id)));
     setReplyTo((prev) => (prev !== null && messageById.has(prev) ? prev : null));
+    setSheetId((prev) => (prev !== null && messageById.has(prev) ? prev : null));
   }, [messageById]);
 
   const lastThem = [...messages].reverse().find((m) => m.role === "them");
@@ -280,6 +301,35 @@ export function ConversationView({
     onAddMessage(role, t, role === "context" ? null : replyTo);
     setText("");
     if (role !== "context") setReplyTo(null);
+  }
+
+  function handleSheetAction(act: SheetAction) {
+    const m = sheetId !== null ? messageById.get(sheetId) : undefined;
+    setSheetId(null);
+    if (!m) return;
+    switch (act) {
+      case "quote":
+        setReplyTo((prev) => (prev === m.id ? null : m.id));
+        break;
+      case "target":
+        toggleTarget(m.id);
+        break;
+      case "flip":
+        onFlipMessage(m.id);
+        break;
+      case "up":
+        onMoveMessage(m.id, "up");
+        break;
+      case "down":
+        onMoveMessage(m.id, "down");
+        break;
+      case "edit":
+        startEdit(m.id, m.content);
+        break;
+      case "delete":
+        onDeleteMessage(m.id);
+        break;
+    }
   }
 
   async function copyValue(value: string, key: string) {
@@ -329,8 +379,17 @@ export function ConversationView({
         variants={rmHeader}
         initial="initial"
         animate="enter"
-        className="glass-header flex h-16 shrink-0 items-center justify-between border-b border-line px-6"
+        className="glass-header flex h-16 shrink-0 items-center justify-between border-b border-line px-3 pt-[env(safe-area-inset-top)] sm:px-6"
       >
+        {onOpenMenu && (
+          <MotionButton
+            onClick={onOpenMenu}
+            aria-label="Open conversations"
+            className="hit mr-1 shrink-0 rounded-md p-2 text-ink-secondary transition-colors duration-150 hover:bg-fill-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas md:hidden"
+          >
+            <IconMenu size={20} />
+          </MotionButton>
+        )}
         <MotionButton
           onClick={onOpenProfile}
           title="Edit profile"
@@ -375,19 +434,19 @@ export function ConversationView({
             )}
           </div>
         </MotionButton>
-        <div className="flex items-center gap-1.5">
-          <MotionButton onClick={onOpenImport} className={GHOST_BTN}>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <MotionButton onClick={onOpenImport} className={cx(GHOST_BTN, "hit-sm")}>
             <IconImport size={15} />
             <span className="hidden sm:inline">Import</span>
           </MotionButton>
-          <MotionButton onClick={onOpenFacts} className={cx(GHOST_BTN, "xl:hidden")}>
+          <MotionButton onClick={onOpenFacts} className={cx(GHOST_BTN, "hit-sm xl:hidden")}>
             <IconBrain size={15} />
             {factsCount > 0 && <span className="tabular-nums">{factsCount}</span>}
           </MotionButton>
           <MotionButton
             onClick={onDeleteConversation}
             aria-label="Delete conversation"
-            className="inline-flex items-center justify-center rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="hit inline-flex items-center justify-center rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             <IconTrash size={16} />
           </MotionButton>
@@ -448,7 +507,7 @@ export function ConversationView({
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
+                            if (e.key === "Enter" && !e.shiftKey && !isCoarse) {
                               e.preventDefault();
                               void saveEdit(m.id);
                             } else if (e.key === "Escape") {
@@ -479,8 +538,9 @@ export function ConversationView({
                         <div
                           className="flex items-center gap-2 rounded-md border border-line bg-fill px-3 py-1"
                           title={clockTime(m.created_at)}
+                          onClick={isCoarse ? () => setSheetId(m.id) : undefined}
                         >
-                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">
+                          <span className="shrink-0 text-meta font-semibold uppercase tracking-wider text-ink-faint">
                             context
                           </span>
                           <span className="whitespace-pre-wrap break-words text-xs italic leading-normal text-ink-secondary">
@@ -492,7 +552,7 @@ export function ConversationView({
                             onClick={() => startEdit(m.id, m.content)}
                             aria-label="Edit context"
                             title="Edit context"
-                            className="text-ink-faint transition-colors duration-150 hover:text-ink"
+                            className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink"
                           >
                             <IconEdit size={13} />
                           </MotionButton>
@@ -500,7 +560,7 @@ export function ConversationView({
                             onClick={() => onDeleteMessage(m.id)}
                             aria-label="Delete context"
                             title="Delete context"
-                            className="text-ink-faint transition-colors duration-150 hover:text-danger"
+                            className="hit-sm text-ink-faint transition-colors duration-150 hover:text-danger"
                           >
                             <IconTrash size={13} />
                           </MotionButton>
@@ -547,7 +607,7 @@ export function ConversationView({
                         : "Quote: the next message you add replies to this one"
                     }
                     className={cx(
-                      "transition-colors duration-150",
+                      "hit-sm transition-colors duration-150",
                       isQuoteSource ? "text-accent" : "text-ink-faint hover:text-ink",
                     )}
                   >
@@ -559,7 +619,7 @@ export function ConversationView({
                       aria-label={isTarget ? "Stop replying to this" : "Reply to this message"}
                       title={isTarget ? "Stop replying to this" : "Reply to this message"}
                       className={cx(
-                        "transition-colors duration-150",
+                        "hit-sm transition-colors duration-150",
                         isTarget ? "text-accent" : "text-ink-faint hover:text-ink",
                       )}
                     >
@@ -570,7 +630,7 @@ export function ConversationView({
                     onClick={() => onFlipMessage(m.id)}
                     aria-label="Flip sender (me/them)"
                     title={`Flip sender — make this ${m.role === "me" ? `${conversation.name}'s` : "my"} message`}
-                    className="text-ink-faint transition-colors duration-150 hover:text-ink"
+                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink"
                   >
                     <IconSwap size={13} />
                   </MotionButton>
@@ -579,7 +639,7 @@ export function ConversationView({
                     disabled={idx === 0}
                     aria-label="Move message up"
                     title="Move up"
-                    className="text-ink-faint transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
                   >
                     <IconChevronUp size={13} />
                   </MotionButton>
@@ -588,7 +648,7 @@ export function ConversationView({
                     disabled={idx === messages.length - 1}
                     aria-label="Move message down"
                     title="Move down"
-                    className="text-ink-faint transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
                   >
                     <IconChevronDown size={13} />
                   </MotionButton>
@@ -596,7 +656,7 @@ export function ConversationView({
                     onClick={() => startEdit(m.id, m.content)}
                     aria-label="Edit message"
                     title="Edit message"
-                    className="text-ink-faint transition-colors duration-150 hover:text-ink"
+                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink"
                   >
                     <IconEdit size={13} />
                   </MotionButton>
@@ -604,7 +664,7 @@ export function ConversationView({
                     onClick={() => onDeleteMessage(m.id)}
                     aria-label="Delete message"
                     title="Delete message"
-                    className="text-ink-faint transition-colors duration-150 hover:text-danger"
+                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-danger"
                   >
                     <IconTrash size={13} />
                   </MotionButton>
@@ -664,6 +724,7 @@ export function ConversationView({
                       {/* Bubble — target toggle-on pulses once (§5); ring stays CSS */}
                       <motion.div
                         id={`msg-${m.id}`}
+                        onClick={isCoarse ? () => setSheetId(m.id) : undefined}
                         animate={
                           reduced ? undefined : { scale: isTarget ? [1, 1.015, 1] : 1 }
                         }
@@ -687,11 +748,12 @@ export function ConversationView({
                           return (
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 document
                                   .getElementById(`msg-${quoted.id}`)
-                                  ?.scrollIntoView({ behavior: "smooth", block: "center" })
-                              }
+                                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                              }}
                               title="Jump to the quoted message"
                               className={cx(
                                 "mb-1.5 flex w-full items-center gap-1.5 rounded-md border-l-2 px-2 py-1 text-left text-xs transition-colors duration-150",
@@ -747,7 +809,7 @@ export function ConversationView({
                     <div className="flex items-center gap-1">
                       <MotionButton
                         onClick={regenerate}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
                       >
                         <IconRefresh size={13} /> Regenerate
                       </MotionButton>
@@ -831,7 +893,7 @@ export function ConversationView({
                               exit="exit"
                               className="rounded-lg border border-line bg-fill p-3 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
                             >
-                              <div className="flex items-center justify-between">
+                              <div className="flex flex-wrap items-center justify-between gap-y-1.5">
                                 {/* Tone chip — the wax seal (§6.1) */}
                                 <motion.span
                                   initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
@@ -853,13 +915,13 @@ export function ConversationView({
                                     </span>
                                   )}
                                 </motion.span>
-                                <div className="flex items-center gap-1">
+                                <div className="flex flex-wrap items-center justify-end gap-1">
                                   <MotionButton
                                     onClick={() => regenerateOne(i)}
                                     disabled={regenIndex !== null}
                                     title="Regenerate just this one"
                                     aria-label="Regenerate this reply"
-                                    className="inline-flex items-center justify-center rounded-md p-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="hit-sm inline-flex items-center justify-center rounded-md p-1.5 max-md:p-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
                                   >
                                     {busy ? <Spinner size={13} /> : <IconRefresh size={13} />}
                                   </MotionButton>
@@ -867,7 +929,7 @@ export function ConversationView({
                                     onClick={() => copyValue(opt.texts.join("\n"), `opt-${i}`)}
                                     disabled={busy}
                                     aria-label="Copy reply"
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
+                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
                                   >
                                     {copied === `opt-${i}` ? (
                                       <>
@@ -885,7 +947,7 @@ export function ConversationView({
                                     }
                                     disabled={busy}
                                     aria-label="Queue reply"
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
+                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
                                   >
                                     <IconClock size={13} /> Queue
                                   </MotionButton>
@@ -936,7 +998,7 @@ export function ConversationView({
       </div>
 
       {/* Bottom: queue + targeting + composer — the dock never moves */}
-      <div className="glass-dock shrink-0 border-t border-line px-4 py-3">
+      <div className="glass-dock shrink-0 border-t border-line px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         {/* Queued replies */}
         <AnimatePresence initial={false}>
           {queued.length > 0 && (
@@ -1000,7 +1062,7 @@ export function ConversationView({
                                       </p>
                                     ))}
                                   </div>
-                                  <div className="mt-1.5 flex items-center gap-1">
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-1 gap-y-1">
                                     {q.tone && (
                                       <span
                                         className={cx(
@@ -1014,7 +1076,7 @@ export function ConversationView({
                                     <MotionButton
                                       onClick={() => copyValue(q.content, `q-${q.id}`)}
                                       aria-label="Copy queued reply"
-                                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
+                                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
                                     >
                                       {copied === `q-${q.id}` ? (
                                         <>
@@ -1028,7 +1090,7 @@ export function ConversationView({
                                     </MotionButton>
                                     <MotionButton
                                       onClick={() => onDeleteQueued(q.id)}
-                                      className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger"
+                                      className="inline-flex items-center rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger"
                                     >
                                       Delete
                                     </MotionButton>
@@ -1090,7 +1152,7 @@ export function ConversationView({
                               <MotionButton
                                 onClick={() => toggleTarget(tid)}
                                 aria-label="Remove target"
-                                className="shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
+                                className="hit shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
                               >
                                 <IconClose size={11} />
                               </MotionButton>
@@ -1154,7 +1216,7 @@ export function ConversationView({
                   <MotionButton
                     onClick={() => setReplyTo(null)}
                     aria-label="Remove quote link"
-                    className="shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
+                    className="hit shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
                   >
                     <IconClose size={12} />
                   </MotionButton>
@@ -1165,7 +1227,8 @@ export function ConversationView({
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                // Touch keyboards: Enter inserts a newline; Generate is the button.
+                if (e.key === "Enter" && !e.shiftKey && !isCoarse) {
                   e.preventDefault();
                   if (canGenerate) handleGenerate();
                 }
@@ -1174,29 +1237,32 @@ export function ConversationView({
               placeholder={`Paste ${conversation.name}'s latest message…`}
               className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-normal text-ink outline-none placeholder:text-ink-muted"
             />
-            <div className="flex items-center justify-between gap-2 px-1 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 pt-1">
               <div className="flex items-center gap-1">
                 <MotionButton
                   onClick={() => addAs("me")}
                   disabled={!text.trim()}
-                  className="inline-flex items-center rounded-md px-2.5 py-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded-md px-2.5 py-1.5 max-md:py-2.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Add as me
+                  <span className="sm:hidden">+ Me</span>
+                  <span className="hidden sm:inline">Add as me</span>
                 </MotionButton>
                 <MotionButton
                   onClick={() => addAs("them")}
                   disabled={!text.trim()}
-                  className="inline-flex items-center rounded-md px-2.5 py-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded-md px-2.5 py-1.5 max-md:py-2.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Add as them
+                  <span className="sm:hidden">+ Them</span>
+                  <span className="hidden sm:inline">Add as them</span>
                 </MotionButton>
                 <MotionButton
                   onClick={() => addAs("context")}
                   disabled={!text.trim()}
                   title="Drop in a situational note for Cyrano (not a message)"
-                  className="inline-flex items-center rounded-md px-2.5 py-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded-md px-2.5 py-1.5 max-md:py-2.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Add as context
+                  <span className="sm:hidden">+ Note</span>
+                  <span className="hidden sm:inline">Add as context</span>
                 </MotionButton>
               </div>
               <div className="flex items-center gap-3">
@@ -1209,7 +1275,7 @@ export function ConversationView({
                   onClick={handleGenerate}
                   disabled={!canGenerate || suggesting}
                   className={cx(
-                    "inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label tabular-nums text-on-accent transition-colors duration-150 hover:bg-accent-strong",
+                    "inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 max-md:py-2.5 text-label tabular-nums text-on-accent transition-colors duration-150 hover:bg-accent-strong",
                     "shadow-[var(--shadow-press),var(--shadow-glow)]",
                     "active:bg-[color-mix(in_oklch,var(--color-accent-strong)_85%,var(--color-accent-deep))]",
                     "active:shadow-[inset_0_-1px_0_rgb(255_255_255/0.22),inset_0_1px_0_rgb(0_0_0/0.25),var(--shadow-glow)]",
@@ -1230,6 +1296,154 @@ export function ConversationView({
           </div>
         </div>
       </div>
+
+      {/* Mobile message action sheet — touch replacement for the hover cluster */}
+      <AnimatePresence>
+        {sheetId !== null &&
+          (() => {
+            const m = messageById.get(sheetId);
+            if (!m) return null;
+            const orderIdx = messages.findIndex((x) => x.id === m.id);
+            return (
+              <MessageActionsSheet
+                key="message-sheet"
+                message={m}
+                conversationName={conversation.name}
+                isFirst={orderIdx === 0}
+                isLast={orderIdx === messages.length - 1}
+                isQuoteSource={replyTo === m.id}
+                isTarget={targets.includes(m.id)}
+                reduced={reduced}
+                onAction={handleSheetAction}
+                onClose={() => setSheetId(null)}
+              />
+            );
+          })()}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Bottom sheet with labeled message actions — the touch replacement for the
+ *  hover-only action cluster next to each bubble. */
+function MessageActionsSheet({
+  message,
+  conversationName,
+  isFirst,
+  isLast,
+  isQuoteSource,
+  isTarget,
+  reduced,
+  onAction,
+  onClose,
+}: {
+  message: Message;
+  conversationName: string;
+  isFirst: boolean;
+  isLast: boolean;
+  isQuoteSource: boolean;
+  isTarget: boolean;
+  reduced: boolean;
+  onAction: (act: SheetAction) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const isContext = message.role === "context";
+  const speaker = isContext ? "Context note" : message.role === "me" ? "You" : conversationName;
+
+  const rows: Array<{
+    act: SheetAction;
+    label: string;
+    icon: ReactNode;
+    disabled?: boolean;
+    danger?: boolean;
+    active?: boolean;
+  }> = isContext
+    ? [
+        { act: "edit", label: "Edit note", icon: <IconEdit size={16} /> },
+        { act: "delete", label: "Delete note", icon: <IconTrash size={16} />, danger: true },
+      ]
+    : [
+        {
+          act: "quote",
+          label: isQuoteSource ? "Stop quoting this" : "Quote in the next message",
+          icon: <IconQuote size={16} />,
+          active: isQuoteSource,
+        },
+        ...(message.role === "them"
+          ? [
+              {
+                act: "target" as SheetAction,
+                label: isTarget ? "Stop replying to this" : "Reply to this message",
+                icon: <IconReply size={16} />,
+                active: isTarget,
+              },
+            ]
+          : []),
+        {
+          act: "flip",
+          label:
+            message.role === "me"
+              ? `Make this ${conversationName}'s message`
+              : "Make this my message",
+          icon: <IconSwap size={16} />,
+        },
+        { act: "up", label: "Move up", icon: <IconChevronUp size={16} />, disabled: isFirst },
+        { act: "down", label: "Move down", icon: <IconChevronDown size={16} />, disabled: isLast },
+        { act: "edit", label: "Edit message", icon: <IconEdit size={16} /> },
+        { act: "delete", label: "Delete message", icon: <IconTrash size={16} />, danger: true },
+      ];
+
+  return (
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Message actions">
+      <motion.button
+        variants={rm(reduced, scrimVariants)}
+        initial="initial"
+        animate="enter"
+        exit="exit"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/65 backdrop-blur-[6px]"
+      />
+      <motion.div
+        variants={rm(reduced, sheetVariants)}
+        initial="initial"
+        animate="enter"
+        exit="exit"
+        className="glass-drawer absolute inset-x-0 bottom-0 rounded-t-xl border-t border-line-strong pb-[env(safe-area-inset-bottom)]"
+      >
+        <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-line-strong" />
+        <div className="flex items-center gap-2 border-b border-line px-5 py-3">
+          <span className="shrink-0 text-label font-medium text-ink-secondary">{speaker}:</span>
+          <span className="truncate text-sm text-ink-muted">{message.content}</span>
+        </div>
+        <div className="py-1">
+          {rows.map((r) => (
+            <MotionButton
+              key={r.act}
+              onClick={() => onAction(r.act)}
+              disabled={r.disabled}
+              className={cx(
+                "flex min-h-12 w-full items-center gap-3 px-5 text-left text-sm transition-colors duration-150",
+                r.danger ? "text-danger" : r.active ? "text-accent" : "text-ink",
+                "disabled:opacity-35 active:bg-fill",
+              )}
+            >
+              <span className={r.danger ? "text-danger" : r.active ? "text-accent" : "text-ink-muted"}>
+                {r.icon}
+              </span>
+              {r.label}
+            </MotionButton>
+          ))}
+        </div>
+      </motion.div>
     </div>
   );
 }

@@ -120,8 +120,8 @@ export function PersonDossier({
         </MotionButton>
       </header>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl space-y-8 px-6 py-8">
+      <div className="flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto max-w-3xl space-y-8 px-4 py-8 sm:px-6">
           {/* Identity */}
           <div className="flex items-center gap-4">
             <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent/25 to-accent-strong/10 text-heading text-accent ring-1 ring-line">

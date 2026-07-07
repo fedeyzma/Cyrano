@@ -165,6 +165,13 @@ export function drawerVariants(side: "left" | "right"): Variants {
   };
 }
 
+/** Bottom sheet (mobile message actions): y 100%→0 SPRING_MODAL; exit tween 180ms. */
+export const sheetVariants: Variants = {
+  initial: { y: "100%" },
+  enter: { y: 0, transition: SPRING_MODAL },
+  exit: { y: "100%", transition: { duration: 0.18, ease: EASE_FADE } },
+};
+
 /** Toast: enter {y:24→0, opacity, scale:0.95→1} SPRING_TOAST; exit {y:12, opacity:0} 160ms. */
 export const toastVariants: Variants = {
   initial: { opacity: 0, y: 24, scale: 0.95 },

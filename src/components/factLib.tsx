@@ -86,7 +86,7 @@ export function FactRow({
         aria-label={fact.pinned ? "Unpin fact" : "Pin fact"}
         title={fact.pinned ? "Unpin" : "Pin to keep on top"}
         className={cx(
-          "-ml-1 shrink-0 rounded-md p-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+          "hit -ml-1 shrink-0 rounded-md p-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
           fact.pinned ? "text-accent" : "text-ink-faint hover:text-ink",
         )}
       >
@@ -104,7 +104,7 @@ export function FactRow({
       <MotionButton
         onClick={() => onDeleteFact(fact.id)}
         aria-label="Delete fact"
-        className="-mr-1 shrink-0 rounded-md p-1 text-ink-faint opacity-0 transition duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+        className="hit -mr-1 shrink-0 rounded-md p-1 text-ink-faint opacity-0 max-md:opacity-100 transition duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
       >
         <IconTrash size={14} />
       </MotionButton>
