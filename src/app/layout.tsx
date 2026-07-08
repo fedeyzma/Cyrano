@@ -1,13 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Fraunces } from "next/font/google";
+import { Fraunces, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 
 // Self-hosted at build time (no runtime/CDN dependency). The --font-sans token
-// falls back to the system stack if this is ever removed.
-const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
+// falls back to the system stack if this is ever removed. Instrument Sans is
+// the machinery: body, labels, buttons, meta.
+const instrument = Instrument_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-instrument-sans",
+});
 
 // Display/brand face — the voice of Cyrano. Variable axes: SOFT/WONK/opsz
-// (set per-context via .font-display / .font-wonk in globals.css).
+// (set per-context via .font-display / .font-wonk in globals.css; SOFT 0 for
+// the sharp letterpress read, WONK 1 on the wordmark only).
 const fraunces = Fraunces({
   subsets: ["latin"],
   display: "swap",
@@ -23,7 +29,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0a0e",
+  themeColor: "#100E0A",
   // Edge-to-edge on notched phones; safe-area insets are applied per-surface.
   viewportFit: "cover",
   // Soft keyboard shrinks the layout viewport so the composer dock stays visible.
@@ -36,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable}`}>
+    <html lang="en" className={`${instrument.variable} ${fraunces.variable}`}>
       <body>{children}</body>
     </html>
   );

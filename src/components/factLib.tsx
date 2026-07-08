@@ -1,20 +1,21 @@
 "use client";
 
 import { motion, type Variants } from "motion/react";
-import { EASE_FADE, MotionButton, SPRING_MICRO, SPRING_SETTLE, rm } from "@/components/motion";
+import { DUR, EASE_INK, MotionButton, SPRING_MICRO, SPRING_SETTLE, rm } from "@/components/motion";
+import { focusRing } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import type { Fact } from "@/lib/types";
 import { FACT_CATEGORIES, FACT_CATEGORY_LABELS, normalizeFactCategory } from "@/lib/types";
 import { IconPin, IconTrash } from "./icons";
 
-/** New facts drop in from above (DESIGN.md §5 FactsPanel); delete leaves right. */
+/** Index entries settle in from above; deletions Melt (opacity + 2px blur). */
 export const FACT_ITEM_VARIANTS: Variants = {
-  initial: { opacity: 0, y: -6, scale: 0.97 },
-  enter: { opacity: 1, y: 0, scale: 1, transition: SPRING_SETTLE },
-  exit: { opacity: 0, x: 12, transition: { duration: 0.14, ease: EASE_FADE } },
+  initial: { opacity: 0, y: -6 },
+  enter: { opacity: 1, y: 0, transition: SPRING_SETTLE },
+  exit: { opacity: 0, filter: "blur(2px)", transition: { duration: DUR.hair, ease: EASE_INK } },
 };
 
-/** Pin icon settles into place when toggled — the fact files itself. */
+/** Pin nib settles into place when toggled — the fact files itself. */
 export const PIN_POP_VARIANTS: Variants = {
   initial: { rotate: -25, scale: 1.15 },
   enter: { rotate: 0, scale: 1, transition: SPRING_MICRO },
@@ -44,9 +45,13 @@ export function groupFacts(facts: Fact[], query?: string): FactGroup[] {
 }
 
 /**
- * A single fact row — pin toggle, content, delete. Lives inside a
- * `<motion.ul variants animate>` + `<AnimatePresence mode="popLayout">` so it
- * inherits the enter state and animates its own exit/layout.
+ * A single fact row, set as an index entry (DESIGN.md §8 «The Profile
+ * Spread»): fact text left, a dotted leader running to the margin, then —
+ * pinned entries only — a letterpress category tag, and the pin/delete
+ * marginalia actions (Marginalia fade on hover; delete always visible on
+ * touch widths). Lives inside a `<motion.ul variants animate>` +
+ * `<AnimatePresence mode="popLayout">` so it inherits the enter state and
+ * animates its own exit/layout.
  */
 export function FactRow({
   fact,
@@ -61,6 +66,7 @@ export function FactRow({
   onTogglePin: (factId: number, pinned: boolean) => void;
   onDeleteFact: (factId: number) => void;
 }) {
+  const pinned = fact.pinned === 1;
   return (
     <motion.li
       layout={!reduced}
@@ -68,46 +74,65 @@ export function FactRow({
       exit="exit"
       transition={{ layout: SPRING_SETTLE }}
       className={cx(
-        "group relative flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-fill",
-        fact.pinned === 1 && "bg-accent-faint ring-1 ring-accent/20",
+        "group relative flex items-start gap-2 rounded-sm px-2 py-1.5 transition-colors duration-150 hover:bg-fill",
+        pinned && "bg-accent-faint",
       )}
     >
+      {/* New-fact flash — a wash of champagne that dries into the paper */}
       {isNew && !reduced && (
         <motion.span
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-md bg-accent-faint"
+          className="pointer-events-none absolute inset-0 rounded-sm bg-accent-soft"
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
-          transition={{ duration: 0.8, ease: EASE_FADE }}
+          transition={{ duration: 0.8, ease: EASE_INK }}
         />
       )}
-      <MotionButton
-        onClick={() => onTogglePin(fact.id, !fact.pinned)}
-        aria-label={fact.pinned ? "Unpin fact" : "Pin fact"}
-        title={fact.pinned ? "Unpin" : "Pin to keep on top"}
-        className={cx(
-          "hit -ml-1 shrink-0 rounded-md p-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-          fact.pinned ? "text-accent" : "text-ink-faint hover:text-ink",
-        )}
-      >
-        <motion.span
-          key={fact.pinned ? "pinned" : "unpinned"}
-          className="block"
-          variants={rm(reduced, PIN_POP_VARIANTS)}
-          initial="initial"
-          animate="enter"
+
+      <span className="min-w-0 text-body text-ink">{fact.content}</span>
+      <span className="dot-leader" aria-hidden />
+
+      {pinned && (
+        <span className="mb-1 hidden shrink-0 self-end whitespace-nowrap rounded-xs border border-line px-1 text-[10px] font-medium uppercase leading-4 tracking-[0.08em] text-ink-muted sm:inline-block">
+          {FACT_CATEGORY_LABELS[normalizeFactCategory(fact.category)]}
+        </span>
+      )}
+
+      <span className="flex shrink-0 items-center gap-0.5 self-end">
+        <MotionButton
+          onClick={() => onTogglePin(fact.id, !fact.pinned)}
+          aria-label={pinned ? "Unpin fact" : "Pin fact"}
+          data-tip={pinned ? "Unpin" : "Pin to keep on top"}
+          className={cx(
+            "hit grid h-6 w-6 shrink-0 place-items-center rounded-xs transition-[color,background-color,opacity] duration-150",
+            pinned
+              ? "text-accent hover:bg-fill-active"
+              : "text-ink-muted opacity-0 hover:bg-fill-active hover:text-ink-secondary group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 max-md:opacity-100",
+            focusRing,
+          )}
         >
-          <IconPin size={14} />
-        </motion.span>
-      </MotionButton>
-      <span className="flex-1 text-sm leading-snug text-ink">{fact.content}</span>
-      <MotionButton
-        onClick={() => onDeleteFact(fact.id)}
-        aria-label="Delete fact"
-        className="hit -mr-1 shrink-0 rounded-md p-1 text-ink-faint opacity-0 max-md:opacity-100 transition duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-      >
-        <IconTrash size={14} />
-      </MotionButton>
+          <motion.span
+            key={pinned ? "pinned" : "unpinned"}
+            className="block"
+            variants={rm(reduced, PIN_POP_VARIANTS)}
+            initial="initial"
+            animate="enter"
+          >
+            <IconPin size={14} />
+          </motion.span>
+        </MotionButton>
+        <MotionButton
+          onClick={() => onDeleteFact(fact.id)}
+          aria-label="Delete fact"
+          data-tip="Delete"
+          className={cx(
+            "hit grid h-6 w-6 shrink-0 place-items-center rounded-xs text-ink-muted opacity-0 transition-[color,background-color,opacity] duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 max-md:opacity-100",
+            focusRing,
+          )}
+        >
+          <IconTrash size={14} />
+        </MotionButton>
+      </span>
     </motion.li>
   );
 }

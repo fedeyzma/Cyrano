@@ -1,5 +1,11 @@
 import type { SVGProps } from "react";
 
+/**
+ * Cyrano icon set — hairline engraving weight (1.7) to sit with the
+ * letterpress chrome. All icons are 24-grid, stroke-only, currentColor,
+ * aria-hidden (buttons carry the labels).
+ */
+
 type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
 function Icon({ size = 18, children, ...props }: IconProps & { children: React.ReactNode }) {
@@ -10,7 +16,7 @@ function Icon({ size = 18, children, ...props }: IconProps & { children: React.R
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.8}
+      strokeWidth={1.7}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -21,17 +27,18 @@ function Icon({ size = 18, children, ...props }: IconProps & { children: React.R
   );
 }
 
+/** Four-point compositor's star with a small companion — Cyrano's voice. */
 export const IconSparkles = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M12 3v4M12 17v4M3 12h4M17 12h4" opacity={0.5} />
-    <path d="M12 7c.6 2.5 2.5 4.4 5 5-2.5.6-4.4 2.5-5 5-.6-2.5-2.5-4.4-5-5 2.5-.6 4.4-2.5 5-5Z" />
+    <path d="M11 4c.7 3.2 2.8 5.3 6 6-3.2.7-5.3 2.8-6 6-.7-3.2-2.8-5.3-6-6 3.2-.7 5.3-2.8 6-6Z" />
+    <path d="M18.5 15.5c.35 1.6 1.4 2.65 3 3-1.6.35-2.65 1.4-3 3-.35-1.6-1.4-2.65-3-3 1.6-.35 2.65-1.4 3-3Z" opacity={0.6} />
   </Icon>
 );
 
 export const IconCopy = (p: IconProps) => (
   <Icon {...p}>
     <rect x="9" y="9" width="11" height="11" rx="2" />
-    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    <path d="M5 15V5a2 2 0 0 1 2-2h10" opacity={0.6} />
   </Icon>
 );
 
@@ -44,6 +51,7 @@ export const IconCheck = (p: IconProps) => (
 export const IconTrash = (p: IconProps) => (
   <Icon {...p}>
     <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" opacity={0.55} />
   </Icon>
 );
 
@@ -62,7 +70,7 @@ export const IconPlus = (p: IconProps) => (
 export const IconSend = (p: IconProps) => (
   <Icon {...p}>
     <path d="m22 2-7 20-4-9-9-4Z" />
-    <path d="M22 2 11 13" />
+    <path d="M22 2 11 13" opacity={0.6} />
   </Icon>
 );
 
@@ -108,7 +116,7 @@ export const IconBrain = (p: IconProps) => (
 export const IconRefresh = (p: IconProps) => (
   <Icon {...p}>
     <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5" />
-    <path d="M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" opacity={0.6} />
   </Icon>
 );
 
@@ -128,7 +136,7 @@ export const IconCompass = (p: IconProps) => (
 
 export const IconEdit = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M12 20h9" />
+    <path d="M12 20h9" opacity={0.55} />
     <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
   </Icon>
 );
@@ -140,17 +148,19 @@ export const IconReply = (p: IconProps) => (
   </Icon>
 );
 
+/** Editorial double quotation — opening marks, engraved. */
 export const IconQuote = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M10 7c-3 .8-4.5 2.9-4.5 6v4H10v-5H7.8c.1-2 .8-3.3 2.2-4Z" />
-    <path d="M19 7c-3 .8-4.5 2.9-4.5 6v4H19v-5h-2.2c.1-2 .8-3.3 2.2-4Z" />
+    <path d="M10.5 7.5C7.6 8.4 6 10.5 6 13.5V17h4.5v-4.5H8.1c.1-1.9.9-3.1 2.4-3.8Z" />
+    <path d="M19.5 7.5c-2.9.9-4.5 3-4.5 6V17h4.5v-4.5h-2.4c.1-1.9.9-3.1 2.4-3.8Z" />
   </Icon>
 );
 
+/** Swap sides — two counterposed arrows on their own baselines. */
 export const IconSwap = (p: IconProps) => (
   <Icon {...p}>
-    <path d="M4 7h13m0 0-3-3m3 3-3 3" />
-    <path d="M20 17H7m0 0 3-3m-3 3 3 3" />
+    <path d="M4 7.5h13.5m0 0L14 4m3.5 3.5L14 11" />
+    <path d="M20 16.5H6.5m0 0L10 13m-3.5 3.5L10 20" opacity={0.7} />
   </Icon>
 );
 
@@ -176,7 +186,7 @@ export const IconClock = (p: IconProps) => (
 export const IconImport = (p: IconProps) => (
   <Icon {...p}>
     <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
-    <path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+    <path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" opacity={0.6} />
   </Icon>
 );
 
@@ -204,7 +214,7 @@ export const IconDownload = (p: IconProps) => (
   <Icon {...p}>
     <path d="M12 3v12" />
     <path d="m7 10 5 5 5-5" />
-    <path d="M5 21h14" />
+    <path d="M5 21h14" opacity={0.6} />
   </Icon>
 );
 
@@ -212,6 +222,21 @@ export const IconUpload = (p: IconProps) => (
   <Icon {...p}>
     <path d="M12 21V9" />
     <path d="m7 14 5-5 5 5" />
-    <path d="M5 3h14" />
+    <path d="M5 3h14" opacity={0.6} />
+  </Icon>
+);
+
+/** Quill — the letterpress studio's pen (empty states, voice moments). */
+export const IconQuill = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M20 4c-6.5.5-11 3-13.5 8.5C5.4 15 5 17.5 5 20c2.5 0 5-.4 7.5-1.5C18 16 19.5 10.5 20 4Z" />
+    <path d="M5 20C8 14 11 10.5 15.5 8" opacity={0.55} />
+  </Icon>
+);
+
+/** Grip / drag handle — the action-sheet pull bar, reorder affordances. */
+export const IconGrip = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 9h8M8 15h8" />
   </Icon>
 );

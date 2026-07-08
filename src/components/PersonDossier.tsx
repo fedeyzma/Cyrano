@@ -1,36 +1,75 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, type Variants } from "motion/react";
 import {
-  MotionButton,
+  DUR,
+  EASE_INK,
+  SPRING_SHEET,
   fadeUp,
   listContainer,
   rm,
   useAppReducedMotion,
 } from "@/components/motion";
+import { Button, Input, SealDisc, Spinner, focusRing, inputClass } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { FactRow, groupFacts } from "@/components/factLib";
 import { relativeTime } from "@/lib/time";
 import type { ConversationDetail, FactCategory } from "@/lib/types";
 import { FACT_CATEGORIES, FACT_CATEGORY_LABELS } from "@/lib/types";
-import { IconEdit, IconPlus, IconReply, IconScan, IconUser } from "./icons";
+import { IconEdit, IconPlus, IconReply, IconScan, IconSearch } from "./icons";
 
-const INPUT_CLASS =
-  "w-full rounded-md border border-line bg-fill px-3 text-sm text-ink placeholder:text-ink-muted outline-none transition-colors duration-150 focus:border-line-accent focus:ring-[3px] focus:ring-accent/12";
+/** The dossier sheet rises like a page laid on the desk (DESIGN.md §8). */
+const dossierVariants: Variants = {
+  initial: { opacity: 0, y: 24 },
+  enter: { opacity: 1, y: 0, transition: SPRING_SHEET },
+  exit: { opacity: 0, y: 12, transition: { duration: DUR.exitBase, ease: EASE_INK } },
+};
 
-const GHOST_BTN =
-  "inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-fill hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
-
-function StatTile({ label, value }: { label: string; value: string | number }) {
+/** Editorial section head — folio caps over the signature double rule. */
+function SectionHead({ label, aside }: { label: string; aside?: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-line bg-fill p-3 shadow-highlight">
-      <div className="text-heading tabular-nums text-ink">{value}</div>
-      <div className="mt-0.5 text-meta uppercase tracking-wider text-ink-muted">{label}</div>
+    <div className="mb-4">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <h2 className="text-folio uppercase text-ink-muted">{label}</h2>
+        {aside}
+      </div>
+      <div className="rule-double" aria-hidden />
     </div>
   );
 }
 
+/** Marginalia-column stat: italic label, dot leader, tabular value. */
+function IndexStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="flex items-baseline">
+      <span className="font-display shrink-0 text-marginalia italic text-ink-muted">{label}</span>
+      <span className="dot-leader" aria-hidden />
+      <span className="min-w-0 truncate text-right text-label tabular-nums text-ink-secondary">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** Telemetry cell — the below-lg stat strip under the masthead. */
+function TelemetryCell({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="min-w-0 px-2.5 py-3 first:pl-0 sm:px-4">
+      <div className="truncate text-title tabular-nums text-ink">{value}</div>
+      <div className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-[0.08em] text-ink-muted">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * PersonDossier — «The Profile Spread» (DESIGN.md §8). A full-region sheet
+ * over the chat: seal-monogram masthead, spread-set name, pull-quote aside,
+ * then a two-column editorial spread (bio + fact index left, marginalia
+ * stats right) that collapses to a telemetry strip below lg.
+ */
 export function PersonDossier({
   detail,
   scanning,
@@ -99,186 +138,272 @@ export function PersonDossier({
   const lastActive = messages.length
     ? messages[messages.length - 1].created_at
     : conversation.updated_at;
+  const since = new Date(conversation.created_at).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+  const standout = facts.find((f) => f.pinned === 1) ?? facts[0];
   const groups = groupFacts(facts, query);
-  const tileVariants = rm(reduced, listContainer(40));
-  const tileItem = rm(reduced, fadeUp(6));
+  const sectionStagger = rm(reduced, listContainer(60));
+  const sectionItem = rm(reduced, fadeUp(10));
 
   return (
     <motion.div
-      variants={rm(reduced, fadeUp(8))}
+      variants={rm(reduced, dossierVariants)}
       initial="initial"
       animate="enter"
       exit="exit"
-      className="absolute inset-0 z-20 flex flex-col bg-canvas"
+      className="absolute inset-0 z-20 flex flex-col overflow-hidden bg-canvas shadow-[var(--shadow-lg)]"
     >
-      <header className="glass-header flex h-16 shrink-0 items-center justify-between border-b border-line px-6">
-        <MotionButton onClick={onClose} className={GHOST_BTN}>
-          <IconReply size={15} /> Back to chat
-        </MotionButton>
-        <MotionButton onClick={onEditProfile} className={GHOST_BTN}>
-          <IconEdit size={15} /> Edit
-        </MotionButton>
+      {/* The dossier's own reading lamp — warm pool over the masthead */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(900px 520px at 20% -10%, rgb(228 197 137 / 0.06), transparent 62%)",
+        }}
+      />
+
+      <header className="plate relative flex h-16 shrink-0 items-center justify-between border-b border-line px-4 sm:px-6">
+        <Button variant="ghost" onClick={onClose} className="hit">
+          <IconReply size={15} />
+          Back to chat
+        </Button>
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-folio uppercase text-ink-muted max-sm:hidden"
+        >
+          The dossier
+        </span>
+        <Button variant="ghost" onClick={onEditProfile} className="hit">
+          <IconEdit size={15} />
+          Edit profile
+        </Button>
       </header>
 
-      <div className="flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto max-w-3xl space-y-8 px-4 py-8 sm:px-6">
-          {/* Identity */}
-          <div className="flex items-center gap-4">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent/25 to-accent-strong/10 text-heading text-accent ring-1 ring-line">
-              {conversation.name.slice(0, 1).toUpperCase() || <IconUser size={22} />}
-            </span>
-            <div className="min-w-0">
-              <h1 className="font-display text-scene text-ink">{conversation.name}</h1>
-              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-meta text-ink-muted">
-                {conversation.platform && <span>{conversation.platform}</span>}
-                {conversation.platform && <span aria-hidden>·</span>}
-                <span>matched {relativeTime(conversation.created_at)}</span>
+      <div className="relative flex-1 overflow-y-auto">
+        <motion.div
+          variants={sectionStagger}
+          initial="initial"
+          animate="enter"
+          className="mx-auto w-full max-w-4xl px-4 pt-10 pb-[calc(3rem+env(safe-area-inset-bottom))] sm:px-6"
+        >
+          {/* ── Masthead ── */}
+          <motion.div variants={sectionItem}>
+            <div className="flex flex-wrap items-end gap-x-5 gap-y-4">
+              <SealDisc initial={conversation.name.trim() || "?"} size={64} className="mb-1.5" />
+              <div className="min-w-0 flex-1">
+                <h1 className="text-spread break-words text-ink">{conversation.name}</h1>
+                <p className="font-display mt-2 text-marginalia italic text-ink-muted">
+                  in conversation since {since} ·{" "}
+                  {messages.length === 1 ? "1 letter" : `${messages.length} letters`}
+                  {conversation.platform ? ` · via ${conversation.platform}` : ""}
+                </p>
               </div>
             </div>
-          </div>
-
-          {/* Stats */}
-          <motion.div
-            variants={tileVariants}
-            initial="initial"
-            animate="enter"
-            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-          >
-            {(
-              [
-                ["Messages", messages.length],
-                ["Facts", facts.length],
-                ["Queued", queued.length],
-                ["Last active", relativeTime(lastActive)],
-              ] as const
-            ).map(([label, value]) => (
-              <motion.div key={label} variants={tileItem}>
-                <StatTile label={label} value={value} />
-              </motion.div>
-            ))}
+            <div className="rule-double mt-6" aria-hidden />
           </motion.div>
 
-          {/* Notes */}
-          {conversation.notes && (
-            <section>
-              <h2 className="kicker mb-2 text-meta font-semibold uppercase tracking-wider text-ink-muted">
-                Your notes
-              </h2>
-              <p className="whitespace-pre-wrap rounded-lg border border-line bg-fill p-3 text-sm leading-normal text-ink-secondary">
-                {conversation.notes}
-              </p>
-            </section>
+          {/* ── Pull-quote — Cyrano's aside, one standout fact ── */}
+          {standout && (
+            <motion.figure
+              variants={sectionItem}
+              className="gilt-rule drawing mt-8 max-w-xl pt-5"
+            >
+              <blockquote className="font-display text-[20px] italic leading-7 text-accent">
+                “{standout.content}”
+              </blockquote>
+              <figcaption className="font-display mt-1.5 text-marginalia italic text-ink-muted">
+                — from the fact library
+              </figcaption>
+            </motion.figure>
           )}
 
-          {/* Fact library */}
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-meta font-semibold uppercase tracking-wider text-ink-muted">
-                Fact library
-              </h2>
-              <span className="text-meta tabular-nums text-ink-muted">{facts.length}</span>
-            </div>
+          {/* ── Telemetry strip (below lg the marginalia column folds here) ── */}
+          <motion.div
+            variants={sectionItem}
+            className="mt-8 grid grid-cols-4 divide-x divide-line border-y border-line lg:hidden"
+          >
+            <TelemetryCell label="Messages" value={messages.length} />
+            <TelemetryCell label="Facts" value={facts.length} />
+            <TelemetryCell label="Queued" value={queued.length} />
+            <TelemetryCell label="Last seen" value={relativeTime(lastActive) || "—"} />
+          </motion.div>
 
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              {messages.length > 0 && (
-                <MotionButton onClick={onScanFacts} disabled={scanning} className={GHOST_BTN}>
-                  <IconScan size={14} className={scanning ? "animate-pulse" : undefined} />
-                  {scanning ? "Reading the whole thread…" : "Scan thread for details"}
-                </MotionButton>
+          {/* ── The spread ── */}
+          <div className="mt-10 grid gap-10 lg:mt-12 lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-12">
+            <div className="min-w-0 space-y-10">
+              {/* Notes — user-authored text, so no drop cap (it mangles short
+                  or lowercase notes; the cap stays on authored empty-state copy) */}
+              {conversation.notes && (
+                <motion.section variants={sectionItem}>
+                  <SectionHead label="Your notes" />
+                  <p className="max-w-prose whitespace-pre-wrap text-body leading-relaxed text-ink-secondary">
+                    {conversation.notes}
+                  </p>
+                </motion.section>
               )}
-              {facts.length > 8 && (
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="search the library…"
-                  className={cx(INPUT_CLASS, "ml-auto max-w-52 py-1.5")}
-                />
-              )}
-            </div>
 
-            <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-center">
-              <div className="flex flex-1 gap-1.5">
-                <input
-                  value={newFact}
-                  onChange={(e) => setNewFact(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addFact();
-                    }
-                  }}
-                  placeholder="add a detail to remember…"
-                  className={cx(INPUT_CLASS, "min-w-0 flex-1 py-1.5")}
+              {/* Fact library — the index */}
+              <motion.section variants={sectionItem}>
+                <SectionHead
+                  label="Fact library"
+                  aside={
+                    <span className="font-display text-marginalia italic tabular-nums text-ink-muted">
+                      {facts.length} filed
+                    </span>
+                  }
                 />
-                <MotionButton
-                  onClick={addFact}
-                  aria-label="Add fact"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-line-strong text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                >
-                  <IconPlus size={16} />
-                </MotionButton>
-              </div>
-              <select
-                aria-label="Category for the new fact"
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value as FactCategory)}
-                className={cx(INPUT_CLASS, "py-1.5 sm:w-48")}
-              >
-                {FACT_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {FACT_CATEGORY_LABELS[c]}
-                  </option>
-                ))}
-              </select>
-            </div>
 
-            {facts.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-line-strong p-6 text-center text-sm text-ink-muted">
-                Nothing filed yet. Scan the thread to build a library of the little things about{" "}
-                {conversation.name}.
-              </div>
-            ) : groups.length === 0 ? (
-              <p className="text-sm text-ink-muted">No details match that.</p>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {groups.map((g) => (
-                  <div
-                    key={g.key}
-                    className="rounded-lg border border-line bg-fill p-3 shadow-highlight"
-                  >
-                    <div className="mb-1.5 flex items-baseline justify-between px-1">
-                      <span
-                        className={cx(
-                          "text-meta font-semibold uppercase tracking-wider",
-                          g.key === "pinned" ? "text-accent" : "text-ink-muted",
-                        )}
-                      >
-                        {g.label}
-                      </span>
-                      <span className="text-meta tabular-nums text-ink-faint">
-                        {g.items.length}
-                      </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {messages.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      onClick={onScanFacts}
+                      disabled={scanning}
+                      className="hit-sm"
+                    >
+                      {scanning ? <Spinner size={13} /> : <IconScan size={14} />}
+                      {scanning ? (
+                        <span className="animate-thinking">Reading the whole thread…</span>
+                      ) : (
+                        "Scan thread for details"
+                      )}
+                    </Button>
+                  )}
+                  {facts.length > 8 && (
+                    <div className="relative ml-auto w-full sm:w-56">
+                      <IconSearch
+                        size={14}
+                        className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                      />
+                      <Input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="search the library…"
+                        className="py-1.5 pl-8"
+                      />
                     </div>
-                    <ul className="space-y-1">
-                      <AnimatePresence mode="popLayout">
-                        {g.items.map((f) => (
-                          <FactRow
-                            key={f.id}
-                            fact={f}
-                            isNew={newFactIdsRef.current.has(f.id)}
-                            reduced={reduced}
-                            onTogglePin={onTogglePin}
-                            onDeleteFact={onDeleteFact}
-                          />
-                        ))}
-                      </AnimatePresence>
-                    </ul>
+                  )}
+                </div>
+
+                <div className="mb-6 mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <div className="flex min-w-0 flex-1 gap-2">
+                    <Input
+                      value={newFact}
+                      onChange={(e) => setNewFact(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addFact();
+                        }
+                      }}
+                      placeholder="add a detail to remember…"
+                      className="min-w-0 flex-1 py-1.5"
+                    />
+                    <button
+                      type="button"
+                      onClick={addFact}
+                      aria-label="Add fact"
+                      data-tip="Add fact"
+                      className={cx(
+                        "hit grid w-9 shrink-0 place-items-center self-stretch rounded-sm border border-line-strong text-ink-secondary transition-colors duration-150 hover:border-line-gilt hover:bg-fill hover:text-accent active:bg-fill-active",
+                        focusRing,
+                      )}
+                    >
+                      <IconPlus size={15} />
+                    </button>
                   </div>
-                ))}
+                  <select
+                    aria-label="Category for the new fact"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value as FactCategory)}
+                    className={cx(inputClass, "py-1.5 sm:w-44")}
+                  >
+                    {FACT_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {FACT_CATEGORY_LABELS[c]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {facts.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-line-strong px-6 py-12 text-center">
+                    <p className="font-display text-[17px] italic leading-6 text-ink-secondary">
+                      Nothing filed yet.
+                    </p>
+                    <p className="mx-auto mt-2 max-w-sm text-body text-ink-muted">
+                      Scan the thread to build a library of the little things about{" "}
+                      {conversation.name}.
+                    </p>
+                  </div>
+                ) : groups.length === 0 ? (
+                  <p className="font-display text-[13px] italic leading-5 text-ink-muted">
+                    No details match that.
+                  </p>
+                ) : (
+                  <div className="space-y-7">
+                    {groups.map((g) => (
+                      <div key={g.key}>
+                        <div
+                          className={cx(
+                            "kicker mb-1.5 flex items-baseline justify-between gap-3",
+                            g.key !== "pinned" && "kicker-laurel",
+                          )}
+                        >
+                          <h3
+                            className={cx(
+                              "text-folio uppercase",
+                              g.key === "pinned" ? "text-accent" : "text-ink-muted",
+                            )}
+                          >
+                            {g.label}
+                          </h3>
+                          <span className="font-display text-marginalia italic tabular-nums text-ink-faint">
+                            {g.items.length}
+                          </span>
+                        </div>
+                        <ul className="space-y-0.5">
+                          <AnimatePresence mode="popLayout">
+                            {g.items.map((f) => (
+                              <FactRow
+                                key={f.id}
+                                fact={f}
+                                isNew={newFactIdsRef.current.has(f.id)}
+                                reduced={reduced}
+                                onTogglePin={onTogglePin}
+                                onDeleteFact={onDeleteFact}
+                              />
+                            ))}
+                          </AnimatePresence>
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.section>
+            </div>
+
+            {/* ── Marginalia column (lg+) ── */}
+            <motion.aside variants={sectionItem} className="hidden lg:block">
+              <div className="sticky top-8 space-y-4 border-l border-line pl-6">
+                <div className="kicker kicker-laurel text-folio uppercase text-ink-muted">Marginalia</div>
+                <div className="space-y-2.5">
+                  <IndexStat label="letters" value={messages.length} />
+                  <IndexStat label="facts filed" value={facts.length} />
+                  <IndexStat label="sealed & waiting" value={queued.length} />
+                  <IndexStat label="last heard" value={relativeTime(lastActive) || "—"} />
+                  <IndexStat label="matched" value={since} />
+                  {conversation.platform && (
+                    <IndexStat label="met on" value={conversation.platform} />
+                  )}
+                </div>
               </div>
-            )}
-          </section>
-        </div>
+            </motion.aside>
+          </div>
+        </motion.div>
       </div>
     </motion.div>
   );

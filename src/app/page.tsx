@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { ConversationView } from "@/components/ConversationView";
 import { FactsPanel } from "@/components/FactsPanel";
-import { IconHeart, IconMenu, IconSparkles } from "@/components/icons";
+import { IconMenu, IconPlus } from "@/components/icons";
 import { ImportThreadModal } from "@/components/ImportThreadModal";
 import { NewConversationModal } from "@/components/NewConversationModal";
 import { PersonDossier } from "@/components/PersonDossier";
@@ -13,8 +13,6 @@ import { ProfileScan } from "@/components/ProfileScan";
 import { PromptsLab } from "@/components/PromptsLab";
 import { Sidebar } from "@/components/Sidebar";
 import {
-  MotionButton,
-  SPRING_MICRO,
   ViewFade,
   drawerVariants,
   fadeUp,
@@ -24,6 +22,7 @@ import {
   toastVariants,
   useAppReducedMotion,
 } from "@/components/motion";
+import { Button, IconButton, SealDisc, SectionLabel, Spinner } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import type { ParsedMessage } from "@/lib/parseThread";
@@ -56,6 +55,31 @@ export default function Home() {
     selectedIdRef.current = id;
     setSelectedId(id);
   }, []);
+
+  // ── The reading lamp & status beam (DESIGN.md §4, §5) ──────────────
+  // A single in-flight counter covers every LLM call in the app —
+  // suggestions, single-card regens, prompt answers, thread parsing,
+  // fact scans and profile scans. While > 0 the status beam sweeps the
+  // top edge and the backdrop lamp turns up (`.speaking`); the lamp
+  // lingers ~1.6s after the last call settles, like a filament cooling.
+  const [llmInFlight, setLlmInFlight] = useState(0);
+  const [speaking, setSpeaking] = useState(false);
+  const trackLlm = useCallback(async function <T>(p: Promise<T>): Promise<T> {
+    setLlmInFlight((n) => n + 1);
+    try {
+      return await p;
+    } finally {
+      setLlmInFlight((n) => Math.max(0, n - 1));
+    }
+  }, []);
+  useEffect(() => {
+    if (llmInFlight > 0) {
+      setSpeaking(true);
+      return;
+    }
+    const cool = setTimeout(() => setSpeaking(false), 1600);
+    return () => clearTimeout(cool);
+  }, [llmInFlight]);
 
   // Suggestion state is kept per conversation: a generation that finishes
   // after switching tabs lands on the conversation it belongs to.
@@ -222,12 +246,14 @@ export default function Home() {
     setSuggestErrorByConv((prev) => ({ ...prev, [id]: undefined }));
     setSuggestionsByConv((prev) => ({ ...prev, [id]: undefined }));
     try {
-      const res = await api.suggest(id, {
-        incoming: incoming || undefined,
-        steer: steer || undefined,
-        targetMessageIds: targetIds.length ? targetIds : undefined,
-        replyToMessageId: incoming && replyToMessageId != null ? replyToMessageId : undefined,
-      });
+      const res = await trackLlm(
+        api.suggest(id, {
+          incoming: incoming || undefined,
+          steer: steer || undefined,
+          targetMessageIds: targetIds.length ? targetIds : undefined,
+          replyToMessageId: incoming && replyToMessageId != null ? replyToMessageId : undefined,
+        }),
+      );
       setSuggestionsByConv((prev) => ({ ...prev, [id]: res.options }));
       await loadDetail(id, { silent: true });
       await refreshList();
@@ -309,13 +335,15 @@ export default function Home() {
     const id = selectedId;
     const avoid = suggestions.flatMap((o) => o.texts);
     try {
-      const res = await api.suggest(id, {
-        count: 1,
-        avoid,
-        steer: steer || undefined,
-        targetMessageIds: targetIds.length ? targetIds : undefined,
-        extractFacts: false,
-      });
+      const res = await trackLlm(
+        api.suggest(id, {
+          count: 1,
+          avoid,
+          steer: steer || undefined,
+          targetMessageIds: targetIds.length ? targetIds : undefined,
+          extractFacts: false,
+        }),
+      );
       const replacement = res.options[0];
       if (replacement) {
         setSuggestionsByConv((prev) => {
@@ -546,7 +574,7 @@ export default function Home() {
     const name = detail?.conversation.name;
     setScanningFactsIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
     try {
-      const res = await api.scanFacts(id);
+      const res = await trackLlm(api.scanFacts(id));
       await loadDetail(id, { silent: true });
       const parts: string[] = [];
       if (res.facts.length > 0) {
@@ -687,8 +715,28 @@ export default function Home() {
           : "replies-empty";
 
   return (
-    <div className="app-backdrop flex h-dvh overflow-hidden text-ink">
-      {/* Inline sidebar (md+) */}
+    <div
+      className={cx(
+        "app-backdrop flex h-dvh overflow-hidden text-ink",
+        speaking && "speaking",
+      )}
+    >
+      {/* Status beam — 2px champagne sweep along the top edge while any
+          LLM call is in flight; fades out 300ms on settle (DESIGN.md §5). */}
+      <AnimatePresence>
+        {llmInFlight > 0 && (
+          <motion.div
+            key="status-beam"
+            aria-hidden="true"
+            className="status-beam"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: 0.2 } }}
+            exit={{ opacity: 0, transition: { duration: 0.3 } }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Inline sidebar — the table of contents (md+) */}
       <aside className="hidden w-72 shrink-0 overflow-hidden border-r border-line md:flex">
         <Sidebar
           conversations={conversations}
@@ -705,23 +753,23 @@ export default function Home() {
 
       {/* Center + right */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile top bar */}
+        {/* Mobile top bar — hidden while a conversation is open in replies
+            view (the conversation header carries the menu button then). */}
         <div
           className={cx(
-            "glass-header flex min-h-12 shrink-0 items-center gap-2 border-b border-line px-3 pt-[env(safe-area-inset-top)] md:hidden",
+            "plate flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-3 pt-[env(safe-area-inset-top)] md:hidden",
             view === "replies" && detail && "hidden",
           )}
         >
-          <MotionButton
-            onClick={() => setMobileNav(true)}
-            aria-label="Open conversations"
-            className="hit rounded-md p-2 text-ink-secondary transition-colors duration-150 hover:bg-fill-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-          >
+          <IconButton label="Open conversations" onClick={() => setMobileNav(true)}>
             <IconMenu size={20} />
-          </MotionButton>
-          {/* Inter here — Fraunces WONK-1 wordmark lives in the sidebar only (spec §4) */}
-          <span className="flex items-center gap-1.5 text-title">
-            <IconHeart size={16} className="text-accent" /> Cyrano
+          </IconButton>
+          {/* Fraunces italic brand — the WONK-1 wordmark lives in the sidebar only (§3) */}
+          <span className="flex min-w-0 items-center gap-2 pl-1">
+            <SealDisc initial="C" size={22} />
+            <span className="font-display truncate text-[17px] italic leading-none text-ink">
+              Cyrano
+            </span>
           </span>
         </div>
 
@@ -730,14 +778,14 @@ export default function Home() {
             <ViewFade viewKey={viewKey} className="flex min-h-0 min-w-0 flex-1 flex-col">
               {view === "scan" ? (
                 <ProfileScan
-                  onAnalyze={(d) => api.analyzeProfile(d)}
-                  onOpeners={(d) => api.scanOpeners(d)}
+                  onAnalyze={(d) => trackLlm(api.analyzeProfile(d))}
+                  onOpeners={(d) => trackLlm(api.scanOpeners(d))}
                   onStart={handleStartFromScan}
                 />
               ) : view === "prompts" ? (
                 <PromptsLab
                   onGenerate={async (data) => {
-                    const res = await api.suggestPrompt(data);
+                    const res = await trackLlm(api.suggestPrompt(data));
                     return res.options;
                   }}
                 />
@@ -778,7 +826,7 @@ export default function Home() {
               )}
             </ViewFade>
 
-            {/* Person dossier — full-region overlay over the chat (§ plan) */}
+            {/* Person dossier — full-region overlay over the chat (§8) */}
             <AnimatePresence>
               {view === "replies" && detail && dossierOpen && (
                 <PersonDossier
@@ -899,26 +947,35 @@ export default function Home() {
         onImport={handleImport}
         onAiParse={async (raw) => {
           if (selectedId === null) return [];
-          const res = await api.parseThread(selectedId, raw);
+          const res = await trackLlm(api.parseThread(selectedId, raw));
           return res.messages;
         }}
       />
 
+      {/* Toast — a floating slip of paper with a status dot (DESIGN.md §8) */}
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-50 flex justify-center px-4">
         <AnimatePresence mode="popLayout">
           {toast && (
             <motion.div
               key={toast.id}
+              role="status"
               variants={rm(reduced, toastVariants)}
               initial="initial"
               animate="enter"
               exit="exit"
-              className={cx(
-                "glass-toast rounded-full border px-4 py-2 text-sm shadow-md",
-                toast.kind === "error" ? "border-danger/30 text-danger" : "border-line text-ink",
-              )}
+              className="flex max-w-md items-center gap-3 rounded-md border border-line-strong bg-[rgb(34_29_22_/_0.85)] px-4 py-2.5 shadow-[var(--shadow-md),var(--shadow-plate)] backdrop-blur-[14px]"
             >
-              {toast.message}
+              <span
+                aria-hidden="true"
+                className={cx(
+                  "h-2 w-2 shrink-0 rounded-full",
+                  toast.kind === "error" ? "bg-danger" : "bg-success",
+                )}
+              />
+              <span className="min-w-0 flex-1 text-body text-ink">{toast.message}</span>
+              <span className="font-display shrink-0 text-marginalia italic text-ink-muted">
+                {new Date(toast.id).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -927,6 +984,8 @@ export default function Home() {
   );
 }
 
+/** Edge drawer — opaque paper panel over a blurred scrim (DESIGN.md §7D).
+ *  Sidebar below md (left), facts below xl (right). */
 function Drawer({
   side,
   onClose,
@@ -944,20 +1003,21 @@ function Drawer({
         initial="initial"
         animate="enter"
         exit="exit"
-        className="absolute inset-0 bg-black/65 backdrop-blur-[6px]"
+        className="absolute inset-0 bg-[rgb(8_7_6_/_0.72)] backdrop-blur-[8px]"
         onClick={onClose}
       />
       <motion.div
         role="dialog"
         aria-modal="true"
+        aria-label={side === "left" ? "Conversations" : "Facts"}
         variants={rm(reduced, drawerVariants(side))}
         initial="initial"
         animate="enter"
         exit="exit"
         className={cx(
-          "glass-drawer absolute inset-y-0 w-[86%] max-w-xs pb-[env(safe-area-inset-bottom)]",
+          "absolute inset-y-0 flex w-[86%] max-w-xs overflow-hidden bg-surface pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-lg),var(--shadow-plate)]",
           side === "left" ? "left-0 border-r" : "right-0 border-l",
-          "border-line-strong shadow-lg",
+          "border-line-strong",
         )}
       >
         {children}
@@ -966,6 +1026,9 @@ function Drawer({
   );
 }
 
+/** Empty main region — the typography is the illustration (DESIGN.md §8).
+ *  Fraunces display heading over a drop-cap paragraph and one ghost CTA,
+ *  cascading in 80ms apart. */
 function EmptyMain({
   loading,
   hasConversations,
@@ -978,46 +1041,49 @@ function EmptyMain({
   const reduced = useAppReducedMotion();
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-ink-muted">
-        <span>Loading…</span>
+      <div className="flex flex-1 items-center justify-center p-6">
+        <span className="font-display flex items-center gap-2.5 text-marginalia italic text-ink-muted">
+          <Spinner size={13} />
+          Opening the correspondence…
+        </span>
       </div>
     );
   }
-  // The drop cap stamps in first (SPRING_MICRO); heading body + copy + CTA
-  // follow 80ms apart (§6.3 "The drop-cap welcome").
-  const stamp = rm(reduced, {
-    initial: { opacity: 0, scale: 1.12 },
-    enter: { opacity: 1, scale: 1, transition: SPRING_MICRO },
-  });
-  const item = rm(reduced, fadeUp(6));
+  const item = rm(reduced, fadeUp(10));
   return (
-    <div className="flex flex-1 items-center justify-center p-6">
+    <div className="flex flex-1 items-center justify-center px-6 py-12 sm:px-10">
       <motion.div
         variants={rm(reduced, listContainer(80))}
         initial="initial"
         animate="enter"
-        className="max-w-sm"
+        className="w-full max-w-md"
       >
+        <motion.div variants={item}>
+          <SectionLabel>{hasConversations ? "The correspondence" : "Éditions · Reply copilot"}</SectionLabel>
+        </motion.div>
         <motion.h2
-          variants={stamp}
-          style={{ transformOrigin: "left bottom" }}
-          className="font-display drop-cap text-display text-ink"
+          variants={item}
+          className="font-display mt-4 text-balance text-display text-ink"
         >
           {hasConversations ? "Pick a conversation" : "Welcome to Cyrano"}
         </motion.h2>
-        <motion.p variants={item} className="mt-3 text-sm leading-normal text-ink-secondary">
+        <motion.p variants={item} className="drop-cap mt-5 text-body text-ink-secondary">
           {hasConversations
             ? "Choose someone from the left, paste their latest message, and get a few natural ways to reply."
             : "Your private reply copilot. Add the first person you're talking to, paste what they said, and get dry, natural replies — with a memory for the details."}
         </motion.p>
-        <motion.div variants={item} className="mt-6">
-          <MotionButton
-            onClick={onNew}
-            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-press transition-colors duration-150 hover:bg-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-          >
-            <IconSparkles size={16} /> New conversation
-          </MotionButton>
+        <motion.div variants={item} className="mt-8 flex items-center gap-4">
+          <Button variant="ghost" size="md" onClick={onNew}>
+            <IconPlus size={15} />
+            New conversation
+          </Button>
         </motion.div>
+        <motion.p
+          variants={item}
+          className="font-display mt-10 border-t border-line pt-3 text-marginalia italic text-ink-muted"
+        >
+          Everything stays on this desk, stored locally.
+        </motion.p>
       </motion.div>
     </div>
   );

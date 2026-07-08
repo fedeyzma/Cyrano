@@ -6,7 +6,7 @@ import type { ProfileAnalysisResult, ScanApproach } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import {
   DUR,
-  EASE_FADE,
+  EASE_INK,
   MotionButton,
   SPRING_MICRO,
   fadeUp,
@@ -14,23 +14,75 @@ import {
   suggestionCardVariants,
   useAppReducedMotion,
 } from "@/components/motion";
-import { IconCheck, IconClose, IconCopy, IconRefresh, IconScan, IconSend, IconSparkles } from "./icons";
-import { Spinner } from "./ui";
+import { IconCheck, IconClose, IconCopy, IconRefresh, IconScan, IconSparkles } from "./icons";
+import {
+  Chip,
+  EmptyState,
+  IconButton,
+  Input,
+  SectionLabel,
+  Spinner,
+  Tag,
+  buttonClass,
+  cardClass,
+  focusRing,
+} from "./ui";
 
-const TONE_STYLES: Record<string, string> = {
-  dry: "bg-zinc-500/12 text-zinc-300 ring-zinc-400/25",
-  playful: "bg-amber-500/12 text-amber-300 ring-amber-400/25",
-  curious: "bg-sky-500/12 text-sky-300 ring-sky-400/25",
-  flirty: "bg-rose-500/12 text-rose-300 ring-rose-400/25",
-  sincere: "bg-emerald-500/12 text-emerald-300 ring-emerald-400/25",
-  bold: "bg-violet-500/12 text-violet-300 ring-violet-400/25",
+/* ── Tone → tone ink (DESIGN.md §2 tone table; warm-rebalanced) ── */
+const TONE_CHIP: Record<string, string> = {
+  dry: "bg-tone-dry/10 text-tone-dry ring-tone-dry/25",
+  playful: "bg-tone-playful/10 text-tone-playful ring-tone-playful/25",
+  curious: "bg-tone-curious/10 text-tone-curious ring-tone-curious/25",
+  flirty: "bg-tone-flirty/10 text-tone-flirty ring-tone-flirty/25",
+  sincere: "bg-tone-sincere/10 text-tone-sincere ring-tone-sincere/25",
+  bold: "bg-tone-bold/10 text-tone-bold ring-tone-bold/25",
 };
-const toneStyle = (t: string) =>
-  TONE_STYLES[t.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong";
+const toneChipClass = (t: string) =>
+  cx(
+    "inline-flex min-w-0 items-center rounded-xs px-2 py-0.5 text-folio uppercase ring-1",
+    TONE_CHIP[t.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong",
+  );
 
 const PLATFORMS = ["Hinge", "Tinder", "Bumble"];
 const LANGUAGES = ["Français", "English", "Español", "Italiano"];
 const MOODS = ["funny", "flirty", "dry", "sincere", "curious", "bold"];
+
+/* Match Strike (§6.8): compiled values of --color-accent / --color-success —
+   motion can't interpolate var() strings. */
+const STRIKE_FLARE = "#E4C589";
+const STRIKE_SAGE = "#A9C48F";
+
+function CopySwap({ active, reduced }: { active: boolean; reduced: boolean }) {
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      {active ? (
+        <motion.span
+          key="struck"
+          className="inline-flex items-center gap-1"
+          initial={reduced ? { opacity: 0, color: STRIKE_SAGE } : { opacity: 0, scale: 0.7, color: STRIKE_FLARE }}
+          animate={
+            reduced
+              ? { opacity: 1, color: STRIKE_SAGE, transition: { duration: 0.12 } }
+              : { opacity: 1, scale: 1, color: STRIKE_SAGE, transition: { duration: 0.4, ease: EASE_INK } }
+          }
+          exit={{ opacity: 0, transition: { duration: 0.1, ease: EASE_INK } }}
+        >
+          <IconCheck size={13} /> Copied
+        </motion.span>
+      ) : (
+        <motion.span
+          key="copy"
+          className="inline-flex items-center gap-1"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, transition: { duration: 0.12, ease: EASE_INK } }}
+          exit={{ opacity: 0, transition: { duration: 0.08, ease: EASE_INK } }}
+        >
+          <IconCopy size={13} /> Copy
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+}
 
 async function fileToResizedDataUrl(file: File, max = 1280, quality = 0.82): Promise<string> {
   const dataUrl = await new Promise<string>((res, rej) => {
@@ -133,6 +185,16 @@ export function ProfileScan({
     return () => window.removeEventListener("paste", onPaste);
   }, [addFiles]);
 
+  // The lamp brightens while a page is held over the dropzone (§8 The Scanner).
+  // Guarded: if the LLM in-flight counter already lit it, leave it alone.
+  useEffect(() => {
+    if (!dragOver) return;
+    const backdrop = document.querySelector(".app-backdrop");
+    if (!backdrop || backdrop.classList.contains("speaking")) return;
+    backdrop.classList.add("speaking");
+    return () => backdrop.classList.remove("speaking");
+  }, [dragOver]);
+
   const canScan = images.length > 0 && !loading;
 
   async function scan() {
@@ -223,14 +285,7 @@ export function ProfileScan({
     }
   }
 
-  const labelCls = "mb-1.5 block text-meta font-semibold uppercase tracking-wider text-ink-muted";
-  const pill = (active: boolean) =>
-    cx(
-      "rounded-full px-3 py-1 text-label transition-colors duration-150",
-      active
-        ? "bg-accent font-medium text-on-accent"
-        : "border border-line-strong text-ink-secondary hover:bg-fill hover:text-ink",
-    );
+  const groupLabel = "mb-1.5 block text-folio uppercase text-ink-muted";
 
   /* ── Motion recipes (all rm-gated) ── */
   const cardVariants = rm(reduced, suggestionCardVariants);
@@ -239,13 +294,13 @@ export function ProfileScan({
   const openerVariants = rm(reduced, fadeUp(6));
   const skeletonVariants = rm(reduced, {
     initial: { opacity: 0, filter: "blur(0px)" },
-    enter: { opacity: 1, filter: "blur(0px)", transition: { duration: DUR.base, ease: EASE_FADE } },
-    exit: { opacity: 0, filter: "blur(3px)", transition: { duration: 0.12, ease: EASE_FADE } },
+    enter: { opacity: 1, filter: "blur(0px)", transition: { duration: DUR.leaf, ease: EASE_INK } },
+    exit: { opacity: 0, filter: "blur(2px)", transition: { duration: DUR.hair, ease: EASE_INK } },
   });
   const resultVariants = rm(reduced, {
     initial: { opacity: 0 },
-    enter: { opacity: 1, transition: { duration: DUR.base, ease: EASE_FADE } },
-    exit: { opacity: 0, transition: { duration: DUR.exitFast, ease: EASE_FADE } },
+    enter: { opacity: 1, transition: { duration: DUR.leaf, ease: EASE_INK } },
+    exit: { opacity: 0, transition: { duration: DUR.hair, ease: EASE_INK } },
   });
 
   // Deal-out order across the result cards: read → approaches → facts.
@@ -254,67 +309,66 @@ export function ProfileScan({
   const anyOpeners = Object.values(openers).some((list) => list.length > 0);
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="glass-header flex h-16 shrink-0 items-center gap-2.5 border-b border-line px-6">
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-accent-soft text-accent ring-1 ring-line">
-          <IconScan size={18} />
-        </span>
-        <div className="leading-tight">
-          <div className="font-display text-scene text-ink">Scan a profile</div>
-          <div className="text-meta text-ink-muted">screenshots in, ways to open + openers out</div>
-        </div>
-      </header>
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-[calc(3rem_+_env(safe-area-inset-bottom))] pt-10 sm:px-6">
+        {/* ── Scene masthead — kicker over Fraunces title (§8) ── */}
+        <header>
+          <SectionLabel>Profile scan</SectionLabel>
+          <h1 className="font-display mt-3 text-scene text-ink">The Scanner</h1>
+          <p className="font-display mt-1.5 text-marginalia italic text-ink-muted">
+            Screenshots in — a read, the ways to open, openers out.
+          </p>
+        </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="mx-auto max-w-2xl space-y-5">
-          {/* Upload */}
-          <div className="space-y-4 rounded-lg border border-line bg-fill p-4 shadow-highlight">
-            <label
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                void addFiles(Array.from(e.dataTransfer.files));
-              }}
+        {/* ── Upload & controls ── */}
+        <section className={cx(cardClass, "space-y-5 p-4 sm:p-5")}>
+          <label
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              void addFiles(Array.from(e.dataTransfer.files));
+            }}
+            className={cx(
+              "group flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-[1.5px] border-dashed px-4 py-9 text-center transition-colors duration-150",
+              dragOver
+                ? "border-line-gilt bg-accent-faint"
+                : "border-line-strong hover:border-line-gilt hover:bg-fill",
+            )}
+          >
+            <IconScan
+              size={22}
               className={cx(
-                "group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-8 text-center transition-[transform,background-color,border-color] duration-150 ease-out-soft",
-                dragOver
-                  ? "scale-[1.01] border-accent/60 bg-accent-faint"
-                  : "border-line-strong hover:border-line-accent hover:bg-fill-hover",
+                "transition-colors duration-150",
+                dragOver ? "text-accent" : "text-ink-muted group-hover:text-accent",
               )}
-            >
-              <span
-                className={cx(
-                  "grid h-10 w-10 place-items-center rounded-full bg-accent-soft text-accent transition-transform duration-150 ease-out-soft group-hover:-translate-y-0.5",
-                  dragOver && "-translate-y-1 scale-110",
-                )}
-              >
-                <IconScan size={20} />
-              </span>
-              <span className="text-sm text-ink-secondary">
-                Drop, paste, or click to add profile screenshots
-              </span>
-              <span className="text-meta text-ink-muted">
-                Hinge profiles span a few screens — add them all (up to 6)
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  void addFiles(Array.from(e.target.files ?? []));
-                  e.target.value = "";
-                }}
-              />
-            </label>
+            />
+            <span className="font-display text-[17px] italic leading-6 text-ink-secondary">
+              Lay the page here
+            </span>
+            <span className="text-label text-ink-muted">
+              Drop, paste, or click to add profile screenshots — they span a few screens, add them
+              all (up to 6)
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void addFiles(Array.from(e.target.files ?? []));
+                e.target.value = "";
+              }}
+            />
+          </label>
 
-            {images.length > 0 && (
-              <div className="flex flex-wrap gap-2">
+          {images.length > 0 && (
+            <div>
+              <div className="flex flex-wrap gap-2.5">
                 <AnimatePresence mode="popLayout" initial={false}>
                   {images.map((img) => (
                     <motion.div
@@ -329,7 +383,7 @@ export function ProfileScan({
                       exit={
                         reduced
                           ? { opacity: 0, transition: { duration: 0.12 } }
-                          : { opacity: 0, scale: 0.9, transition: { duration: 0.14, ease: EASE_FADE } }
+                          : { opacity: 0, scale: 0.9, transition: { duration: 0.14, ease: EASE_INK } }
                       }
                       className="group relative"
                     >
@@ -337,331 +391,358 @@ export function ProfileScan({
                       <img
                         src={img.url}
                         alt="profile screenshot"
-                        className="h-24 w-20 rounded-md object-cover ring-1 ring-line"
+                        className="h-24 w-20 rounded-md border border-line object-cover"
                       />
                       <MotionButton
                         onClick={() => setImages((prev) => prev.filter((x) => x.id !== img.id))}
                         aria-label="Remove screenshot"
-                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-surface-high text-ink-secondary shadow-highlight ring-1 ring-line-strong transition-colors duration-150 hover:text-danger"
+                        className={cx(
+                          "hit absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-line-strong bg-surface-high text-ink-secondary shadow-[var(--shadow-sm)] transition-colors duration-150 hover:text-danger",
+                          focusRing,
+                        )}
                       >
-                        <IconClose size={12} />
+                        <IconClose size={11} />
                       </MotionButton>
                     </motion.div>
                   ))}
                 </AnimatePresence>
               </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <span className={labelCls}>Platform</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {PLATFORMS.map((p) => (
-                    <MotionButton key={p} onClick={() => setPlatform(p)} className={pill(platform === p)}>
-                      {p}
-                    </MotionButton>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <span className={labelCls}>Language</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {LANGUAGES.map((l) => (
-                    <MotionButton key={l} onClick={() => setLanguage(l)} className={pill(language === l)}>
-                      {l}
-                    </MotionButton>
-                  ))}
-                </div>
-              </div>
+              <p className="font-display mt-2 text-marginalia italic text-ink-muted [font-variant-numeric:oldstyle-nums]">
+                {images.length} of 6 pages laid out
+              </p>
             </div>
+          )}
 
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-4">
             <div>
-              <span className={labelCls}>
-                Mood <span className="font-normal normal-case text-ink-faint">(optional)</span>
-              </span>
-              <input
-                value={mood}
-                onChange={(e) => setMood(e.target.value)}
-                placeholder="e.g. playful, a little flirty…"
-                className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted outline-none transition-colors duration-150 focus:border-line-accent focus:ring-[3px] focus:ring-accent/12"
-              />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {MOODS.map((m) => (
-                  <MotionButton
-                    key={m}
-                    onClick={() => setMood((cur) => (cur === m ? "" : m))}
-                    className={cx(
-                      "rounded-full px-2.5 py-0.5 text-meta transition-colors duration-150",
-                      mood === m
-                        ? "bg-accent-soft text-accent ring-1 ring-accent/30"
-                        : "border border-line-strong text-ink-secondary hover:bg-fill hover:text-ink",
-                    )}
-                  >
-                    {m}
-                  </MotionButton>
+              <span className={groupLabel}>Platform</span>
+              <div className="flex flex-wrap gap-2">
+                {PLATFORMS.map((p) => (
+                  <Chip key={p} active={platform === p} onClick={() => setPlatform(p)} className="hit min-h-7">
+                    {p}
+                  </Chip>
                 ))}
               </div>
             </div>
+            <div>
+              <span className={groupLabel}>Language</span>
+              <div className="flex flex-wrap gap-2">
+                {LANGUAGES.map((l) => (
+                  <Chip key={l} active={language === l} onClick={() => setLanguage(l)} className="hit min-h-7">
+                    {l}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          </div>
 
+          <div>
+            <label htmlFor="scan-mood" className={groupLabel}>
+              Mood{" "}
+              <span className="font-display normal-case italic tracking-normal text-ink-muted">— optional</span>
+            </label>
+            <Input
+              id="scan-mood"
+              value={mood}
+              onChange={(e) => setMood(e.target.value)}
+              placeholder="e.g. playful, a little flirty…"
+            />
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {MOODS.map((m) => (
+                <Chip
+                  key={m}
+                  active={mood === m}
+                  onClick={() => setMood((cur) => (cur === m ? "" : m))}
+                  className="hit min-h-7"
+                >
+                  {m}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          {/* Scan — the one lit object on the desk (gilt glow + wick ring) */}
+          <div
+            className={cx(
+              "rounded-sm",
+              (canScan || loading) && "shadow-[var(--shadow-gilt)]",
+              loading && "wick-ring",
+            )}
+          >
             <MotionButton
               onClick={scan}
               disabled={!canScan}
-              className={cx(
-                "inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2.5 text-label text-on-accent shadow-press transition-colors duration-150 hover:bg-accent-strong active:bg-accent-strong disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-                loading && "wick-ring",
-              )}
+              className={buttonClass("primary", "md", "min-h-11 w-full gap-2")}
             >
-              {loading ? <Spinner size={15} /> : <IconSparkles size={16} />}
+              {loading ? <Spinner size={14} /> : <IconSparkles size={15} />}
               {analysis ? "Scan again" : "Find the ways in"}
             </MotionButton>
           </div>
+        </section>
 
-          <AnimatePresence initial={false}>
-            {error && (
-              <motion.div
-                key="error"
-                role="alert"
-                variants={errorVariants}
-                initial="initial"
-                animate="enter"
-                exit="exit"
-                className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger"
-              >
-                {error}
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {/* ── Error ── */}
+        <AnimatePresence initial={false}>
+          {error && (
+            <motion.div
+              key="error"
+              role="alert"
+              variants={errorVariants}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              className="rounded-md border border-danger/30 bg-danger-soft p-4"
+            >
+              <p className="font-display text-body italic text-danger">The scanner lost the page.</p>
+              <p className="mt-1 text-body text-ink-secondary">{error}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          <AnimatePresence mode="wait">
-            {loading ? (
-              <motion.div
-                key="loading"
-                variants={skeletonVariants}
-                initial="initial"
-                animate="enter"
-                exit="exit"
-                className="space-y-3"
-              >
-                <p className="animate-thinking px-1">Cyrano is reading her profile…</p>
-                <div className="skeleton h-16" />
-                <div className="skeleton h-12" />
-                <div className="skeleton h-12" />
-              </motion.div>
-            ) : analysis ? (
-              <motion.div
-                key="result"
-                variants={resultVariants}
-                initial="initial"
-                animate="enter"
-                exit="exit"
-                className="space-y-4"
-              >
-                {analysis.read && (
-                  <motion.p
-                    custom={0}
-                    variants={cardVariants}
-                    initial="initial"
-                    animate="enter"
-                    className="px-1 text-sm leading-normal text-ink-secondary"
-                  >
-                    {analysis.read}
-                  </motion.p>
-                )}
-
-                {/* Approaches */}
-                <div className="space-y-2.5">
-                  <div className="px-1 text-meta font-semibold uppercase tracking-wider text-ink-muted">
-                    Ways to open
+        {/* ── Reading / result / empty ── */}
+        <AnimatePresence mode="wait">
+          {loading ? (
+            <motion.div
+              key="loading"
+              variants={skeletonVariants}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              className="space-y-3"
+            >
+              <p className="animate-thinking px-1">Cyrano is reading her profile…</p>
+              <div className={cx(cardClass, "p-4")}>
+                <div className="skeleton h-3.5 w-full" />
+                <div className="skeleton mt-2 h-3.5 w-4/5" />
+              </div>
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className={cx(cardClass, "p-4")}>
+                  <div className="flex items-center justify-between">
+                    <div className="skeleton h-4 w-36" />
+                    <div className="skeleton h-4 w-10" />
                   </div>
-                  {analysis.approaches.map((a, ai) => {
-                    const list = openers[ai];
-                    const busy = writing.includes(ai);
-                    // Any single-opener regen in flight for this approach: block the
-                    // approach-level rewrite and the other regen buttons so concurrent
-                    // requests can't clobber each other or share a stale avoid list.
-                    const regenBusy = regenKeys.some((k) => k.startsWith(`${ai}:`));
-                    return (
-                      <motion.div
-                        key={ai}
-                        custom={approachBase + ai}
-                        variants={cardVariants}
-                        initial="initial"
-                        animate="enter"
-                        className="rounded-lg border border-accent/30 bg-accent-faint p-3.5 shadow-highlight"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="truncate text-sm font-medium text-accent">{a.angle}</span>
-                            <span className="shrink-0 rounded-full bg-fill px-2 py-0.5 text-meta uppercase tracking-wider text-ink-muted">
-                              {a.type}
-                            </span>
-                          </div>
-                          <MotionButton
-                            onClick={() => writeOpeners(ai)}
-                            disabled={busy || regenBusy}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-accent/90 px-2.5 py-1 text-label font-medium text-on-accent transition-colors duration-150 hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-                          >
-                            {busy ? <Spinner size={13} /> : <IconSparkles size={13} />}
-                            {list ? "Rewrite openers" : "Write openers"}
-                          </MotionButton>
-                        </div>
-                        <p className="mt-1.5 text-sm leading-normal text-ink">“{a.target}”</p>
-                        <p className="mt-1 text-[13px] leading-normal text-ink-muted">{a.reason}</p>
-
-                        <AnimatePresence initial={false}>
-                          {list && list.length > 0 && (
-                            <motion.div
-                              key="openers"
-                              variants={openerVariants}
-                              initial="initial"
-                              animate="enter"
-                              exit="exit"
-                              className="mt-3 space-y-2"
-                            >
-                              {list.map((o, oi) => {
-                                const key = `${ai}:${oi}`;
-                                const oBusy = regenKeys.includes(key);
-                                return (
-                                  <div
-                                    key={oi}
-                                    className="rounded-md border border-line bg-fill p-3 shadow-highlight transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span
-                                        className={cx(
-                                          "rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
-                                          toneStyle(o.tone),
-                                        )}
-                                      >
-                                        {o.tone}
-                                      </span>
-                                      <div className="flex items-center gap-1">
-                                        <MotionButton
-                                          onClick={() => regenerateOne(ai, oi)}
-                                          disabled={busy || regenBusy}
-                                          aria-label="Regenerate this opener"
-                                          title="Regenerate just this one"
-                                          className="inline-flex items-center rounded-md p-1.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                          {oBusy ? <Spinner size={13} /> : <IconRefresh size={13} />}
-                                        </MotionButton>
-                                        <MotionButton
-                                          onClick={() => copy(o.text, key)}
-                                          disabled={oBusy}
-                                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
-                                        >
-                                          {copied === key ? (
-                                            <>
-                                              <IconCheck size={13} /> Copied
-                                            </>
-                                          ) : (
-                                            <>
-                                              <IconCopy size={13} /> Copy
-                                            </>
-                                          )}
-                                        </MotionButton>
-                                        <MotionButton
-                                          onClick={() =>
-                                            onStart({
-                                              name: analysis.name,
-                                              platform,
-                                              facts: analysis.extractedFacts,
-                                              opener: o.text,
-                                            })
-                                          }
-                                          disabled={oBusy}
-                                          className="inline-flex items-center gap-1 rounded-md bg-accent/90 px-2.5 py-1 text-label font-medium text-on-accent transition-colors duration-150 hover:bg-accent disabled:opacity-50"
-                                        >
-                                          <IconSend size={13} /> Start
-                                        </MotionButton>
-                                      </div>
-                                    </div>
-                                    <AnimatePresence mode="wait" initial={false}>
-                                      <motion.p
-                                        key={o.text}
-                                        initial={
-                                          reduced ? { opacity: 0 } : { opacity: 0, y: 4, filter: "blur(0px)" }
-                                        }
-                                        animate={
-                                          reduced
-                                            ? { opacity: oBusy ? 0.4 : 1, transition: { duration: 0.12 } }
-                                            : {
-                                                opacity: oBusy ? 0.4 : 1,
-                                                y: 0,
-                                                filter: "blur(0px)",
-                                                transition: { duration: 0.18, ease: EASE_FADE },
-                                              }
-                                        }
-                                        exit={
-                                          reduced
-                                            ? { opacity: 0, transition: { duration: 0.12 } }
-                                            : {
-                                                opacity: 0,
-                                                filter: "blur(2px)",
-                                                transition: { duration: 0.12, ease: EASE_FADE },
-                                              }
-                                        }
-                                        className="mt-2 text-sm leading-normal text-ink"
-                                      >
-                                        {o.text}
-                                      </motion.p>
-                                    </AnimatePresence>
-                                  </div>
-                                );
-                              })}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                    );
-                  })}
-                  {anyOpeners && (
-                    <p className="px-1 pt-1 text-meta text-ink-muted">
-                      Start opens a new conversation with her — facts saved, opener dropped into the
-                      thread and copied.
-                    </p>
-                  )}
+                  <div className="skeleton mt-3 h-3.5 w-2/3" />
+                  <div className="skeleton mt-2 h-3 w-1/2" />
                 </div>
+              ))}
+            </motion.div>
+          ) : analysis ? (
+            <motion.div
+              key="result"
+              variants={resultVariants}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              className="space-y-6"
+            >
+              {/* The read — Cyrano's aside, set as a pull-quote */}
+              {analysis.read && (
+                <motion.div
+                  custom={0}
+                  variants={cardVariants}
+                  initial="initial"
+                  animate="enter"
+                  className="px-1"
+                >
+                  <div aria-hidden="true" className="h-0.5 w-10 rounded-full bg-line-gilt" />
+                  <p className="font-display mt-3 text-[17px] italic leading-relaxed text-ink-secondary">
+                    {analysis.read}
+                  </p>
+                </motion.div>
+              )}
 
-                {analysis.extractedFacts.length > 0 && (
-                  <motion.div
-                    custom={factsIdx}
-                    variants={cardVariants}
-                    initial="initial"
-                    animate="enter"
-                    className="rounded-md border border-line bg-fill p-3 shadow-highlight"
-                  >
-                    <div className="mb-1.5 text-meta font-semibold uppercase tracking-wider text-ink-muted">
-                      Picked up about her
-                    </div>
-                    <ul className="space-y-0.5">
-                      {analysis.extractedFacts.map((f, i) => (
-                        <li key={i} className="text-[13px] leading-normal text-ink-secondary">
-                          • {f.fact}
-                        </li>
-                      ))}
-                    </ul>
-                  </motion.div>
+              {/* Approaches — the ways in */}
+              <div className="space-y-3">
+                <SectionLabel>Ways to open</SectionLabel>
+                {analysis.approaches.map((a, ai) => {
+                  const list = openers[ai];
+                  const busy = writing.includes(ai);
+                  // Any single-opener regen in flight for this approach: block the
+                  // approach-level rewrite and the other regen buttons so concurrent
+                  // requests can't clobber each other or share a stale avoid list.
+                  const regenBusy = regenKeys.some((k) => k.startsWith(`${ai}:`));
+                  return (
+                    <motion.article
+                      key={ai}
+                      custom={approachBase + ai}
+                      variants={cardVariants}
+                      initial="initial"
+                      animate="enter"
+                      className={cx(cardClass, "p-4 transition-colors duration-150 hover:border-line-strong")}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                          <h3 className="font-display min-w-0 text-[17px] font-medium italic leading-6 text-ink">
+                            {a.angle}
+                          </h3>
+                          <Tag>{a.type}</Tag>
+                        </div>
+                        <span className="font-display shrink-0 text-marginalia italic text-ink-faint [font-variant-numeric:oldstyle-nums]">
+                          № {ai + 1}
+                        </span>
+                      </div>
+
+                      <blockquote className="font-display mt-2.5 border-l-2 border-line-gilt pl-3 text-[15px] italic leading-relaxed text-ink-secondary">
+                        “{a.target}”
+                      </blockquote>
+                      <p className="mt-2 text-body text-ink-muted">{a.reason}</p>
+
+                      <div className="mt-3 flex justify-end">
+                        <MotionButton
+                          onClick={() => writeOpeners(ai)}
+                          disabled={busy || regenBusy}
+                          className={buttonClass("ghost", "sm", "gap-1.5")}
+                        >
+                          {busy ? <Spinner size={13} /> : <IconSparkles size={13} />}
+                          {list ? "Rewrite openers" : "Write openers"}
+                        </MotionButton>
+                      </div>
+
+                      <AnimatePresence initial={false}>
+                        {list && list.length > 0 && (
+                          <motion.div
+                            key="openers"
+                            variants={openerVariants}
+                            initial="initial"
+                            animate="enter"
+                            exit="exit"
+                            className="mt-3 space-y-2 border-t border-line pt-3"
+                          >
+                            {list.map((o, oi) => {
+                              const key = `${ai}:${oi}`;
+                              const oBusy = regenKeys.includes(key);
+                              return (
+                                <div
+                                  key={oi}
+                                  className={cx(
+                                    "rounded-md border border-line bg-fill p-3 transition-colors duration-150 hover:border-line-strong",
+                                    oBusy && "wick-ring",
+                                  )}
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                                    <span className={toneChipClass(o.tone)}>{o.tone}</span>
+                                    <div className="flex items-center gap-1">
+                                      <IconButton
+                                        label="Regenerate this opener"
+                                        onClick={() => regenerateOne(ai, oi)}
+                                        disabled={busy || regenBusy}
+                                        className="disabled:pointer-events-none disabled:opacity-40"
+                                      >
+                                        {oBusy ? <Spinner size={13} /> : <IconRefresh size={14} />}
+                                      </IconButton>
+                                      <MotionButton
+                                        onClick={() => copy(o.text, key)}
+                                        disabled={oBusy}
+                                        className={buttonClass("subtle", "sm")}
+                                      >
+                                        <CopySwap active={copied === key} reduced={reduced} />
+                                      </MotionButton>
+                                      {/* Start = a commitment — it carries the seal, not the metal */}
+                                      <MotionButton
+                                        onClick={() =>
+                                          onStart({
+                                            name: analysis.name,
+                                            platform,
+                                            facts: analysis.extractedFacts,
+                                            opener: o.text,
+                                          })
+                                        }
+                                        disabled={oBusy}
+                                        className={buttonClass("ghost", "sm", "gap-1.5")}
+                                      >
+                                        <span aria-hidden="true" className="h-2 w-2 rounded-full bg-seal" />
+                                        Start
+                                      </MotionButton>
+                                    </div>
+                                  </div>
+                                  <AnimatePresence mode="wait" initial={false}>
+                                    <motion.p
+                                      key={o.text}
+                                      initial={
+                                        reduced ? { opacity: 0 } : { opacity: 0, y: 4, filter: "blur(0px)" }
+                                      }
+                                      animate={
+                                        reduced
+                                          ? { opacity: oBusy ? 0.4 : 1, transition: { duration: 0.12 } }
+                                          : {
+                                              opacity: oBusy ? 0.4 : 1,
+                                              y: 0,
+                                              filter: "blur(0px)",
+                                              transition: { duration: DUR.leaf, ease: EASE_INK },
+                                            }
+                                      }
+                                      exit={
+                                        reduced
+                                          ? { opacity: 0, transition: { duration: 0.12 } }
+                                          : {
+                                              opacity: 0,
+                                              filter: "blur(2px)",
+                                              transition: { duration: DUR.hair, ease: EASE_INK },
+                                            }
+                                      }
+                                      className="mt-2.5 text-bubble text-ink"
+                                    >
+                                      {o.text}
+                                    </motion.p>
+                                  </AnimatePresence>
+                                </div>
+                              );
+                            })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.article>
+                  );
+                })}
+                {anyOpeners && (
+                  <p className="font-display px-1 pt-1 text-marginalia italic text-ink-muted">
+                    Start opens a new conversation with her — facts saved, opener dropped into the
+                    thread and copied.
+                  </p>
                 )}
-              </motion.div>
-            ) : !error ? (
-              <motion.div
-                key="empty"
-                variants={emptyVariants}
-                initial="initial"
-                animate="enter"
-                exit="exit"
-                className="rounded-lg border border-dashed border-line-strong p-8 text-center"
-              >
-                <p className="drop-cap-sm text-sm text-ink-secondary">Add a profile, then find your in.</p>
-                <p className="mt-1 text-meta leading-normal text-ink-muted">
-                  Cami reads the prompts and photos, maps out a few ways to open, and writes openers
-                  in your voice for whichever one you pick — grounded in your context file.
-                </p>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </div>
+              </div>
+
+              {/* Extracted facts — index entries with dot leaders */}
+              {analysis.extractedFacts.length > 0 && (
+                <motion.div
+                  custom={factsIdx}
+                  variants={cardVariants}
+                  initial="initial"
+                  animate="enter"
+                  className={cx(cardClass, "p-4")}
+                >
+                  <div className="text-folio uppercase text-ink-muted">Picked up about her</div>
+                  <ul className="mt-3 space-y-1.5">
+                    {analysis.extractedFacts.map((f, i) => (
+                      <li key={i} className="flex items-baseline">
+                        <span className="min-w-0 text-body text-ink-secondary">{f.fact}</span>
+                        {f.category ? (
+                          <>
+                            <span aria-hidden="true" className="dot-leader" />
+                            <Tag className="shrink-0">{f.category}</Tag>
+                          </>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </motion.div>
+              )}
+            </motion.div>
+          ) : !error ? (
+            <motion.div
+              key="empty"
+              variants={emptyVariants}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+            >
+              <EmptyState title="Every profile leaves a door open.">
+                Add her profile, then find your in. Cami reads the prompts and photos, maps out a
+                few ways to open, and writes openers in your voice for whichever one you pick —
+                grounded in your context file.
+              </EmptyState>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );

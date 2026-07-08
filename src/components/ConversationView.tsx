@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AnimatePresence,
   motion,
@@ -10,16 +10,17 @@ import {
 } from "motion/react";
 import {
   DUR,
-  EASE_FADE,
+  EASE_INK,
   MotionButton,
   SPRING_MICRO,
-  SPRING_MODAL,
   SPRING_SETTLE,
+  SPRING_SHEET,
   bubbleVariants,
   collapseVariants,
   fadeUp,
   rm,
   scrimVariants,
+  sealVariants,
   sheetVariants,
   suggestionCardVariants,
   useAppReducedMotion,
@@ -33,16 +34,13 @@ import type {
   MessageRole,
   QueuedReply,
   ReplyOption,
-  Role,
 } from "@/lib/types";
 import {
   IconBrain,
   IconCheck,
   IconChevronDown,
   IconChevronUp,
-  IconClock,
   IconClose,
-  IconCompass,
   IconCopy,
   IconEdit,
   IconImport,
@@ -54,81 +52,113 @@ import {
   IconSparkles,
   IconSwap,
   IconTrash,
-  IconUser,
 } from "./icons";
-import { Spinner } from "./ui";
+import {
+  Button,
+  EmptyState,
+  IconButton,
+  SealDisc,
+  Spinner,
+  Tag,
+  Textarea,
+  focusRing,
+} from "./ui";
+
+/* ── Tone chip inks (DESIGN.md §2 — exact, warm-rebalanced) ── */
 
 const TONE_STYLES: Record<string, string> = {
-  dry: "bg-zinc-500/12 text-zinc-300 ring-zinc-400/25",
-  playful: "bg-amber-500/12 text-amber-300 ring-amber-400/25",
-  curious: "bg-sky-500/12 text-sky-300 ring-sky-400/25",
-  flirty: "bg-rose-500/12 text-rose-300 ring-rose-400/25",
-  sincere: "bg-emerald-500/12 text-emerald-300 ring-emerald-400/25",
-  bold: "bg-violet-500/12 text-violet-300 ring-violet-400/25",
+  dry: "bg-tone-dry/10 text-tone-dry ring-tone-dry/25",
+  playful: "bg-tone-playful/10 text-tone-playful ring-tone-playful/25",
+  curious: "bg-tone-curious/10 text-tone-curious ring-tone-curious/25",
+  flirty: "bg-tone-flirty/10 text-tone-flirty ring-tone-flirty/25",
+  sincere: "bg-tone-sincere/10 text-tone-sincere ring-tone-sincere/25",
+  bold: "bg-tone-bold/10 text-tone-bold ring-tone-bold/25",
 };
 
 function toneStyle(tone: string): string {
   return TONE_STYLES[tone.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong";
 }
 
+/** Letterpress tone tag — folio small caps in a tinted frame. */
+const TONE_CHIP =
+  "inline-flex items-center rounded-xs px-1.5 py-0.5 text-folio uppercase tracking-[0.1em] ring-1";
+
 /** Actions offered by the mobile message action sheet. */
 type SheetAction = "quote" | "target" | "flip" | "up" | "down" | "edit" | "delete";
 
 /* ── Shared class recipes (tokens only) ─────────────────── */
 
-/** Primary rose button — letterpress press (DESIGN.md §3): resting
- *  --shadow-press, :active inverts the insets and sinks toward accent-deep. */
-const PRIMARY_BTN =
-  "inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 text-label text-on-accent shadow-press transition-colors duration-150 hover:bg-accent-strong active:bg-[color-mix(in_oklch,var(--color-accent-strong)_85%,var(--color-accent-deep))] active:shadow-[inset_0_-1px_0_rgb(255_255_255/0.22),inset_0_1px_0_rgb(0_0_0/0.25)] disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
+/** Flat inline card (§4): hairline + surface + top-light, no drop shadow. */
+const CARD =
+  "rounded-md border border-line bg-surface shadow-[var(--shadow-plate)] [background-image:linear-gradient(rgb(242_236_222_/_0.02),transparent)]";
 
-const GHOST_BTN =
-  "inline-flex items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-accent/40 hover:bg-fill hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
+/** Generate — the one lit object on the writing desk (§8): letterpress fill
+ *  plus the gilt lamp glow; Kiss Impression on :active (translate + shadow
+ *  inversion, never scale). Kept inline because .letterpress would override
+ *  the composed press+gilt shadow. */
+const GENERATE_BTN = cx(
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm bg-accent-strong px-3.5 py-1.5 text-label font-medium tabular-nums text-on-accent transition-[background-color,box-shadow,transform] duration-150 max-md:py-3",
+  "shadow-[var(--shadow-press),var(--shadow-gilt)] hover:bg-accent",
+  "active:translate-y-[0.5px] active:bg-[color-mix(in_oklch,var(--color-accent-strong)_82%,var(--color-accent-deep))]",
+  "active:shadow-[inset_0_-1.5px_0_rgb(255_255_255/0.25),inset_0_1px_0_rgb(0_0_0/0.3),var(--shadow-gilt)]",
+  "disabled:pointer-events-none",
+  focusRing,
+);
+
+/** "Mark sent" — the commitment completing: sage success treatment on a
+ *  ghost skeleton (custom because the stock ghost warms to champagne). */
+const SEND_BTN = cx(
+  "inline-flex min-h-7 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border border-line-laurel px-2.5 py-1 text-label font-medium text-laurel transition-colors duration-150",
+  "hover:border-laurel-strong hover:bg-laurel-soft active:bg-laurel-soft",
+  "disabled:pointer-events-none disabled:opacity-50",
+  focusRing,
+);
 
 /* ── Local variants (composed from the canonical springs) ── */
 
-/** Suggestions panel: fadeUp(12) on SPRING_MODAL; dismiss exit per §5. */
+/** The Galleys panel rises y 12→0 on SPRING_SHEET (§7A). */
 const panelVariants: Variants = {
   initial: { opacity: 0, y: 12 },
-  enter: { opacity: 1, y: 0, transition: SPRING_MODAL },
-  exit: { opacity: 0, y: 8, scale: 0.98, transition: { duration: 0.17, ease: EASE_FADE } },
+  enter: { opacity: 1, y: 0, transition: SPRING_SHEET },
+  exit: { opacity: 0, y: 8, transition: { duration: 0.15, ease: EASE_INK } },
 };
 
-/** Old card leaving during a per-card regenerate (§5: 120ms blur fade). */
-const cardBlurExit: TargetAndTransition = {
+/** Melt — a card leaving during a per-card regenerate (§6.7). */
+const cardMeltExit: TargetAndTransition = {
   opacity: 0,
   filter: "blur(2px)",
-  transition: { duration: 0.12, ease: EASE_FADE },
+  transition: { duration: DUR.hair, ease: EASE_INK },
 };
 
-/** Deal-out cards (first arrival of a set) — §6.1, custom={i}. */
-const dealCardVariants: Variants = { ...suggestionCardVariants, exit: cardBlurExit };
+/** The deal (first arrival of a set) — §7A(3), custom={i}. */
+const dealCardVariants: Variants = { ...suggestionCardVariants, exit: cardMeltExit };
 
-/** Swapped-in card after a per-card regenerate. */
+/** Swapped-in card after a per-card regenerate: y 4→0, 180ms. */
 const swapCardVariants: Variants = {
   initial: { opacity: 0, y: 4 },
-  enter: { opacity: 1, y: 0, transition: { duration: 0.18, ease: EASE_FADE } },
-  exit: cardBlurExit,
+  enter: { opacity: 1, y: 0, transition: { duration: DUR.leaf, ease: EASE_INK } },
+  exit: cardMeltExit,
 };
 
-/** Queue items: listItem-style enter; "Mark sent" leaves toward the thread. */
+/** Queue items: settle in; "Mark sent" Melts toward the thread (§7B). */
 const queueItemVariants: Variants = {
   initial: { opacity: 0, y: 6 },
   enter: { opacity: 1, y: 0, transition: SPRING_SETTLE },
-  exit: { opacity: 0, x: 24, transition: { duration: 0.18, ease: EASE_FADE } },
+  exit: { opacity: 0, x: 24, transition: { duration: DUR.leaf, ease: EASE_INK } },
 };
 
 /** Targeting-bar chips. */
 const chipVariants: Variants = {
   initial: { opacity: 0, scale: 0.9 },
   enter: { opacity: 1, scale: 1, transition: SPRING_MICRO },
-  exit: { opacity: 0, scale: 0.9, transition: { duration: 0.14, ease: EASE_FADE } },
+  exit: { opacity: 0, scale: 0.9, transition: { duration: 0.14, ease: EASE_INK } },
 };
 
-/** Context note: settles straight down (no left/right slide — it's not a speaker). */
+/** Context note: an editor's aside settling straight down — not a speaker. */
 const contextNoteVariants: Variants = {
-  initial: { opacity: 0, y: -4, scale: 0.98 },
-  enter: { opacity: 1, y: 0, scale: 1, transition: SPRING_SETTLE },
-  exit: { opacity: 0, scale: 0.96, transition: { duration: 0.14, ease: EASE_FADE } },
+  initial: { opacity: 0, y: -4 },
+  enter: { opacity: 1, y: 0, transition: SPRING_SETTLE },
+  exit: { opacity: 0, transition: { duration: 0.14, ease: EASE_INK } },
 };
 
 /** Adds a stagger delay to a variants object's enter transition (mount cascade). */
@@ -140,6 +170,111 @@ function withEnterDelay(variants: Variants, delay: number): Variants {
     ...variants,
     enter: { ...target, transition: { ...(target.transition as Transition | undefined), delay } },
   };
+}
+
+/* ── Match Strike (§6.8) — check flares champagne, cools to sage ── */
+
+function StrikeCheck({ reduced, size = 13 }: { reduced: boolean; size?: number }) {
+  if (reduced) {
+    return (
+      <span className="inline-flex text-success">
+        <IconCheck size={size} />
+      </span>
+    );
+  }
+  return (
+    <motion.span
+      className="inline-flex"
+      initial={{ color: "var(--color-accent)" }}
+      animate={{ color: "var(--color-success)" }}
+      transition={{ duration: 0.4, ease: EASE_INK }}
+    >
+      <IconCheck size={size} />
+    </motion.span>
+  );
+}
+
+/* ── Compositor's Rail button (§7C) ─────────────────────── */
+
+function RailButton({
+  label,
+  danger = false,
+  active = false,
+  tone = "gilt",
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  danger?: boolean;
+  active?: boolean;
+  /** Pigment when active/hovered: gilt (default) or laurel (reply-targeting). */
+  tone?: "gilt" | "laurel";
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      data-tip={label}
+      className={cx(
+        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors duration-150 disabled:pointer-events-none disabled:opacity-35",
+        danger
+          ? "text-ink-secondary hover:bg-danger-soft hover:text-danger"
+          : active
+            ? cx(tone === "laurel" ? "text-laurel" : "text-accent", "hover:bg-fill")
+            : cx(
+                "text-ink-secondary hover:bg-fill",
+                tone === "laurel" ? "hover:text-laurel" : "hover:text-accent",
+              ),
+        focusRing,
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/* ── Inline message editor (bubbles + context notes) ────── */
+
+function MessageEditor({
+  value,
+  onChange,
+  onSave,
+  onCancel,
+  isCoarse,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  isCoarse: boolean;
+}) {
+  return (
+    <div className="w-full max-w-[80%]">
+      <Textarea
+        autoFocus
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey && !isCoarse) {
+            e.preventDefault();
+            onSave();
+          } else if (e.key === "Escape") {
+            onCancel();
+          }
+        }}
+        rows={2}
+        className="text-bubble"
+      />
+      <div className="mt-1.5 flex justify-end gap-1.5">
+        <Button variant="subtle" size="sm" className="hit-sm" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button variant="primary" size="sm" className="hit-sm" disabled={!value.trim()} onClick={onSave}>
+          Save
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export function ConversationView({
@@ -214,10 +349,11 @@ export function ConversationView({
   const reduced = useAppReducedMotion();
   const isCoarse = useIsCoarsePointer();
 
-  /* Mount-cascade bookkeeping (§5 Thread messages): on conversation mount the
-     last 8 messages cascade in; everything older renders instantly; messages
-     appended after mount animate individually. `seen` ids never re-animate,
-     so a long thread does not re-stagger on unrelated state changes. */
+  /* Mount-cascade bookkeeping (§6.4 Ink Rise): on conversation mount the
+     last 8 messages cascade in at 35ms stagger; everything older renders
+     instantly; messages appended after mount animate individually. `seen`
+     ids never re-animate, so a long thread does not re-stagger on
+     unrelated state changes. */
   const mountedRef = useRef(false);
   const cascadeStartRef = useRef(Math.max(0, messages.length - 8));
   const seenRef = useRef<Set<number> | null>(null);
@@ -236,18 +372,18 @@ export function ConversationView({
     for (const m of messages) seen.add(m.id);
   }, [messages, seen]);
 
-  /* §6.1 — distinguishes the full deal-out (fresh set) from a per-card swap. */
+  /* §7A — distinguishes the full deal-out (fresh set) from a per-card swap. */
   const dealtRef = useRef(false);
   useEffect(() => {
     if (suggesting) dealtRef.current = false;
     else if (suggestions) dealtRef.current = true;
   }, [suggesting, suggestions]);
 
-  /* §6.1(4) — "the room brightens when Cyrano speaks": pulse Blob A via the
-     `.speaking` hook on the app backdrop for 1.6s when results arrive.
-     Purely visual (CSS opacity transition); skipped under reduced motion. */
+  /* §7A(4) — the Reading Lamp turns up when Cyrano speaks: pulse the
+     `.speaking` hook on the app backdrop for ~1.6s when results arrive.
+     Opacity-only, so it is kept under reduced motion (DESIGN.md §6). */
   useEffect(() => {
-    if (reduced || suggesting || !suggestions) return;
+    if (suggesting || !suggestions) return;
     const el = document.querySelector(".app-backdrop");
     if (!el) return;
     el.classList.add("speaking");
@@ -256,7 +392,7 @@ export function ConversationView({
       window.clearTimeout(t);
       el.classList.remove("speaking");
     };
-  }, [reduced, suggesting, suggestions]);
+  }, [suggesting, suggestions]);
 
   const messageById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
 
@@ -367,38 +503,55 @@ export function ConversationView({
     setEditText("");
   }
 
+  /** Escape inside the Compositor's Rail hides it by returning focus to the page. */
+  function railKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      (document.activeElement as HTMLElement | null)?.blur();
+    }
+  }
+
   const rmCollapse = rm(reduced, collapseVariants);
   const rmChip = rm(reduced, chipVariants);
   const rmPanel = rm(reduced, panelVariants);
   const rmHeader = rm(reduced, fadeUp(6));
+  const rmSeal = rm(reduced, sealVariants);
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header — sticky glass; fades up on conversation mount (§6.2) */}
+      {/* ── Header — the plate (§8 Conversation header) ────── */}
       <motion.header
         variants={rmHeader}
         initial="initial"
         animate="enter"
-        className="glass-header flex h-16 shrink-0 items-center justify-between border-b border-line px-3 pt-[env(safe-area-inset-top)] sm:px-6"
+        className="plate z-20 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-line px-3 pt-[env(safe-area-inset-top)] sm:px-6"
       >
         {onOpenMenu && (
           <MotionButton
             onClick={onOpenMenu}
             aria-label="Open conversations"
-            className="hit mr-1 shrink-0 rounded-md p-2 text-ink-secondary transition-colors duration-150 hover:bg-fill-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas md:hidden"
+            className={cx(
+              "hit mr-0.5 shrink-0 rounded-sm p-2 text-ink-secondary transition-colors duration-150 hover:bg-fill hover:text-ink md:hidden",
+              focusRing,
+            )}
           >
             <IconMenu size={20} />
           </MotionButton>
         )}
+
         <MotionButton
           onClick={onOpenProfile}
           title="Edit profile"
-          className="group/profile flex min-w-0 items-center gap-3 rounded-md px-1 py-0.5 text-left transition-colors duration-150 hover:bg-fill focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          className={cx(
+            "group/profile flex min-w-0 items-center gap-3 rounded-sm px-1.5 py-1 text-left transition-colors duration-150 hover:bg-fill",
+            focusRing,
+          )}
         >
-          <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent/25 to-accent-strong/10 text-title text-accent ring-1 ring-line">
-            {conversation.name.slice(0, 1).toUpperCase() || <IconUser size={16} />}
-            {/* §6.2 — the avatar ring draws once per conversation switch */}
+          <span className="relative grid h-9 w-9 shrink-0 place-items-center">
+            <SealDisc initial={conversation.name || "?"} size={36} />
+            {/* §8 — the avatar's gilt ring Rule Draws once per conversation switch */}
             <motion.svg
+              key={conversation.id}
               aria-hidden="true"
               viewBox="0 0 36 36"
               className="absolute inset-0 h-full w-full -rotate-90"
@@ -408,20 +561,22 @@ export function ConversationView({
                 cy="18"
                 r="17.25"
                 fill="none"
-                stroke="var(--color-accent)"
-                strokeOpacity={0.55}
-                strokeWidth="1.5"
+                stroke="rgb(228 197 137 / 0.5)"
+                strokeWidth="1.25"
                 strokeLinecap="round"
                 initial={reduced ? false : { pathLength: 0 }}
                 animate={{ pathLength: 1 }}
-                transition={{ duration: 0.5, ease: EASE_FADE }}
+                transition={{ duration: 0.5, ease: EASE_INK }}
               />
             </motion.svg>
           </span>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              {/* §6.2 — "Her name in ink": Fraunces persona name, pen-stroke reveal */}
-              <span className="animate-ink truncate font-display text-persona text-ink">
+            <div className="flex min-w-0 items-center gap-1.5">
+              {/* Her name in ink — Fraunces persona italic, pen-stroke reveal */}
+              <span
+                key={conversation.id}
+                className="animate-ink min-w-0 truncate font-display text-persona italic text-ink"
+              >
                 {conversation.name}
               </span>
               <IconEdit
@@ -430,53 +585,49 @@ export function ConversationView({
               />
             </div>
             {conversation.platform && (
-              <div className="text-meta text-ink-muted">{conversation.platform}</div>
+              <div className="mt-0.5">
+                <Tag>{conversation.platform}</Tag>
+              </div>
             )}
           </div>
         </MotionButton>
+
         <div className="flex shrink-0 items-center gap-1.5">
-          <MotionButton onClick={onOpenImport} className={cx(GHOST_BTN, "hit-sm")}>
+          <Button variant="ghost" className="hit-sm" onClick={onOpenImport}>
             <IconImport size={15} />
             <span className="hidden sm:inline">Import</span>
-          </MotionButton>
-          <MotionButton onClick={onOpenFacts} className={cx(GHOST_BTN, "hit-sm xl:hidden")}>
+          </Button>
+          <Button
+            variant="ghost"
+            className="hit-sm xl:hidden"
+            aria-label="Open facts"
+            onClick={onOpenFacts}
+          >
             <IconBrain size={15} />
             {factsCount > 0 && <span className="tabular-nums">{factsCount}</span>}
-          </MotionButton>
-          <MotionButton
-            onClick={onDeleteConversation}
-            aria-label="Delete conversation"
-            className="hit inline-flex items-center justify-center rounded-md p-1.5 text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-          >
+          </Button>
+          <IconButton label="Delete conversation" tone="danger" onClick={onDeleteConversation}>
             <IconTrash size={16} />
-          </MotionButton>
+          </IconButton>
         </div>
       </motion.header>
 
-      {/* Thread + suggestions */}
-      <div className="flex-1 overflow-y-auto px-4 py-5">
-        <div className="mx-auto max-w-2xl space-y-3">
+      {/* ── Thread — "The Correspondence" (§8) ─────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 pb-6 pt-10 sm:px-6">
+        <div className="mx-auto max-w-[44rem] space-y-3">
           {messages.length === 0 && (
-            <motion.div
-              variants={rm(reduced, fadeUp(6))}
-              initial="initial"
-              animate="enter"
-              className="mx-auto mt-16 max-w-sm rounded-lg border border-dashed border-line-strong p-6 text-center"
-            >
-              <span className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-accent-soft text-accent">
-                <IconSparkles size={20} />
-              </span>
-              {/* §6.3 small drop cap — accent-tinted first letter */}
-              <p className="drop-cap-sm mt-3 font-display text-display text-ink">
-                No messages yet.
-              </p>
-              <p className="mt-1 text-xs leading-normal text-ink-muted">
-                Paste what {conversation.name} said in the box below and hit Generate — Cyrano
-                will hand you a few ways to reply.
-              </p>
-              <MotionButton onClick={onOpenImport} className={cx(GHOST_BTN, "mt-4")}>
-                <IconImport size={14} /> Import an existing thread
-              </MotionButton>
+            <motion.div variants={rm(reduced, fadeUp(6))} initial="initial" animate="enter">
+              <EmptyState
+                title="A blank page."
+                action={
+                  <Button variant="ghost" onClick={onOpenImport}>
+                    <IconImport size={14} /> Import an existing thread
+                  </Button>
+                }
+              >
+                Paste what {conversation.name} said in the box below and press Generate — Cyrano
+                will set a few replies in type for you to choose from.
+              </EmptyState>
             </motion.div>
           )}
 
@@ -486,9 +637,8 @@ export function ConversationView({
               const isEditing = editingId === m.id;
               const isNew = !seen.has(m.id);
 
-              // Context notes are situational, not a speaker: centered, muted,
-              // never a reply target. Rendered before the bubble path so the
-              // remaining role narrows to "them" | "me".
+              // Context notes are editor's asides, not a speaker: centered
+              // Fraunces italic under an asterism, no bubble, no hairlines.
               if (m.role === "context") {
                 return (
                   <motion.div
@@ -498,178 +648,75 @@ export function ConversationView({
                     initial={isNew ? "initial" : false}
                     animate="enter"
                     exit="exit"
-                    className="group flex justify-center"
+                    className="group flex flex-col items-center py-1"
                   >
                     {isEditing ? (
-                      <div className="w-full max-w-[80%]">
-                        <textarea
-                          autoFocus
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey && !isCoarse) {
-                              e.preventDefault();
-                              void saveEdit(m.id);
-                            } else if (e.key === "Escape") {
-                              cancelEdit();
-                            }
-                          }}
-                          rows={2}
-                          className="w-full resize-none rounded-md border border-accent/50 bg-black/30 px-3 py-2 text-sm leading-normal text-ink outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
-                        />
-                        <div className="mt-1 flex justify-end gap-2">
-                          <MotionButton
-                            onClick={cancelEdit}
-                            className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
-                          >
-                            Cancel
-                          </MotionButton>
-                          <MotionButton
-                            onClick={() => void saveEdit(m.id)}
-                            disabled={!editText.trim()}
-                            className={PRIMARY_BTN}
-                          >
-                            Save
-                          </MotionButton>
-                        </div>
-                      </div>
+                      <MessageEditor
+                        value={editText}
+                        onChange={setEditText}
+                        onSave={() => void saveEdit(m.id)}
+                        onCancel={cancelEdit}
+                        isCoarse={isCoarse}
+                      />
                     ) : (
-                      <div className="flex max-w-[85%] items-center gap-1.5">
-                        <div
-                          className="flex items-center gap-2 rounded-md border border-line bg-fill px-3 py-1"
-                          title={clockTime(m.created_at)}
-                          onClick={isCoarse ? () => setSheetId(m.id) : undefined}
-                        >
-                          <span className="shrink-0 text-meta font-semibold uppercase tracking-wider text-ink-faint">
-                            context
-                          </span>
-                          <span className="whitespace-pre-wrap break-words text-xs italic leading-normal text-ink-secondary">
+                      <>
+                        <span aria-hidden="true" className="select-none text-sm leading-none text-ink-faint">
+                          ⁂
+                        </span>
+                        <div className="mt-1.5 flex max-w-[85%] items-start justify-center gap-1.5">
+                          <div
+                            title={clockTime(m.created_at)}
+                            onClick={isCoarse ? () => setSheetId(m.id) : undefined}
+                            className="whitespace-pre-wrap break-words text-center font-display text-[13px] italic leading-5 text-ink-secondary"
+                          >
                             {m.content}
-                          </span>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1 pt-0.5 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
+                            <MotionButton
+                              onClick={() => startEdit(m.id, m.content)}
+                              aria-label="Edit context"
+                              title="Edit context"
+                              className={cx(
+                                "hit-sm rounded-xs text-ink-faint transition-colors duration-150 hover:text-ink",
+                                focusRing,
+                              )}
+                            >
+                              <IconEdit size={13} />
+                            </MotionButton>
+                            <MotionButton
+                              onClick={() => onDeleteMessage(m.id)}
+                              aria-label="Delete context"
+                              title="Delete context"
+                              className={cx(
+                                "hit-sm rounded-xs text-ink-faint transition-colors duration-150 hover:text-danger",
+                                focusRing,
+                              )}
+                            >
+                              <IconTrash size={13} />
+                            </MotionButton>
+                          </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-                          <MotionButton
-                            onClick={() => startEdit(m.id, m.content)}
-                            aria-label="Edit context"
-                            title="Edit context"
-                            className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink"
-                          >
-                            <IconEdit size={13} />
-                          </MotionButton>
-                          <MotionButton
-                            onClick={() => onDeleteMessage(m.id)}
-                            aria-label="Delete context"
-                            title="Delete context"
-                            className="hit-sm text-ink-faint transition-colors duration-150 hover:text-danger"
-                          >
-                            <IconTrash size={13} />
-                          </MotionButton>
-                        </div>
-                      </div>
+                      </>
                     )}
                   </motion.div>
                 );
               }
 
+              const isMe = m.role === "me";
               const cascadeDelay =
                 !mountedRef.current && isNew
-                  ? Math.max(0, idx - cascadeStartRef.current) * 0.03
+                  ? Math.max(0, idx - cascadeStartRef.current) * 0.035
                   : 0;
               const base = bubbleVariants(m.role);
               const rowVariants = rm(
                 reduced,
                 cascadeDelay > 0 ? withEnterDelay(base, cascadeDelay) : base,
               );
-
               const isQuoteSource = replyTo === m.id;
-              const actions = (
-                <div
-                  className={cx(
-                    "mb-0.5 grid grid-cols-2 items-center gap-1 transition-[opacity,transform] duration-150",
-                    isTarget || isQuoteSource
-                      ? "opacity-100"
-                      : cx(
-                          "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
-                          m.role === "me"
-                            ? "-translate-x-1 group-hover:translate-x-0 group-focus-within:translate-x-0"
-                            : "translate-x-1 group-hover:translate-x-0 group-focus-within:translate-x-0",
-                        ),
-                  )}
-                >
-                  <MotionButton
-                    onClick={() => setReplyTo((prev) => (prev === m.id ? null : m.id))}
-                    aria-label={
-                      isQuoteSource ? "Stop quoting this message" : "Next added message replies to this"
-                    }
-                    title={
-                      isQuoteSource
-                        ? "Stop quoting this message"
-                        : "Quote: the next message you add replies to this one"
-                    }
-                    className={cx(
-                      "hit-sm transition-colors duration-150",
-                      isQuoteSource ? "text-accent" : "text-ink-faint hover:text-ink",
-                    )}
-                  >
-                    <IconQuote size={13} />
-                  </MotionButton>
-                  {m.role === "them" && (
-                    <MotionButton
-                      onClick={() => toggleTarget(m.id)}
-                      aria-label={isTarget ? "Stop replying to this" : "Reply to this message"}
-                      title={isTarget ? "Stop replying to this" : "Reply to this message"}
-                      className={cx(
-                        "hit-sm transition-colors duration-150",
-                        isTarget ? "text-accent" : "text-ink-faint hover:text-ink",
-                      )}
-                    >
-                      <IconReply size={14} />
-                    </MotionButton>
-                  )}
-                  <MotionButton
-                    onClick={() => onFlipMessage(m.id)}
-                    aria-label="Flip sender (me/them)"
-                    title={`Flip sender — make this ${m.role === "me" ? `${conversation.name}'s` : "my"} message`}
-                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink"
-                  >
-                    <IconSwap size={13} />
-                  </MotionButton>
-                  <MotionButton
-                    onClick={() => onMoveMessage(m.id, "up")}
-                    disabled={idx === 0}
-                    aria-label="Move message up"
-                    title="Move up"
-                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
-                  >
-                    <IconChevronUp size={13} />
-                  </MotionButton>
-                  <MotionButton
-                    onClick={() => onMoveMessage(m.id, "down")}
-                    disabled={idx === messages.length - 1}
-                    aria-label="Move message down"
-                    title="Move down"
-                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
-                  >
-                    <IconChevronDown size={13} />
-                  </MotionButton>
-                  <MotionButton
-                    onClick={() => startEdit(m.id, m.content)}
-                    aria-label="Edit message"
-                    title="Edit message"
-                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-ink"
-                  >
-                    <IconEdit size={13} />
-                  </MotionButton>
-                  <MotionButton
-                    onClick={() => onDeleteMessage(m.id)}
-                    aria-label="Delete message"
-                    title="Delete message"
-                    className="hit-sm text-ink-faint transition-colors duration-150 hover:text-danger"
-                  >
-                    <IconTrash size={13} />
-                  </MotionButton>
-                </div>
-              );
+              const quoted =
+                m.reply_to_message_id !== null
+                  ? messageById.get(m.reply_to_message_id)
+                  : undefined;
 
               return (
                 <motion.div
@@ -679,110 +726,160 @@ export function ConversationView({
                   initial={isNew ? "initial" : false}
                   animate="enter"
                   exit="exit"
-                  className={cx(
-                    "flex",
-                    m.role === "me" ? "justify-end" : "justify-start",
-                    !isEditing && "group items-end gap-2",
-                  )}
+                  className={cx("flex", isMe ? "justify-end" : "justify-start")}
                 >
                   {isEditing ? (
-                    <div className="w-full max-w-[80%]">
-                      <textarea
-                        autoFocus
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            void saveEdit(m.id);
-                          } else if (e.key === "Escape") {
-                            cancelEdit();
-                          }
-                        }}
-                        rows={2}
-                        className="w-full resize-none rounded-md border border-accent/50 bg-black/30 px-3 py-2 text-sm leading-normal text-ink outline-none transition-colors duration-150 focus:border-accent/50 focus:ring-2 focus:ring-accent/20"
-                      />
-                      <div className="mt-1 flex justify-end gap-2">
-                        <MotionButton
-                          onClick={cancelEdit}
-                          className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
-                        >
-                          Cancel
-                        </MotionButton>
-                        <MotionButton
-                          onClick={() => void saveEdit(m.id)}
-                          disabled={!editText.trim()}
-                          className={PRIMARY_BTN}
-                        >
-                          Save
-                        </MotionButton>
-                      </div>
-                    </div>
+                    <MessageEditor
+                      value={editText}
+                      onChange={setEditText}
+                      onSave={() => void saveEdit(m.id)}
+                      onCancel={cancelEdit}
+                      isCoarse={isCoarse}
+                    />
                   ) : (
-                    <>
-                      {m.role === "me" && actions}
-                      {/* Bubble — target toggle-on pulses once (§5); ring stays CSS */}
-                      <motion.div
-                        id={`msg-${m.id}`}
-                        onClick={isCoarse ? () => setSheetId(m.id) : undefined}
-                        animate={
-                          reduced ? undefined : { scale: isTarget ? [1, 1.015, 1] : 1 }
-                        }
-                        transition={{ duration: 0.26, ease: EASE_FADE }}
-                        className={cx(
-                          "max-w-[78%] rounded-lg px-3.5 py-2 text-sm leading-normal",
-                          m.role === "me"
-                            ? "rounded-br-sm bg-accent text-on-accent shadow-highlight"
-                            : "rounded-bl-sm bg-fill text-ink ring-1 ring-line",
-                          isTarget && "ring-2 ring-accent/70",
-                          isQuoteSource && "ring-2 ring-accent/50",
-                        )}
-                        title={clockTime(m.created_at)}
-                      >
-                        {(() => {
-                          const quoted =
-                            m.reply_to_message_id !== null
-                              ? messageById.get(m.reply_to_message_id)
-                              : undefined;
-                          if (!quoted) return null;
-                          return (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                document
-                                  .getElementById(`msg-${quoted.id}`)
-                                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
-                              }}
-                              title="Jump to the quoted message"
-                              className={cx(
-                                "mb-1.5 flex w-full items-center gap-1.5 rounded-md border-l-2 px-2 py-1 text-left text-xs transition-colors duration-150",
-                                m.role === "me"
-                                  ? "border-white/50 bg-black/15 text-on-accent/85 hover:bg-black/25"
-                                  : "border-accent/60 bg-black/20 text-ink-muted hover:bg-black/30",
-                              )}
+                    <div
+                      className={cx(
+                        "group relative flex max-w-[78%] flex-col",
+                        isMe ? "items-end" : "items-start",
+                      )}
+                    >
+                      {/* ¶ marginalia tag — targeted for reply (§8) */}
+                      {isTarget && (
+                        <span className="mb-1 px-1 font-display text-marginalia italic text-laurel">
+                          ¶ replying to this
+                        </span>
+                      )}
+
+                      {/* Compositor's Rail (§7C) — fine pointer only; the
+                          floating pill fades in above the bubble's margin
+                          side, nothing reflows. */}
+                      {!isCoarse && (
+                        <div
+                          className={cx(
+                            "pointer-events-none absolute bottom-full z-10 translate-y-1 pb-1.5 opacity-0",
+                            "transition-[opacity,transform] duration-150 ease-[var(--ease-ink)]",
+                            "group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100",
+                            "group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100",
+                            isMe ? "right-0" : "left-0",
+                          )}
+                          onKeyDown={railKeyDown}
+                        >
+                          <div className="flex items-center gap-0.5 whitespace-nowrap rounded-full border border-line-strong bg-surface-high px-1 py-0.5 shadow-[var(--shadow-md),var(--shadow-plate)]">
+                            <RailButton
+                              label={isQuoteSource ? "Stop quoting this" : "Quote in next message"}
+                              active={isQuoteSource}
+                              onClick={() => setReplyTo((prev) => (prev === m.id ? null : m.id))}
                             >
-                              <IconQuote size={10} className="shrink-0 opacity-70" />
-                              <span className="truncate">
-                                <span className="font-medium">
-                                  {quoted.role === "me" ? "You" : conversation.name}:
-                                </span>{" "}
-                                {quoted.content}
-                              </span>
-                            </button>
-                          );
-                        })()}
+                              <IconQuote size={15} />
+                            </RailButton>
+                            {m.role === "them" && (
+                              <RailButton
+                                label={isTarget ? "Stop replying to this" : "Reply to this message"}
+                                active={isTarget}
+                                tone="laurel"
+                                onClick={() => toggleTarget(m.id)}
+                              >
+                                <IconReply size={15} />
+                              </RailButton>
+                            )}
+                            <RailButton label="Flip sender" onClick={() => onFlipMessage(m.id)}>
+                              <IconSwap size={15} />
+                            </RailButton>
+                            <RailButton
+                              label="Move up"
+                              disabled={idx === 0}
+                              onClick={() => onMoveMessage(m.id, "up")}
+                            >
+                              <IconChevronUp size={15} />
+                            </RailButton>
+                            <RailButton
+                              label="Move down"
+                              disabled={idx === messages.length - 1}
+                              onClick={() => onMoveMessage(m.id, "down")}
+                            >
+                              <IconChevronDown size={15} />
+                            </RailButton>
+                            <RailButton label="Edit message" onClick={() => startEdit(m.id, m.content)}>
+                              <IconEdit size={15} />
+                            </RailButton>
+                            <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-line" />
+                            <RailButton label="Delete message" danger onClick={() => onDeleteMessage(m.id)}>
+                              <IconTrash size={15} />
+                            </RailButton>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* The bubble — gilt-edged for me, hairlined for them */}
+                      <div
+                        id={`msg-${m.id}`}
+                        title={clockTime(m.created_at)}
+                        onClick={isCoarse ? () => setSheetId(m.id) : undefined}
+                        className={cx(
+                          "rounded-lg border px-3.5 py-2 text-bubble text-ink",
+                          isMe
+                            ? "rounded-br-[4px] border-line-gilt bg-accent-soft"
+                            : cx(
+                                "rounded-bl-[4px]",
+                                isTarget
+                                  ? "border-line-laurel bg-laurel-faint"
+                                  : "border-line bg-surface",
+                              ),
+                          isQuoteSource && "ring-1 ring-accent/45",
+                        )}
+                      >
+                        {quoted && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              document
+                                .getElementById(`msg-${quoted.id}`)
+                                ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }}
+                            title="Jump to the quoted message"
+                            className={cx(
+                              "mb-1.5 flex w-full items-center gap-1.5 rounded-xs border-l-2 border-accent/70 py-0.5 pl-2 pr-1 text-left transition-colors duration-150 hover:bg-fill",
+                              focusRing,
+                            )}
+                          >
+                            <span className="min-w-0 truncate font-display text-marginalia italic text-ink-muted">
+                              <span className="text-accent">
+                                {quoted.role === "me" ? "You" : conversation.name}:
+                              </span>{" "}
+                              {quoted.content}
+                            </span>
+                          </button>
+                        )}
                         <span className="whitespace-pre-wrap break-words">{m.content}</span>
-                      </motion.div>
-                      {m.role === "them" && actions}
-                    </>
+                      </div>
+
+                      {/* Timestamps — Fraunces marginalia. ≥md they live in
+                          the margin beside the bubble (Marginalia hover);
+                          on touch they sit quietly beneath. */}
+                      {!isCoarse && (
+                        <span
+                          className={cx(
+                            "pointer-events-none absolute top-1/2 hidden -translate-y-1/2 whitespace-nowrap font-display text-marginalia italic text-ink-muted opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 md:block",
+                            isMe ? "right-full mr-2.5" : "left-full ml-2.5",
+                          )}
+                        >
+                          {clockTime(m.created_at)}
+                        </span>
+                      )}
+                      {isCoarse && (
+                        <span className="mt-1 px-1 font-display text-marginalia italic text-ink-muted">
+                          {clockTime(m.created_at)}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </motion.div>
               );
             })}
           </AnimatePresence>
 
-          {/* Suggestions — "the reply arrives like a letter" (§6.1) */}
+          {/* ── The Galleys — "Pulling the Proof" (§7A) ─────── */}
           <AnimatePresence>
             {(suggesting || suggestions || suggestError) && (
               <motion.div
@@ -792,203 +889,263 @@ export function ConversationView({
                 animate="enter"
                 exit="exit"
                 className={cx(
-                  "rose-rule !mt-6 rounded-lg border border-line bg-fill p-4",
+                  "gilt-rule rule-garnet !mt-8 pt-4",
                   !suggesting && suggestions && "drawing",
                 )}
               >
-                <div className="mb-2.5 flex items-center justify-between px-1">
-                  <div className="flex items-center gap-2 text-label font-medium text-ink-secondary">
-                    <IconSparkles size={15} className="text-accent" />
-                    {suggesting ? (
-                      <span className="animate-thinking">Cyrano is thinking…</span>
-                    ) : (
-                      "Pick a reply"
-                    )}
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <div className="flex items-center gap-2">
+                    <IconSparkles size={14} className="text-garnet" />
+                    <span className="text-folio uppercase text-ink-secondary">The proofs</span>
+                    {suggesting && <span className="animate-thinking">Setting type…</span>}
                   </div>
                   {!suggesting && (suggestions || suggestError) && (
                     <div className="flex items-center gap-1">
-                      <MotionButton
-                        onClick={regenerate}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
-                      >
+                      <Button variant="subtle" size="sm" className="hit-sm" onClick={regenerate}>
                         <IconRefresh size={13} /> Regenerate
-                      </MotionButton>
-                      <MotionButton
+                      </Button>
+                      <Button
+                        variant="subtle"
+                        size="sm"
+                        className="hit-sm"
                         onClick={onDismissSuggestions}
-                        className="inline-flex items-center rounded-md px-2 py-1 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
                       >
                         Dismiss
-                      </MotionButton>
+                      </Button>
                     </div>
                   )}
                 </div>
+                <div className="rule-double mt-2.5" aria-hidden="true" />
 
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {suggesting && (
-                    <motion.div
-                      key="skeletons"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={
-                        reduced
-                          ? { opacity: 0, transition: { duration: 0.12, ease: EASE_FADE } }
-                          : {
-                              opacity: 0,
-                              filter: "blur(3px)",
-                              transition: { duration: 0.12, ease: EASE_FADE },
-                            }
-                      }
-                      transition={{ duration: DUR.fast, ease: EASE_FADE }}
-                      className="space-y-2"
-                    >
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} className="rounded-lg border border-line bg-fill p-3">
-                          <div className="skeleton h-3 w-3/4 rounded" />
-                          <div className="skeleton mt-2 h-3 w-1/2 rounded" />
-                        </div>
-                      ))}
-                    </motion.div>
-                  )}
-
-                  {!suggesting && suggestError && (
-                    <motion.div
-                      key="error"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0, transition: { duration: 0.12, ease: EASE_FADE } }}
-                      transition={{ duration: DUR.base, ease: EASE_FADE }}
-                      className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger"
-                    >
-                      {suggestError}
-                      <MotionButton
-                        onClick={regenerate}
-                        className="mt-2 block text-xs text-danger underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+                <div className="mt-3">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    {suggesting && (
+                      /* Skeleton galleys — layout reserved so arrival is a
+                         cross-fade, not a reflow jump. They Melt out. */
+                      <motion.div
+                        key="skeletons"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={
+                          reduced
+                            ? { opacity: 0, transition: { duration: DUR.hair, ease: EASE_INK } }
+                            : {
+                                opacity: 0,
+                                filter: "blur(2px)",
+                                transition: { duration: DUR.hair, ease: EASE_INK },
+                              }
+                        }
+                        transition={{ duration: DUR.hair, ease: EASE_INK }}
+                        className="space-y-2"
                       >
-                        Try again
-                      </MotionButton>
-                    </motion.div>
-                  )}
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <div key={i} className={cx(CARD, "p-4")}>
+                            <div className="flex items-center justify-between">
+                              <div className="skeleton h-4 w-16 rounded-xs" />
+                              <div className="skeleton h-3 w-8" />
+                            </div>
+                            <div className="skeleton mt-3.5 h-3.5 w-full" />
+                            <div className="skeleton mt-2 h-3.5 w-3/4" />
+                            <div className="mt-4 flex justify-end border-t border-line pt-3">
+                              <div className="skeleton h-6 w-44" />
+                            </div>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
 
-                  {!suggesting && suggestions && (
-                    <motion.div
-                      key="cards"
-                      initial={false}
-                      exit={{ opacity: 0, transition: { duration: 0.12, ease: EASE_FADE } }}
-                      className="space-y-2"
-                    >
-                      <AnimatePresence mode="popLayout">
-                        {suggestions.map((opt, i) => {
-                          const busy = regenIndex === i;
-                          const isSwap = dealtRef.current;
-                          const cardV = rm(reduced, isSwap ? swapCardVariants : dealCardVariants);
-                          const chipDelay = reduced ? 0 : isSwap ? 0.06 : i * 0.09 + 0.06;
-                          return (
-                            <motion.div
-                              key={`${i}:${opt.texts.join(" ")}`}
-                              custom={i}
-                              layout={reduced ? false : "position"}
-                              variants={cardV}
-                              initial="initial"
-                              animate="enter"
-                              exit="exit"
-                              className="rounded-lg border border-line bg-fill p-3 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-y-1.5">
-                                {/* Tone chip — the wax seal (§6.1) */}
-                                <motion.span
-                                  initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={
-                                    reduced
-                                      ? { duration: 0.12, ease: EASE_FADE }
-                                      : { ...SPRING_MICRO, delay: chipDelay }
-                                  }
+                    {!suggesting && suggestError && (
+                      <motion.div
+                        key="error"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0, transition: { duration: DUR.hair, ease: EASE_INK } }}
+                        transition={{ duration: DUR.leaf, ease: EASE_INK }}
+                        className="rounded-md border border-danger/30 bg-danger-soft p-4"
+                      >
+                        <p className="font-display text-body italic text-danger">{suggestError}</p>
+                        <Button variant="danger" size="sm" className="mt-3 hit-sm" onClick={regenerate}>
+                          <IconRefresh size={13} /> Try again
+                        </Button>
+                      </motion.div>
+                    )}
+
+                    {!suggesting && suggestions && (
+                      <motion.div
+                        key="cards"
+                        initial={false}
+                        exit={{ opacity: 0, transition: { duration: DUR.hair, ease: EASE_INK } }}
+                        className="space-y-2"
+                      >
+                        <AnimatePresence mode="popLayout">
+                          {suggestions.map((opt, i) => {
+                            const busy = regenIndex === i;
+                            const isSwap = dealtRef.current;
+                            const cardV = rm(reduced, isSwap ? swapCardVariants : dealCardVariants);
+                            const chipDelay = reduced ? 0 : isSwap ? 0.06 : i * 0.07 + 0.06;
+                            const multi = opt.texts.length > 1;
+                            return (
+                              <motion.div
+                                key={`${i}:${opt.texts.join(" ")}`}
+                                custom={i}
+                                layout={reduced ? false : "position"}
+                                variants={cardV}
+                                initial="initial"
+                                animate="enter"
+                                exit="exit"
+                                className={cx(
+                                  CARD,
+                                  "p-4 transition-colors duration-150 hover:border-line-strong",
+                                  busy && "wick-ring",
+                                )}
+                              >
+                                {/* Top row: tone ink left, № folio right */}
+                                <div className="flex items-start justify-between gap-2">
+                                  <motion.span
+                                    initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={
+                                      reduced
+                                        ? { duration: DUR.hair, ease: EASE_INK }
+                                        : { ...SPRING_MICRO, delay: chipDelay }
+                                    }
+                                    className={cx(TONE_CHIP, toneStyle(opt.tone))}
+                                  >
+                                    {opt.tone}
+                                    {multi && (
+                                      <span className="ml-1 normal-case tabular-nums tracking-normal opacity-70">
+                                        · {opt.texts.length} texts
+                                      </span>
+                                    )}
+                                  </motion.span>
+                                  <span className="shrink-0 font-display text-marginalia italic text-ink-faint [font-variant-numeric:oldstyle-nums]">
+                                    № {i + 1}
+                                  </span>
+                                </div>
+
+                                {/* Body — card № 1 carries the drop cap */}
+                                <div
                                   className={cx(
-                                    "rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
-                                    toneStyle(opt.tone),
+                                    "mt-2.5 transition-opacity duration-150",
+                                    busy && "opacity-40",
                                   )}
                                 >
-                                  {opt.tone}
-                                  {opt.texts.length > 1 && (
-                                    <span className="ml-1 normal-case tabular-nums text-ink-muted">
-                                      · {opt.texts.length} texts
-                                    </span>
+                                  {!multi ? (
+                                    <p
+                                      className={cx(
+                                        "whitespace-pre-wrap break-words text-bubble text-ink",
+                                        i === 0 && "drop-cap",
+                                      )}
+                                    >
+                                      {opt.texts[0]}
+                                    </p>
+                                  ) : (
+                                    opt.texts.map((t, j) => (
+                                      <Fragment key={j}>
+                                        {j > 0 && (
+                                          <div
+                                            aria-hidden="true"
+                                            className="flex justify-center py-1 text-xs leading-none text-ink-faint"
+                                          >
+                                            ⁂
+                                          </div>
+                                        )}
+                                        <div className="flex items-start gap-2.5">
+                                          <span className="mt-1 shrink-0 font-display text-marginalia italic text-ink-faint [font-variant-numeric:oldstyle-nums]">
+                                            № {j + 1}/{opt.texts.length}
+                                          </span>
+                                          <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-bubble text-ink">
+                                            {t}
+                                          </p>
+                                          <MotionButton
+                                            onClick={() => copyValue(t, `opt-${i}-${j}`)}
+                                            disabled={busy}
+                                            aria-label="Copy this text"
+                                            title="Copy this text"
+                                            className={cx(
+                                              "hit-sm mt-1 shrink-0 rounded-xs text-ink-muted transition-colors duration-150 hover:text-ink disabled:opacity-50",
+                                              focusRing,
+                                            )}
+                                          >
+                                            {copied === `opt-${i}-${j}` ? (
+                                              <StrikeCheck reduced={reduced} size={14} />
+                                            ) : (
+                                              <IconCopy size={14} />
+                                            )}
+                                          </MotionButton>
+                                        </div>
+                                      </Fragment>
+                                    ))
                                   )}
-                                </motion.span>
-                                <div className="flex flex-wrap items-center justify-end gap-1">
-                                  <MotionButton
-                                    onClick={() => regenerateOne(i)}
+                                </div>
+
+                                {/* Bottom action rail — behind a hairline */}
+                                <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 border-t border-line pt-2.5">
+                                  <IconButton
+                                    label="Regenerate just this one"
                                     disabled={regenIndex !== null}
-                                    title="Regenerate just this one"
-                                    aria-label="Regenerate this reply"
-                                    className="hit-sm inline-flex items-center justify-center rounded-md p-1.5 max-md:p-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                                    onClick={() => void regenerateOne(i)}
+                                    className="mr-auto"
                                   >
-                                    {busy ? <Spinner size={13} /> : <IconRefresh size={13} />}
-                                  </MotionButton>
-                                  <MotionButton
-                                    onClick={() => copyValue(opt.texts.join("\n"), `opt-${i}`)}
+                                    {busy ? <Spinner size={13} /> : <IconRefresh size={14} />}
+                                  </IconButton>
+                                  <Button
+                                    variant="subtle"
+                                    size="sm"
+                                    className="hit"
                                     disabled={busy}
                                     aria-label="Copy reply"
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
+                                    onClick={() => copyValue(opt.texts.join("\n"), `opt-${i}`)}
                                   >
                                     {copied === `opt-${i}` ? (
                                       <>
-                                        <IconCheck size={13} /> Copied
+                                        <StrikeCheck reduced={reduced} /> Copied
                                       </>
                                     ) : (
                                       <>
                                         <IconCopy size={13} /> Copy
                                       </>
                                     )}
-                                  </MotionButton>
-                                  <MotionButton
-                                    onClick={() =>
-                                      onQueueOption(opt.texts, opt.tone, primaryTargetId)
-                                    }
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="hit"
                                     disabled={busy}
                                     aria-label="Queue reply"
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:opacity-50"
+                                    onClick={() => onQueueOption(opt.texts, opt.tone, primaryTargetId)}
                                   >
-                                    <IconClock size={13} /> Queue
-                                  </MotionButton>
-                                  <MotionButton
+                                    <span
+                                      aria-hidden="true"
+                                      className="h-2 w-2 rounded-full bg-seal shadow-[inset_0_1px_1px_rgb(0_0_0/0.5),inset_0_-1px_0_rgb(255_255_255/0.08)]"
+                                    />
+                                    Queue
+                                  </Button>
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    className="hit"
+                                    disabled={busy}
                                     onClick={() => {
                                       void copyValue(opt.texts.join("\n"), `opt-${i}`);
                                       onUseOption(opt.texts);
                                     }}
-                                    disabled={busy}
-                                    className={PRIMARY_BTN}
                                   >
                                     <IconSend size={13} /> Use
-                                  </MotionButton>
+                                  </Button>
                                 </div>
-                              </div>
-                              <div
-                                className={cx(
-                                  "mt-2 space-y-1 transition-opacity duration-150",
-                                  busy && "opacity-40",
-                                )}
-                              >
-                                {opt.texts.map((t, j) => (
-                                  <p
-                                    key={j}
-                                    className="rounded-md bg-black/20 px-2.5 py-1.5 text-sm leading-normal text-ink"
-                                  >
-                                    {t}
-                                  </p>
-                                ))}
-                              </div>
-                            </motion.div>
-                          );
-                        })}
-                      </AnimatePresence>
-                      <p className="px-1 pt-1 text-meta text-ink-muted">
-                        “Use” sends now (logs to the thread); “Queue” saves it as a draft for
-                        later.
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                              </motion.div>
+                            );
+                          })}
+                        </AnimatePresence>
+                        <p className="px-1 pt-1 font-display text-marginalia italic text-ink-muted">
+                          “Use” sends now (logs to the thread); “Queue” saves it as a draft for
+                          later.
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -997,9 +1154,9 @@ export function ConversationView({
         </div>
       </div>
 
-      {/* Bottom: queue + targeting + composer — the dock never moves */}
-      <div className="glass-dock shrink-0 border-t border-line px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-        {/* Queued replies */}
+      {/* ── The Writing Desk — dock never moves (§8) ────────── */}
+      <div className="plate z-20 shrink-0 border-t border-line px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6">
+        {/* Outbox, sealed — the reply queue (§7B) */}
         <AnimatePresence initial={false}>
           {queued.length > 0 && (
             <motion.div
@@ -1008,19 +1165,30 @@ export function ConversationView({
               initial="initial"
               animate="enter"
               exit="exit"
-              className="mx-auto w-full max-w-2xl overflow-hidden"
+              className="mx-auto w-full max-w-[44rem] overflow-hidden"
             >
               <div className="pb-2">
-                <div className="rounded-lg border border-line bg-fill">
+                <div className={CARD}>
                   <MotionButton
                     onClick={() => setQueueOpen((o) => !o)}
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-label font-medium text-ink-secondary transition-colors duration-150"
+                    className={cx(
+                      "flex w-full items-center justify-between rounded-md px-3 py-2.5 transition-colors duration-150 hover:bg-fill",
+                      focusRing,
+                    )}
                   >
-                    <span className="flex items-center gap-1.5">
-                      <IconClock size={14} className="text-accent" /> Queued replies ·{" "}
-                      <span className="tabular-nums">{queued.length}</span>
+                    <span className="flex items-center gap-2 text-folio uppercase text-ink-secondary">
+                      <span
+                        aria-hidden="true"
+                        className="h-2 w-2 rounded-full bg-seal shadow-[inset_0_1px_1px_rgb(0_0_0/0.5),inset_0_-1px_0_rgb(255_255_255/0.08)]"
+                      />
+                      Sealed &amp; waiting
+                      <span className="font-display text-marginalia italic normal-case tracking-normal text-garnet [font-variant-numeric:oldstyle-nums]">
+                        № {queued.length}
+                      </span>
                     </span>
-                    <span className="text-ink-muted">{queueOpen ? "hide" : "show"}</span>
+                    <span className="font-display text-marginalia italic text-ink-muted">
+                      {queueOpen ? "hide" : "show"}
+                    </span>
                   </MotionButton>
                   <AnimatePresence initial={false}>
                     {queueOpen && (
@@ -1047,58 +1215,67 @@ export function ConversationView({
                                   initial="initial"
                                   animate="enter"
                                   exit="exit"
-                                  className="rounded-lg border border-line bg-fill p-2.5 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
+                                  className="rounded-md border border-line bg-fill p-2.5 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
                                 >
-                                  {tm && (
-                                    <div className="mb-1 flex items-center gap-1 text-meta text-ink-muted">
-                                      <IconReply size={11} className="shrink-0" />
-                                      <span className="truncate">{tm.content}</span>
+                                  <div className="flex items-start gap-2.5">
+                                    {/* The Wax Seal — stamps in 80ms after the row */}
+                                    <motion.span
+                                      variants={rmSeal}
+                                      initial="initial"
+                                      animate="enter"
+                                      className="mt-0.5 shrink-0"
+                                    >
+                                      <SealDisc initial={conversation.name || "?"} size={16} />
+                                    </motion.span>
+                                    <div className="min-w-0 flex-1">
+                                      {tm && (
+                                        <div className="mb-0.5 flex items-center gap-1.5 font-display text-marginalia italic text-ink-muted">
+                                          <IconReply size={11} className="shrink-0" />
+                                          <span className="truncate">{tm.content}</span>
+                                        </div>
+                                      )}
+                                      <div className="space-y-0.5">
+                                        {parts.map((p, pIdx) => (
+                                          <p key={pIdx} className="text-body text-ink">
+                                            {p}
+                                          </p>
+                                        ))}
+                                      </div>
                                     </div>
-                                  )}
-                                  <div className="space-y-0.5">
-                                    {parts.map((p, idx) => (
-                                      <p key={idx} className="text-sm leading-normal text-ink">
-                                        {p}
-                                      </p>
-                                    ))}
                                   </div>
-                                  <div className="mt-1.5 flex flex-wrap items-center gap-1 gap-y-1">
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5 gap-y-1.5">
                                     {q.tone && (
-                                      <span
-                                        className={cx(
-                                          "mr-auto rounded-full px-2 py-0.5 text-meta font-medium uppercase tracking-wider ring-1",
-                                          toneStyle(q.tone),
-                                        )}
-                                      >
+                                      <span className={cx(TONE_CHIP, "mr-auto", toneStyle(q.tone))}>
                                         {q.tone}
                                       </span>
                                     )}
-                                    <MotionButton
-                                      onClick={() => copyValue(q.content, `q-${q.id}`)}
+                                    <Button
+                                      variant="subtle"
+                                      size="sm"
+                                      className="hit"
                                       aria-label="Copy queued reply"
-                                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
+                                      onClick={() => copyValue(q.content, `q-${q.id}`)}
                                     >
                                       {copied === `q-${q.id}` ? (
                                         <>
-                                          <IconCheck size={13} /> Copied
+                                          <StrikeCheck reduced={reduced} /> Copied
                                         </>
                                       ) : (
                                         <>
                                           <IconCopy size={13} /> Copy
                                         </>
                                       )}
-                                    </MotionButton>
-                                    <MotionButton
+                                    </Button>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      className="hit"
                                       onClick={() => onDeleteQueued(q.id)}
-                                      className="inline-flex items-center rounded-md px-2 py-1 max-md:py-2 text-label text-ink-muted transition-colors duration-150 hover:bg-danger-soft hover:text-danger"
                                     >
                                       Delete
-                                    </MotionButton>
-                                    <MotionButton
-                                      onClick={() => onSendQueued(q)}
-                                      className={PRIMARY_BTN}
-                                    >
-                                      <IconSend size={13} /> Mark sent
+                                    </Button>
+                                    <MotionButton className={cx(SEND_BTN, "hit")} onClick={() => onSendQueued(q)}>
+                                      <IconCheck size={13} /> Mark sent
                                     </MotionButton>
                                   </div>
                                 </motion.div>
@@ -1115,7 +1292,7 @@ export function ConversationView({
           )}
         </AnimatePresence>
 
-        {/* Targeting bar */}
+        {/* Targeting strip — letterpress tags with × (§8) */}
         <AnimatePresence initial={false}>
           {targets.length > 0 && (
             <motion.div
@@ -1124,78 +1301,82 @@ export function ConversationView({
               initial="initial"
               animate="enter"
               exit="exit"
-              className="mx-auto w-full max-w-2xl overflow-hidden"
+              className="mx-auto w-full max-w-[44rem] overflow-hidden"
             >
-              <div className="pb-2">
-                <div className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft px-3 py-2">
-                  <IconReply size={14} className="mt-0.5 shrink-0 text-accent" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-label font-medium tabular-nums text-accent">
-                      Replying to {targets.length} message{targets.length > 1 ? "s" : ""}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      <AnimatePresence initial={false}>
-                        {targets.map((tid) => {
-                          const tm = messageById.get(tid);
-                          if (!tm) return null;
-                          return (
-                            <motion.span
-                              key={tid}
-                              layout={reduced ? false : "position"}
-                              variants={rmChip}
-                              initial="initial"
-                              animate="enter"
-                              exit="exit"
-                              className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-meta text-ink-secondary"
-                            >
-                              <span className="truncate">{tm.content}</span>
-                              <MotionButton
-                                onClick={() => toggleTarget(tid)}
-                                aria-label="Remove target"
-                                className="hit shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
-                              >
-                                <IconClose size={11} />
-                              </MotionButton>
-                            </motion.span>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                  <MotionButton
-                    onClick={() => setTargets([])}
-                    className="shrink-0 text-label text-ink-muted transition-colors duration-150 hover:text-ink"
-                  >
-                    clear
-                  </MotionButton>
-                </div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pb-2">
+                <span className="font-display text-marginalia italic tabular-nums text-laurel">
+                  ¶ replying to {targets.length} message{targets.length > 1 ? "s" : ""}
+                </span>
+                <AnimatePresence initial={false}>
+                  {targets.map((tid) => {
+                    const tm = messageById.get(tid);
+                    if (!tm) return null;
+                    return (
+                      <motion.span
+                        key={tid}
+                        layout={reduced ? false : "position"}
+                        variants={rmChip}
+                        initial="initial"
+                        animate="enter"
+                        exit="exit"
+                        className="inline-flex max-w-[13rem] items-center gap-1.5 rounded-xs border border-line-laurel bg-laurel-faint px-1.5 py-0.5"
+                      >
+                        <span className="truncate text-label text-ink-secondary">{tm.content}</span>
+                        <MotionButton
+                          onClick={() => toggleTarget(tid)}
+                          aria-label="Remove target"
+                          className={cx(
+                            "hit shrink-0 rounded-xs text-ink-muted transition-colors duration-150 hover:text-ink",
+                            focusRing,
+                          )}
+                        >
+                          <IconClose size={11} />
+                        </MotionButton>
+                      </motion.span>
+                    );
+                  })}
+                </AnimatePresence>
+                <MotionButton
+                  onClick={() => setTargets([])}
+                  className={cx(
+                    "hit rounded-xs text-label text-ink-muted transition-colors duration-150 hover:text-ink",
+                    focusRing,
+                  )}
+                >
+                  clear
+                </MotionButton>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Composer */}
-        <div className="mx-auto max-w-2xl">
-          <div className="rounded-lg border border-line bg-fill p-2 shadow-highlight transition-colors duration-150 focus-within:border-line-accent focus-within:ring-[3px] focus-within:ring-accent/12">
-            <div className="flex items-center gap-1.5 px-1 pb-1.5">
-              <IconCompass size={14} className="shrink-0 text-ink-muted" />
+        {/* Composer — one framed instrument */}
+        <div className="mx-auto max-w-[44rem]">
+          <div className="rounded-lg border border-line-strong bg-surface shadow-[var(--shadow-plate)] transition-colors duration-150 focus-within:border-line-gilt focus-within:ring-[3px] focus-within:ring-accent/12">
+            {/* Steer — the secondary field, folio-kickered */}
+            <div className="flex items-center gap-2.5 border-b border-line px-3 py-1.5">
+              <span className="shrink-0 text-folio uppercase text-ink-muted">Steer</span>
               <input
                 value={steer}
                 onChange={(e) => setSteer(e.target.value)}
-                placeholder="optional: steer it — “be flirtier”, “ask her out”, “say something like…”"
-                className="min-w-0 flex-1 bg-transparent text-xs text-ink-secondary outline-none placeholder:text-ink-muted"
+                placeholder="optional: “be flirtier”, “ask her out”, “say something like…”"
+                className="min-w-0 flex-1 bg-transparent py-0.5 text-label text-ink-secondary outline-none placeholder:text-ink-muted"
               />
               {steer && (
                 <MotionButton
                   onClick={() => setSteer("")}
                   aria-label="Clear steer"
-                  className="shrink-0 text-ink-faint transition-colors duration-150 hover:text-ink"
+                  className={cx(
+                    "hit shrink-0 rounded-xs text-ink-faint transition-colors duration-150 hover:text-ink",
+                    focusRing,
+                  )}
                 >
                   <IconClose size={13} />
                 </MotionButton>
               )}
             </div>
-            <div className="my-1 h-px bg-line" />
+
+            {/* Quoted-reply strip — gilt rule + Fraunces excerpt (§8) */}
             <AnimatePresence initial={false}>
               {replyTo !== null && messageById.has(replyTo) && (
                 <motion.div
@@ -1204,25 +1385,31 @@ export function ConversationView({
                   initial="initial"
                   animate="enter"
                   exit="exit"
-                  className="mx-1 mb-1 flex items-center gap-1.5 rounded-md border border-accent/30 bg-accent-soft px-2 py-1"
+                  className="flex items-center gap-2 border-b border-line px-3 py-1.5"
                 >
-                  <IconQuote size={12} className="shrink-0 text-accent" />
-                  <span className="min-w-0 flex-1 truncate text-meta text-ink-secondary">
-                    <span className="font-medium text-accent">
-                      replies to {messageById.get(replyTo)!.role === "me" ? "you" : conversation.name}:
+                  <span aria-hidden="true" className="w-0.5 shrink-0 self-stretch rounded-full bg-accent/70" />
+                  <span className="min-w-0 flex-1 truncate font-display text-marginalia italic text-ink-muted">
+                    <span className="text-accent">
+                      replies to{" "}
+                      {messageById.get(replyTo)!.role === "me" ? "you" : conversation.name}:
                     </span>{" "}
                     {messageById.get(replyTo)!.content}
                   </span>
                   <MotionButton
                     onClick={() => setReplyTo(null)}
                     aria-label="Remove quote link"
-                    className="hit shrink-0 text-ink-muted transition-colors duration-150 hover:text-ink"
+                    className={cx(
+                      "hit shrink-0 rounded-xs text-ink-muted transition-colors duration-150 hover:text-ink",
+                      focusRing,
+                    )}
                   >
                     <IconClose size={12} />
                   </MotionButton>
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* The field */}
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -1235,54 +1422,54 @@ export function ConversationView({
               }}
               rows={2}
               placeholder={`Paste ${conversation.name}'s latest message…`}
-              className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-normal text-ink outline-none placeholder:text-ink-muted"
+              className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-3 py-2.5 text-bubble text-ink outline-none placeholder:text-ink-muted"
             />
-            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 pt-1">
-              <div className="flex items-center gap-1">
-                <MotionButton
-                  onClick={() => addAs("me")}
+
+            {/* Action row */}
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-line px-2 py-1.5">
+              <div className="flex items-center gap-0.5">
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  className="hit"
                   disabled={!text.trim()}
-                  className="inline-flex items-center rounded-md px-2.5 py-1.5 max-md:py-2.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => addAs("me")}
                 >
                   <span className="sm:hidden">+ Me</span>
                   <span className="hidden sm:inline">Add as me</span>
-                </MotionButton>
-                <MotionButton
-                  onClick={() => addAs("them")}
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  className="hit"
                   disabled={!text.trim()}
-                  className="inline-flex items-center rounded-md px-2.5 py-1.5 max-md:py-2.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => addAs("them")}
                 >
                   <span className="sm:hidden">+ Them</span>
                   <span className="hidden sm:inline">Add as them</span>
-                </MotionButton>
-                <MotionButton
-                  onClick={() => addAs("context")}
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  className="hit"
                   disabled={!text.trim()}
                   title="Drop in a situational note for Cyrano (not a message)"
-                  className="inline-flex items-center rounded-md px-2.5 py-1.5 max-md:py-2.5 text-label text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => addAs("context")}
                 >
                   <span className="sm:hidden">+ Note</span>
                   <span className="hidden sm:inline">Add as context</span>
-                </MotionButton>
+                </Button>
               </div>
               <div className="flex items-center gap-3">
-                <span className="hidden items-center gap-1.5 text-meta text-ink-muted sm:flex">
-                  <span className="kbd">↵</span> generate ·{" "}
-                  <span className="kbd">⇧↵</span> newline
+                <span className="hidden items-center gap-1.5 font-display text-marginalia italic text-ink-muted sm:flex">
+                  <span className="kbd not-italic">↵</span> generate ·{" "}
+                  <span className="kbd not-italic">⇧↵</span> newline
                 </span>
-                {/* Generate — the only glowing control; wick ring while thinking (§6.4) */}
+                {/* Generate — the lamp; conic gilt ring while setting type */}
                 <MotionButton
                   onClick={handleGenerate}
                   disabled={!canGenerate || suggesting}
-                  className={cx(
-                    "inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-1.5 max-md:py-2.5 text-label tabular-nums text-on-accent transition-colors duration-150 hover:bg-accent-strong",
-                    "shadow-[var(--shadow-press),var(--shadow-glow)]",
-                    "active:bg-[color-mix(in_oklch,var(--color-accent-strong)_85%,var(--color-accent-deep))]",
-                    "active:shadow-[inset_0_-1px_0_rgb(255_255_255/0.22),inset_0_1px_0_rgb(0_0_0/0.25),var(--shadow-glow)]",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-                    "disabled:pointer-events-none",
-                    suggesting ? "wick-ring" : "disabled:opacity-40",
-                  )}
+                  className={cx(GENERATE_BTN, suggesting ? "wick-ring" : "disabled:opacity-40")}
                 >
                   {suggesting ? <Spinner size={14} /> : <IconSparkles size={15} />}
                   {targets.length > 0
@@ -1297,7 +1484,7 @@ export function ConversationView({
         </div>
       </div>
 
-      {/* Mobile message action sheet — touch replacement for the hover cluster */}
+      {/* Mobile message action sheet — touch replacement for the rail */}
       <AnimatePresence>
         {sheetId !== null &&
           (() => {
@@ -1325,7 +1512,7 @@ export function ConversationView({
 }
 
 /** Bottom sheet with labeled message actions — the touch replacement for the
- *  hover-only action cluster next to each bubble. */
+ *  desktop Compositor's Rail. Sheet physics per DESIGN.md §7D. */
 function MessageActionsSheet({
   message,
   conversationName,
@@ -1365,6 +1552,8 @@ function MessageActionsSheet({
     disabled?: boolean;
     danger?: boolean;
     active?: boolean;
+    /** Laurel pigment when active (reply-targeting rows). */
+    laurel?: boolean;
   }> = isContext
     ? [
         { act: "edit", label: "Edit note", icon: <IconEdit size={16} /> },
@@ -1384,6 +1573,7 @@ function MessageActionsSheet({
                 label: isTarget ? "Stop replying to this" : "Reply to this message",
                 icon: <IconReply size={16} />,
                 active: isTarget,
+                laurel: true,
               },
             ]
           : []),
@@ -1398,8 +1588,12 @@ function MessageActionsSheet({
         { act: "up", label: "Move up", icon: <IconChevronUp size={16} />, disabled: isFirst },
         { act: "down", label: "Move down", icon: <IconChevronDown size={16} />, disabled: isLast },
         { act: "edit", label: "Edit message", icon: <IconEdit size={16} /> },
-        { act: "delete", label: "Delete message", icon: <IconTrash size={16} />, danger: true },
       ];
+
+  const dangerRows = isContext ? rows.filter((r) => r.danger) : [
+    { act: "delete" as SheetAction, label: "Delete message", icon: <IconTrash size={16} /> },
+  ];
+  const mainRows = rows.filter((r) => !r.danger);
 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Message actions">
@@ -1410,38 +1604,56 @@ function MessageActionsSheet({
         exit="exit"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/65 backdrop-blur-[6px]"
+        className="absolute inset-0 bg-[rgb(8_7_6/0.72)] backdrop-blur-[8px]"
       />
       <motion.div
         variants={rm(reduced, sheetVariants)}
         initial="initial"
         animate="enter"
         exit="exit"
-        className="glass-drawer absolute inset-x-0 bottom-0 rounded-t-xl border-t border-line-strong pb-[env(safe-area-inset-bottom)]"
+        className="absolute inset-x-0 bottom-0 rounded-t-xl border-t border-line-strong bg-surface-high pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-lg),var(--shadow-plate)]"
       >
-        <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-line-strong" />
-        <div className="flex items-center gap-2 border-b border-line px-5 py-3">
-          <span className="shrink-0 text-label font-medium text-ink-secondary">{speaker}:</span>
-          <span className="truncate text-sm text-ink-muted">{message.content}</span>
+        <div aria-hidden="true" className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-line-strong" />
+        <div className="border-b border-line px-5 py-3">
+          <p className="truncate font-display text-marginalia italic text-ink-muted">
+            <span className="text-ink-secondary">{speaker}</span> · {message.content}
+          </p>
         </div>
         <div className="py-1">
-          {rows.map((r) => (
+          {mainRows.map((r) => (
             <MotionButton
               key={r.act}
               onClick={() => onAction(r.act)}
               disabled={r.disabled}
               className={cx(
-                "flex min-h-12 w-full items-center gap-3 px-5 text-left text-sm transition-colors duration-150",
-                r.danger ? "text-danger" : r.active ? "text-accent" : "text-ink",
-                "disabled:opacity-35 active:bg-fill",
+                "flex min-h-11 w-full items-center gap-3 px-5 text-left text-body transition-colors duration-150 active:bg-fill disabled:opacity-35",
+                r.active ? (r.laurel ? "text-laurel" : "text-accent") : "text-ink",
               )}
             >
-              <span className={r.danger ? "text-danger" : r.active ? "text-accent" : "text-ink-muted"}>
+              <span
+                className={r.active ? (r.laurel ? "text-laurel" : "text-accent") : "text-ink-secondary"}
+              >
                 {r.icon}
               </span>
               {r.label}
             </MotionButton>
           ))}
+          <div aria-hidden="true" className="mx-5 my-1 h-px bg-line" />
+          {dangerRows.map((r) => (
+            <MotionButton
+              key={r.act}
+              onClick={() => onAction(r.act)}
+              className="flex min-h-11 w-full items-center gap-3 px-5 text-left text-body text-danger transition-colors duration-150 active:bg-danger-soft"
+            >
+              <span className="text-danger">{r.icon}</span>
+              {r.label}
+            </MotionButton>
+          ))}
+          <div className="px-4 pb-2 pt-1.5">
+            <Button variant="ghost" className="min-h-11 w-full" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
         </div>
       </motion.div>
     </div>
