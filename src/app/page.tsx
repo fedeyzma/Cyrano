@@ -22,7 +22,7 @@ import {
   toastVariants,
   useAppReducedMotion,
 } from "@/components/motion";
-import { Button, IconButton, SealDisc, SectionLabel, Spinner } from "@/components/ui";
+import { Button, IconButton, SealDisc, Spinner } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import type { ParsedMessage } from "@/lib/parseThread";
@@ -56,12 +56,12 @@ export default function Home() {
     setSelectedId(id);
   }, []);
 
-  // ── The reading lamp & status beam (DESIGN.md §4, §5) ──────────────
+  // ── The aurora & status beam (DESIGN.md §4, §5) ────────────────────
   // A single in-flight counter covers every LLM call in the app —
   // suggestions, single-card regens, prompt answers, thread parsing,
   // fact scans and profile scans. While > 0 the status beam sweeps the
-  // top edge and the backdrop lamp turns up (`.speaking`); the lamp
-  // lingers ~1.6s after the last call settles, like a filament cooling.
+  // top edge and the aurora surges (`.speaking`); the glow holds ~1.6s
+  // after the last call settles, then eases back down.
   const [llmInFlight, setLlmInFlight] = useState(0);
   const [speaking, setSpeaking] = useState(false);
   const trackLlm = useCallback(async function <T>(p: Promise<T>): Promise<T> {
@@ -579,13 +579,13 @@ export default function Home() {
       const parts: string[] = [];
       if (res.facts.length > 0) {
         parts.push(
-          `Filed ${res.facts.length} new ${res.facts.length === 1 ? "detail" : "details"} about ${name ?? "them"}`,
+          `Saved ${res.facts.length} new ${res.facts.length === 1 ? "detail" : "details"} about ${name ?? "them"}`,
         );
       }
       if (res.refiled > 0) {
         parts.push(`organized ${res.refiled} existing`);
       }
-      showToast(parts.length > 0 ? parts.join(", ") : "Nothing new to file — the library is up to date");
+      showToast(parts.length > 0 ? parts.join(", ") : "Nothing new — facts are already up to date");
     } catch (e) {
       handleError(e);
     } finally {
@@ -721,8 +721,8 @@ export default function Home() {
         speaking && "speaking",
       )}
     >
-      {/* Status beam — 2px champagne sweep along the top edge while any
-          LLM call is in flight; fades out 300ms on settle (DESIGN.md §5). */}
+      {/* Status beam — 2px garnet-and-gold sweep along the top edge while
+          any LLM call is in flight; fades out 300ms on settle (§5). */}
       <AnimatePresence>
         {llmInFlight > 0 && (
           <motion.div
@@ -736,7 +736,7 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Inline sidebar — the table of contents (md+) */}
+      {/* Inline sidebar (md+) */}
       <aside className="hidden w-72 shrink-0 overflow-hidden border-r border-line md:flex">
         <Sidebar
           conversations={conversations}
@@ -764,10 +764,11 @@ export default function Home() {
           <IconButton label="Open conversations" onClick={() => setMobileNav(true)}>
             <IconMenu size={20} />
           </IconButton>
-          {/* Fraunces italic brand — the WONK-1 wordmark lives in the sidebar only (§3) */}
+          {/* Wordmark — Inter 700 with the gold→white gradient text fill,
+              the one decorated piece of type in the app (§3) */}
           <span className="flex min-w-0 items-center gap-2 pl-1">
             <SealDisc initial="C" size={22} />
-            <span className="font-display truncate text-[17px] italic leading-none text-ink">
+            <span className="truncate bg-[linear-gradient(90deg,var(--color-accent),var(--color-ink))] bg-clip-text text-[17px] font-bold leading-none tracking-[-0.03em] text-transparent">
               Cyrano
             </span>
           </span>
@@ -952,7 +953,8 @@ export default function Home() {
         }}
       />
 
-      {/* Toast — a floating slip of paper with a status dot (DESIGN.md §8) */}
+      {/* Toast — iOS banner: frosted pill dropping in on a spring, with an
+          8px glow dot (laurel success, danger error) (DESIGN.md §8) */}
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-50 flex justify-center px-4">
         <AnimatePresence mode="popLayout">
           {toast && (
@@ -963,17 +965,17 @@ export default function Home() {
               initial="initial"
               animate="enter"
               exit="exit"
-              className="flex max-w-md items-center gap-3 rounded-md border border-line-strong bg-[rgb(34_29_22_/_0.85)] px-4 py-2.5 shadow-[var(--shadow-md),var(--shadow-plate)] backdrop-blur-[14px]"
+              className="glass-toast flex max-w-md items-center gap-3 rounded-full border-line-strong px-4 py-2.5"
             >
               <span
                 aria-hidden="true"
                 className={cx(
-                  "h-2 w-2 shrink-0 rounded-full",
-                  toast.kind === "error" ? "bg-danger" : "bg-success",
+                  "h-2 w-2 shrink-0 rounded-full bg-current shadow-[0_0_8px_currentColor]",
+                  toast.kind === "error" ? "text-danger" : "text-laurel",
                 )}
               />
               <span className="min-w-0 flex-1 text-body text-ink">{toast.message}</span>
-              <span className="font-display shrink-0 text-marginalia italic text-ink-muted">
+              <span className="shrink-0 text-marginalia text-ink-muted tabular-nums">
                 {new Date(toast.id).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
               </span>
             </motion.div>
@@ -984,8 +986,10 @@ export default function Home() {
   );
 }
 
-/** Edge drawer — opaque paper panel over a blurred scrim (DESIGN.md §7D).
- *  Sidebar below md (left), facts below xl (right). */
+/** Edge drawer — a frosted glass pane sliding in on the iOS sheet spring,
+ *  over a dark blurred scrim (DESIGN.md §7D). Sidebar below md (left),
+ *  facts below xl (right). Rounded on its free edge so it reads as a pane
+ *  floating over the aurora, not a wall. */
 function Drawer({
   side,
   onClose,
@@ -1003,7 +1007,7 @@ function Drawer({
         initial="initial"
         animate="enter"
         exit="exit"
-        className="absolute inset-0 bg-[rgb(8_7_6_/_0.72)] backdrop-blur-[8px]"
+        className="absolute inset-0 bg-[rgb(4_5_10_/_0.60)] backdrop-blur-[12px]"
         onClick={onClose}
       />
       <motion.div
@@ -1015,9 +1019,8 @@ function Drawer({
         animate="enter"
         exit="exit"
         className={cx(
-          "absolute inset-y-0 flex w-[86%] max-w-xs overflow-hidden bg-surface pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-lg),var(--shadow-plate)]",
-          side === "left" ? "left-0 border-r" : "right-0 border-l",
-          "border-line-strong",
+          "glass-drawer absolute inset-y-0 flex w-[86%] max-w-xs overflow-hidden pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-lg),var(--shadow-plate)]",
+          side === "left" ? "left-0 rounded-r-lg" : "right-0 rounded-l-lg",
         )}
       >
         {children}
@@ -1026,9 +1029,10 @@ function Drawer({
   );
 }
 
-/** Empty main region — the typography is the illustration (DESIGN.md §8).
- *  Fraunces display heading over a drop-cap paragraph and one ghost CTA,
- *  cascading in 80ms apart. */
+/** Empty main region — a floating pane of simulated glass over the aurora
+ *  (DESIGN.md §8): gem-disc monogram, display heading, one quiet paragraph,
+ *  a single ghost CTA, cascading in 80ms apart. No blur — the aurora behind
+ *  the glass is the illustration. */
 function EmptyMain({
   loading,
   hasConversations,
@@ -1042,9 +1046,9 @@ function EmptyMain({
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
-        <span className="font-display flex items-center gap-2.5 text-marginalia italic text-ink-muted">
+        <span className="flex items-center gap-2.5 text-marginalia text-ink-muted">
           <Spinner size={13} />
-          Opening the correspondence…
+          Loading…
         </span>
       </div>
     );
@@ -1056,23 +1060,20 @@ function EmptyMain({
         variants={rm(reduced, listContainer(80))}
         initial="initial"
         animate="enter"
-        className="w-full max-w-md"
+        className="glass-card w-full max-w-md rounded-lg p-8 text-center sm:p-10"
       >
-        <motion.div variants={item}>
-          <SectionLabel>{hasConversations ? "The correspondence" : "Éditions · Reply copilot"}</SectionLabel>
+        <motion.div variants={item} className="flex justify-center">
+          <SealDisc initial="C" size={44} />
         </motion.div>
-        <motion.h2
-          variants={item}
-          className="font-display mt-4 text-balance text-display text-ink"
-        >
+        <motion.h2 variants={item} className="mt-5 text-balance text-display text-ink">
           {hasConversations ? "Pick a conversation" : "Welcome to Cyrano"}
         </motion.h2>
-        <motion.p variants={item} className="drop-cap mt-5 text-body text-ink-secondary">
+        <motion.p variants={item} className="mt-3 text-body text-ink-secondary">
           {hasConversations
             ? "Choose someone from the left, paste their latest message, and get a few natural ways to reply."
-            : "Your private reply copilot. Add the first person you're talking to, paste what they said, and get dry, natural replies — with a memory for the details."}
+            : "Your private reply copilot. Add someone you're talking to, paste what they said, and get replies that sound like you. It keeps track of the details, too."}
         </motion.p>
-        <motion.div variants={item} className="mt-8 flex items-center gap-4">
+        <motion.div variants={item} className="mt-7 flex justify-center">
           <Button variant="ghost" size="md" onClick={onNew}>
             <IconPlus size={15} />
             New conversation
@@ -1080,9 +1081,9 @@ function EmptyMain({
         </motion.div>
         <motion.p
           variants={item}
-          className="font-display mt-10 border-t border-line pt-3 text-marginalia italic text-ink-muted"
+          className="mt-8 border-t border-line pt-4 text-marginalia text-ink-muted"
         >
-          Everything stays on this desk, stored locally.
+          Stored locally. Nothing leaves your machine.
         </motion.p>
       </motion.div>
     </div>

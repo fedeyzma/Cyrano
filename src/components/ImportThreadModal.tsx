@@ -61,11 +61,11 @@ export function ImportThreadModal({
 
   const scrim = rm(reduced, scrimVariants);
   const panel = rm(reduced, modalVariants);
-  const stage = rm(reduced, viewVariants); // Folio Turn between paste ⇄ preview
+  const stage = rm(reduced, viewVariants); // Crossfade-and-breathe between paste ⇄ preview
   const alert = rm(reduced, railVariants);
   const galleyList = rm(reduced, listContainer(35));
   const galleyRow = rm(reduced, listItem(10));
-  // The Fraunces title arrives a beat after the plate (DESIGN.md §8 Modals).
+  // The title settles in a beat after the pane (DESIGN.md §8 Modals).
   const title = rm(reduced, {
     initial: { opacity: 0, y: 6 },
     enter: {
@@ -135,7 +135,7 @@ export function ImportThreadModal({
         >
           <motion.button
             aria-label="Close"
-            className="absolute inset-0 bg-[rgb(8_7_6_/_0.72)] backdrop-blur-[8px]"
+            className="absolute inset-0 bg-[rgb(4_5_10_/_0.60)] backdrop-blur-[12px]"
             onClick={onClose}
             variants={scrim}
             initial="initial"
@@ -150,10 +150,10 @@ export function ImportThreadModal({
             initial="initial"
             animate="enter"
             exit="exit"
-            className="relative flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-xl rounded-b-none border border-line-strong bg-surface-high shadow-[var(--shadow-lg),var(--shadow-plate)] sm:rounded-xl"
+            className="glass-modal relative flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-xl rounded-b-none sm:rounded-xl"
           >
-            {/* Drag handle — bottom-sheet affordance below sm only */}
-            <div className="mx-auto mt-3 h-1 w-9 shrink-0 rounded-full bg-line-strong sm:hidden" aria-hidden="true" />
+            {/* Grab handle — bottom-sheet affordance below sm only (§7D) */}
+            <div className="mx-auto mt-3 h-[5px] w-9 shrink-0 rounded-full bg-[rgb(255_255_255_/_0.25)] sm:hidden" aria-hidden="true" />
 
             <div className="shrink-0 px-6 pt-3 sm:pt-6">
               <div className="flex items-start justify-between gap-3">
@@ -161,11 +161,11 @@ export function ImportThreadModal({
                   <motion.h2
                     id="import-thread-title"
                     variants={title}
-                    className="font-display text-modal text-ink"
+                    className="text-modal text-ink"
                   >
                     Import a thread
                   </motion.h2>
-                  <p className="font-display mt-1 text-marginalia italic text-ink-muted">
+                  <p className="mt-1 text-marginalia text-ink-muted">
                     Paste an existing conversation with {conversationName}.
                   </p>
                 </div>
@@ -196,17 +196,17 @@ export function ImportThreadModal({
                     className={cx(inputClass, "h-64 max-h-[45vh] min-h-40 resize-y")}
                   />
                   <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <span className="font-display text-marginalia italic text-ink-muted">
-                      the compositor reads past names and timestamps
+                    <span className="text-marginalia text-ink-muted">
+                      Names and timestamps are fine — they get stripped out
                     </span>
-                    <span className="text-folio uppercase tabular-nums text-ink-muted">
+                    <span className="text-marginalia tabular-nums text-ink-muted">
                       {raw.length.toLocaleString()} characters ·{" "}
                       {raw.split(/\r?\n/).filter((l) => l.trim()).length} lines
                     </span>
                   </div>
                   {raw.length > MAX_IMPORT_CHARS && (
                     <p className="mt-1.5 text-label tabular-nums text-accent">
-                      only the first {MAX_IMPORT_CHARS.toLocaleString()} characters will be read —
+                      Only the first {MAX_IMPORT_CHARS.toLocaleString()} characters will be read —
                       split very long threads
                     </p>
                   )}
@@ -266,7 +266,7 @@ export function ImportThreadModal({
                   className="flex min-h-0 flex-1 flex-col"
                 >
                   <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-6 py-2">
-                    <span className="font-display text-marginalia italic text-ink-muted">
+                    <span className="text-marginalia text-ink-muted">
                       <span className="tabular-nums">{parsed.length}</span> messages · tap a bubble
                       to switch speaker
                     </span>
@@ -289,7 +289,7 @@ export function ImportThreadModal({
                           onChange={(e) => setImportAll(e.target.checked)}
                           className="h-3.5 w-3.5 accent-[var(--color-accent)]"
                         />
-                        import all anyway
+                        Import all anyway
                       </label>
                     </div>
                   )}
@@ -301,7 +301,7 @@ export function ImportThreadModal({
                     className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 py-4 sm:px-6"
                   >
                     {parsed.length === 0 ? (
-                      <p className="font-display px-6 py-10 text-center text-body italic text-ink-secondary">
+                      <p className="px-6 py-10 text-center text-body text-ink-secondary">
                         Nothing to import — go back and paste some text.
                       </p>
                     ) : (
@@ -322,11 +322,11 @@ export function ImportThreadModal({
                               onClick={() => toggleRole(i)}
                               title={isDup ? "Already saved — won't be imported" : "Switch speaker"}
                               className={cx(
-                                "max-w-[78%] whitespace-pre-wrap break-words border px-3.5 py-2 text-left text-bubble text-ink transition-colors duration-150",
+                                "max-w-[78%] whitespace-pre-wrap break-words border px-3.5 py-2 text-left text-bubble text-ink shadow-[var(--shadow-plate)] transition-colors duration-150",
                                 focusRing,
                                 m.role === "me"
-                                  ? "rounded-[14px] rounded-br-[4px] border-line-gilt bg-accent-soft hover:border-accent/50"
-                                  : "rounded-[14px] rounded-bl-[4px] border-line bg-surface hover:border-line-strong hover:bg-fill",
+                                  ? "rounded-[20px] rounded-br-[6px] border-line-gilt bg-accent-soft hover:border-accent/50"
+                                  : "rounded-[20px] rounded-bl-[6px] border-line bg-[rgb(255_255_255_/_0.05)] hover:border-line-strong hover:bg-fill-hover",
                               )}
                             >
                               {m.content}

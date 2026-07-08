@@ -1,8 +1,8 @@
 import type { SVGProps } from "react";
 
 /**
- * Cyrano icon set — hairline engraving weight (1.7) to sit with the
- * letterpress chrome. All icons are 24-grid, stroke-only, currentColor,
+ * Cyrano icon set — light hairline weight (1.7) to sit with the frosted
+ * glass chrome. All icons are 24-grid, stroke-only, currentColor,
  * aria-hidden (buttons carry the labels).
  */
 
@@ -226,7 +226,7 @@ export const IconUpload = (p: IconProps) => (
   </Icon>
 );
 
-/** Quill — the letterpress studio's pen (empty states, voice moments). */
+/** Quill — Cyrano's pen (empty states, voice moments). */
 export const IconQuill = (p: IconProps) => (
   <Icon {...p}>
     <path d="M20 4c-6.5.5-11 3-13.5 8.5C5.4 15 5 17.5 5 20c2.5 0 5-.4 7.5-1.5C18 16 19.5 10.5 20 4Z" />

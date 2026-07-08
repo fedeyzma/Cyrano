@@ -29,21 +29,22 @@ import {
 
 type Answer = { text: string; angle: string };
 
-/* ── Angle → tone ink (DESIGN.md §2 tone table; warm-rebalanced) ── */
+/* ── Angle → tone ink (DESIGN.md §2 tone table; §5 pill recipe:
+   tone/12% fill, tone/30 ring, full-value text, sentence case) ── */
 const TONE_CHIP: Record<string, string> = {
-  dry: "bg-tone-dry/10 text-tone-dry ring-tone-dry/25",
-  funny: "bg-tone-playful/10 text-tone-playful ring-tone-playful/25",
-  playful: "bg-tone-playful/10 text-tone-playful ring-tone-playful/25",
-  curious: "bg-tone-curious/10 text-tone-curious ring-tone-curious/25",
-  chill: "bg-tone-curious/10 text-tone-curious ring-tone-curious/25",
-  flirty: "bg-tone-flirty/10 text-tone-flirty ring-tone-flirty/25",
-  sincere: "bg-tone-sincere/10 text-tone-sincere ring-tone-sincere/25",
-  adventurous: "bg-tone-sincere/10 text-tone-sincere ring-tone-sincere/25",
-  bold: "bg-tone-bold/10 text-tone-bold ring-tone-bold/25",
+  dry: "bg-tone-dry/12 text-tone-dry ring-tone-dry/30",
+  funny: "bg-tone-playful/12 text-tone-playful ring-tone-playful/30",
+  playful: "bg-tone-playful/12 text-tone-playful ring-tone-playful/30",
+  curious: "bg-tone-curious/12 text-tone-curious ring-tone-curious/30",
+  chill: "bg-tone-curious/12 text-tone-curious ring-tone-curious/30",
+  flirty: "bg-tone-flirty/12 text-tone-flirty ring-tone-flirty/30",
+  sincere: "bg-tone-sincere/12 text-tone-sincere ring-tone-sincere/30",
+  adventurous: "bg-tone-sincere/12 text-tone-sincere ring-tone-sincere/30",
+  bold: "bg-tone-bold/12 text-tone-bold ring-tone-bold/30",
 };
 function toneChipClass(angle: string): string {
   return cx(
-    "inline-flex min-w-0 items-center rounded-xs px-2 py-0.5 text-folio uppercase ring-1",
+    "inline-flex min-w-0 items-center rounded-full px-2.5 py-0.5 text-folio ring-1",
     TONE_CHIP[angle.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong",
   );
 }
@@ -53,25 +54,26 @@ const LANGUAGES = ["Français", "English", "Español", "Italiano"];
 const MOODS = ["funny", "flirty", "dry", "sincere", "adventurous", "chill", "bold"];
 const CUSTOM = "Custom prompt…";
 
-/* Skeleton galleys — reserve final card size, then Melt out (§7A.1). */
+/* Skeleton cards — reserved at final size so arrival is a crossfade, then
+   they Melt out (§7A.1). */
 const skeletonGroupVariants: Variants = {
   initial: { opacity: 0 },
   enter: { opacity: 1, transition: { duration: DUR.hair, ease: EASE_INK } },
   exit: { opacity: 0, filter: "blur(2px)", transition: { duration: DUR.hair, ease: EASE_INK } },
 };
 
-/* The proofs panel rises as one plate; cards deal themselves within (§7A.2). */
-const proofsPanelVariants: Variants = {
-  initial: { opacity: 0, y: 12 },
+/* The results panel rises as one glass pane; cards float in within (§7A.2). */
+const resultsPanelVariants: Variants = {
+  initial: { opacity: 0, y: 16 },
   enter: { opacity: 1, y: 0, transition: SPRING_SHEET },
   exit: { opacity: 0, transition: { duration: DUR.hair, ease: EASE_INK } },
 };
 
-/* Match Strike (§6.8): the copy glyph swaps to a check that flares champagne
-   and cools to sage. Colors are the compiled values of --color-accent /
-   --color-success (motion can't interpolate var() strings). */
-const STRIKE_FLARE = "#E4C589";
-const STRIKE_SAGE = "#A9C48F";
+/* Match Strike (§6.8): the copy glyph swaps to a check that flares gold and
+   cools to laurel. Colors are the compiled values of --color-accent /
+   --color-laurel (motion can't interpolate var() strings). */
+const STRIKE_FLARE = "#FFD37E";
+const STRIKE_COOL = "#7DE8B4";
 
 function CopySwap({ active, reduced }: { active: boolean; reduced: boolean }) {
   return (
@@ -80,11 +82,11 @@ function CopySwap({ active, reduced }: { active: boolean; reduced: boolean }) {
         <motion.span
           key="struck"
           className="inline-flex items-center gap-1"
-          initial={reduced ? { opacity: 0, color: STRIKE_SAGE } : { opacity: 0, scale: 0.7, color: STRIKE_FLARE }}
+          initial={reduced ? { opacity: 0, color: STRIKE_COOL } : { opacity: 0, scale: 0.7, color: STRIKE_FLARE }}
           animate={
             reduced
-              ? { opacity: 1, color: STRIKE_SAGE, transition: { duration: 0.12 } }
-              : { opacity: 1, scale: 1, color: STRIKE_SAGE, transition: { duration: 0.4, ease: EASE_INK } }
+              ? { opacity: 1, color: STRIKE_COOL, transition: { duration: 0.12 } }
+              : { opacity: 1, scale: 1, color: STRIKE_COOL, transition: { duration: 0.4, ease: EASE_INK } }
           }
           exit={{ opacity: 0, transition: { duration: 0.1, ease: EASE_INK } }}
         >
@@ -179,16 +181,16 @@ export function PromptsLab({
   }
 
   const cardVariants = rm(reduced, suggestionCardVariants);
-  const groupLabel = "mb-1.5 block text-folio uppercase text-ink-muted";
+  const groupLabel = "mb-1.5 block text-folio text-ink-muted";
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-[calc(3rem_+_env(safe-area-inset-bottom))] pt-10 sm:px-6">
-        {/* ── Scene masthead — kicker over Fraunces title (§8) ── */}
+        {/* ── Scene masthead — glow-dot kicker over the scene title (§8) ── */}
         <header>
           <SectionLabel>Profile prompts</SectionLabel>
-          <h1 className="font-display mt-3 text-scene text-ink">The Prompt Desk</h1>
-          <p className="font-display mt-1.5 text-marginalia italic text-ink-muted">
+          <h1 className="mt-3 text-scene text-ink">Prompts</h1>
+          <p className="mt-1.5 text-body text-ink-muted">
             Answers in your voice, easy to match on.
           </p>
         </header>
@@ -224,7 +226,7 @@ export function PromptsLab({
               <Input
                 value={custom}
                 onChange={(e) => setCustom(e.target.value)}
-                placeholder="write the prompt question…"
+                placeholder="Type your prompt question…"
                 className="mt-2"
               />
             )}
@@ -254,8 +256,7 @@ export function PromptsLab({
 
           <div>
             <label htmlFor="prompt-mood" className={groupLabel}>
-              Mood / vibe{" "}
-              <span className="font-display normal-case italic tracking-normal text-ink-muted">— optional</span>
+              Mood / vibe <span className="font-normal text-ink-muted">(optional)</span>
             </label>
             <Input
               id="prompt-mood"
@@ -277,10 +278,10 @@ export function PromptsLab({
             </div>
           </div>
 
-          {/* Generate — the one lit object on the desk (gilt glow + wick ring) */}
+          {/* Generate — this view's one glow (gilt halo + conic ring, Law 4) */}
           <div
             className={cx(
-              "rounded-sm",
+              "rounded-full",
               (canGenerate || loading) && "shadow-[var(--shadow-gilt)]",
               loading && "wick-ring",
             )}
@@ -308,7 +309,7 @@ export function PromptsLab({
               exit="exit"
               className="rounded-md border border-danger/30 bg-danger-soft p-4"
             >
-              <p className="font-display text-body italic text-danger">The press jammed mid-run.</p>
+              <p className="text-body font-medium text-danger">Something went wrong.</p>
               <p className="mt-1 text-body text-ink-secondary">{error}</p>
               <div className="mt-3">
                 <MotionButton
@@ -323,7 +324,7 @@ export function PromptsLab({
           )}
         </AnimatePresence>
 
-        {/* ── Proofs / skeleton galleys / empty ── */}
+        {/* ── Suggestions / skeleton cards / empty ── */}
         <AnimatePresence mode="wait" initial={false}>
           {loading && (
             <motion.div
@@ -334,11 +335,11 @@ export function PromptsLab({
               exit="exit"
               className="space-y-3"
             >
-              <p className="animate-thinking px-1">Setting type…</p>
+              <p className="animate-thinking px-1">Thinking…</p>
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className={cx(cardClass, "p-4")}>
                   <div className="flex items-center justify-between">
-                    <div className="skeleton h-5 w-20 rounded-xs" />
+                    <div className="skeleton h-5 w-20 rounded-full" />
                     <div className="skeleton h-4 w-10" />
                   </div>
                   <div className="skeleton mt-4 h-3.5 w-full" />
@@ -354,19 +355,19 @@ export function PromptsLab({
           {!loading && options && (
             <motion.section
               key="results"
-              variants={rm(reduced, proofsPanelVariants)}
+              variants={rm(reduced, resultsPanelVariants)}
               initial="initial"
               animate="enter"
               exit="exit"
-              className="gilt-rule drawing pt-5"
+              className="glass-panel gilt-rule rule-garnet drawing rounded-lg p-4 sm:p-5"
             >
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-folio uppercase text-ink-muted">The Proofs</h2>
-                <span className="font-display text-marginalia italic text-ink-muted [font-variant-numeric:oldstyle-nums]">
-                  {options.length} {options.length === 1 ? "answer" : "answers"}, set in your voice
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-folio text-ink-secondary">Suggestions</h2>
+                <span className="rounded-full bg-fill px-2 py-px text-marginalia tabular-nums text-ink-muted">
+                  {options.length}
                 </span>
               </div>
-              <div className="rule-double mt-2" aria-hidden="true" />
+              <div className="rule-double mt-3" aria-hidden="true" />
 
               <div className="mt-4 space-y-3">
                 {options.map((o, i) => {
@@ -386,12 +387,12 @@ export function PromptsLab({
                     >
                       <div className="flex items-start justify-between gap-3">
                         <span className={toneChipClass(o.angle)}>{o.angle}</span>
-                        <span className="font-display shrink-0 text-marginalia italic text-ink-faint [font-variant-numeric:oldstyle-nums]">
-                          № {i + 1}
+                        <span className="shrink-0 text-marginalia tabular-nums text-ink-faint">
+                          {i + 1}
                         </span>
                       </div>
 
-                      {/* Melt out → swap in on regenerate (§8 The Galleys) */}
+                      {/* Melt out → Float In on per-card regenerate (§8) */}
                       <AnimatePresence mode="wait" initial={false}>
                         <motion.p
                           key={o.text}
@@ -411,10 +412,7 @@ export function PromptsLab({
                               ? { opacity: 0, transition: { duration: 0.12 } }
                               : { opacity: 0, filter: "blur(2px)", transition: { duration: DUR.hair, ease: EASE_INK } }
                           }
-                          className={cx(
-                            "mt-3 whitespace-pre-wrap text-bubble text-ink",
-                            i === 0 && "drop-cap",
-                          )}
+                          className="mt-3 whitespace-pre-wrap text-bubble text-ink"
                         >
                           {o.text}
                         </motion.p>
@@ -452,10 +450,9 @@ export function PromptsLab({
               animate="enter"
               exit="exit"
             >
-              <EmptyState title="An answer worth opening on.">
-                Pick a prompt, set a mood, and generate. Every answer is grounded in your context
-                file and written to give a match an easy line back — nothing polished, nothing
-                try-hard, just you on a good day.
+              <EmptyState title="Answers that sound like you">
+                Pick a prompt, set a mood, and hit Generate. Every answer is grounded in your
+                context file and written to give a match an easy line back.
               </EmptyState>
             </motion.div>
           )}

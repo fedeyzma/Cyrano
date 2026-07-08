@@ -8,14 +8,14 @@ import type { Fact } from "@/lib/types";
 import { FACT_CATEGORIES, FACT_CATEGORY_LABELS, normalizeFactCategory } from "@/lib/types";
 import { IconPin, IconTrash } from "./icons";
 
-/** Index entries settle in from above; deletions Melt (opacity + 2px blur). */
+/** Fact rows settle in from above; deletions Melt (opacity + 2px blur). */
 export const FACT_ITEM_VARIANTS: Variants = {
   initial: { opacity: 0, y: -6 },
   enter: { opacity: 1, y: 0, transition: SPRING_SETTLE },
   exit: { opacity: 0, filter: "blur(2px)", transition: { duration: DUR.hair, ease: EASE_INK } },
 };
 
-/** Pin nib settles into place when toggled — the fact files itself. */
+/** Pin nib settles into place when toggled — the fact tucks itself away. */
 export const PIN_POP_VARIANTS: Variants = {
   initial: { rotate: -25, scale: 1.15 },
   enter: { rotate: 0, scale: 1, transition: SPRING_MICRO },
@@ -45,13 +45,14 @@ export function groupFacts(facts: Fact[], query?: string): FactGroup[] {
 }
 
 /**
- * A single fact row, set as an index entry (DESIGN.md §8 «The Profile
- * Spread»): fact text left, a dotted leader running to the margin, then —
- * pinned entries only — a letterpress category tag, and the pin/delete
- * marginalia actions (Marginalia fade on hover; delete always visible on
- * touch widths). Lives inside a `<motion.ul variants animate>` +
- * `<AnimatePresence mode="popLayout">` so it inherits the enter state and
- * animates its own exit/layout.
+ * A single fact row — a soft list item (DESIGN.md v2 §5/§8): transparent at
+ * rest with a rounded fill on hover, fact text left, then — pinned entries
+ * only, since the pinned group loses its category context — a pill category
+ * tag, and the round pin/delete icon actions (Capsule-style fade on hover;
+ * delete always visible on touch widths). Pinned rows wear the gold wash
+ * (pinned facts belong to the user's hand). Lives inside a
+ * `<motion.ul variants animate>` + `<AnimatePresence mode="popLayout">` so it
+ * inherits the enter state and animates its own exit/layout.
  */
 export function FactRow({
   fact,
@@ -74,40 +75,40 @@ export function FactRow({
       exit="exit"
       transition={{ layout: SPRING_SETTLE }}
       className={cx(
-        "group relative flex items-start gap-2 rounded-sm px-2 py-1.5 transition-colors duration-150 hover:bg-fill",
+        "group relative flex items-center gap-2 rounded-md px-2.5 py-2 transition-colors duration-150 hover:bg-fill",
         pinned && "bg-accent-faint",
       )}
     >
-      {/* New-fact flash — a wash of champagne that dries into the paper */}
+      {/* New-fact flash — a wash of gold light that settles into the glass */}
       {isNew && !reduced && (
         <motion.span
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-sm bg-accent-soft"
+          className="pointer-events-none absolute inset-0 rounded-md bg-accent-soft"
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 0.8, ease: EASE_INK }}
         />
       )}
 
-      <span className="min-w-0 text-body text-ink">{fact.content}</span>
-      <span className="dot-leader" aria-hidden />
+      <span className="min-w-0 flex-1 text-body text-ink">{fact.content}</span>
 
       {pinned && (
-        <span className="mb-1 hidden shrink-0 self-end whitespace-nowrap rounded-xs border border-line px-1 text-[10px] font-medium uppercase leading-4 tracking-[0.08em] text-ink-muted sm:inline-block">
+        <span className="hidden shrink-0 items-center whitespace-nowrap rounded-full bg-fill px-2 py-px text-folio text-ink-muted sm:inline-flex">
           {FACT_CATEGORY_LABELS[normalizeFactCategory(fact.category)]}
         </span>
       )}
 
-      <span className="flex shrink-0 items-center gap-0.5 self-end">
+      <span className="flex shrink-0 items-center gap-0.5">
         <MotionButton
           onClick={() => onTogglePin(fact.id, !fact.pinned)}
           aria-label={pinned ? "Unpin fact" : "Pin fact"}
           data-tip={pinned ? "Unpin" : "Pin to keep on top"}
+          whileTap={reduced ? undefined : { scale: 0.92 }}
           className={cx(
-            "hit grid h-6 w-6 shrink-0 place-items-center rounded-xs transition-[color,background-color,opacity] duration-150",
+            "hit grid h-7 w-7 shrink-0 place-items-center rounded-full transition-[color,background-color,opacity] duration-150",
             pinned
               ? "text-accent hover:bg-fill-active"
-              : "text-ink-muted opacity-0 hover:bg-fill-active hover:text-ink-secondary group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 max-md:opacity-100",
+              : "text-ink-muted opacity-0 hover:bg-fill hover:text-ink-secondary group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 max-md:opacity-100",
             focusRing,
           )}
         >
@@ -125,8 +126,9 @@ export function FactRow({
           onClick={() => onDeleteFact(fact.id)}
           aria-label="Delete fact"
           data-tip="Delete"
+          whileTap={reduced ? undefined : { scale: 0.92 }}
           className={cx(
-            "hit grid h-6 w-6 shrink-0 place-items-center rounded-xs text-ink-muted opacity-0 transition-[color,background-color,opacity] duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 max-md:opacity-100",
+            "hit grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-muted opacity-0 transition-[color,background-color,opacity] duration-150 hover:bg-danger-soft hover:text-danger group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 max-md:opacity-100",
             focusRing,
           )}
         >

@@ -10,7 +10,7 @@ import {
   rm,
   useAppReducedMotion,
 } from "@/components/motion";
-import { IconButton, SealDisc, Tag, focusRing } from "@/components/ui";
+import { IconButton, SealDisc, Tag, buttonClass, focusRing } from "@/components/ui";
 import { cx } from "@/lib/cx";
 import { relativeTime } from "@/lib/time";
 import type { ConversationListItem } from "@/lib/types";
@@ -30,10 +30,11 @@ const VIEW_TABS: Array<{ key: "replies" | "prompts" | "scan"; label: string }> =
   { key: "scan", label: "Scan" },
 ];
 
-/** Sidebar — "Table of Contents" (DESIGN.md §8). Masthead plate with the
- *  seal monogram + WONK wordmark; text-only folio tabs with a sliding gilt
- *  underline; TOC rows with dot leaders and the Ribbon Mark on the active
- *  entry; marginalia footer. */
+/** Sidebar — «Liquid Aurora» (DESIGN.md v2 §8). Thin-glass masthead with the
+ *  gem-disc monogram and gradient wordmark; an iOS segmented control with a
+ *  sliding glass thumb; a frosted pill search field and pill sort chips; an
+ *  inset-grouped conversation list with the gold Ribbon Mark on the active
+ *  row; a quiet vibrancy footer. */
 export function Sidebar({
   conversations,
   selectedId,
@@ -95,20 +96,25 @@ export function Sidebar({
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
-      {/* ── Masthead ─────────────────────────────────────── */}
+      {/* ── Masthead — thin glass, gem monogram, gradient wordmark ── */}
       <header className="plate flex h-16 shrink-0 items-center justify-between gap-3 border-b border-line pl-4 pr-3">
         <div className="flex min-w-0 items-center gap-3">
           <SealDisc initial="C" size={24} />
           <div className="min-w-0 leading-none">
             <div
-              className="font-display font-wonk truncate text-[22px] italic leading-[1.1] tracking-[-0.01em] text-ink"
-              style={{ fontWeight: 480 }}
+              className="truncate text-[20px] font-bold leading-6 tracking-[-0.03em]"
+              style={{
+                backgroundImage:
+                  "linear-gradient(120deg, var(--color-accent), var(--color-ink) 85%)",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                color: "transparent",
+              }}
             >
               Cyrano
             </div>
-            <div className="mt-0.5 truncate text-folio uppercase text-ink-muted">
-              Éditions · Reply Copilot
-            </div>
+            <div className="vibrancy mt-0.5 truncate text-folio">Reply copilot</div>
           </div>
         </div>
         <MotionButton
@@ -117,7 +123,7 @@ export function Sidebar({
           data-tip="New conversation"
           whileHover={reduced ? undefined : "hover"}
           className={cx(
-            "hit grid h-9 w-9 shrink-0 place-items-center rounded-sm border border-line-strong text-ink-secondary transition-colors duration-150 hover:border-line-gilt hover:bg-fill hover:text-accent active:bg-fill-active",
+            "hit grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line-strong text-ink-secondary transition-colors duration-150 hover:border-line-gilt hover:bg-fill hover:text-accent active:bg-fill-active",
             focusRing,
           )}
         >
@@ -132,53 +138,55 @@ export function Sidebar({
         </MotionButton>
       </header>
 
-      {/* ── View tabs — folio caps, sliding gilt underline ── */}
-      <div className="flex shrink-0 items-stretch border-b border-line px-2">
-        {VIEW_TABS.map(({ key, label }) => (
-          <MotionButton
-            key={key}
-            onClick={() => onView(key)}
-            aria-pressed={view === key}
-            className={cx(
-              "hit-sm relative flex-1 px-2 py-2.5 text-center text-folio uppercase transition-colors duration-150",
-              view === key ? "text-accent" : "text-ink-muted hover:text-ink-secondary",
-              focusRing,
-            )}
-          >
-            {label}
-            {view === key && (
-              <motion.span
-                layoutId={`${idPrefix}-view-tab`}
-                aria-hidden
-                transition={inkTransition}
-                className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-accent"
-              />
-            )}
-          </MotionButton>
-        ))}
+      {/* ── View switch — iOS segmented control, sliding glass thumb ── */}
+      <div className="shrink-0 px-3 pb-2 pt-3">
+        <div className="flex items-stretch rounded-full border border-line bg-[rgb(255_255_255_/_0.06)] p-1">
+          {VIEW_TABS.map(({ key, label }) => (
+            <MotionButton
+              key={key}
+              onClick={() => onView(key)}
+              aria-pressed={view === key}
+              className={cx(
+                "hit-sm relative min-w-0 flex-1 rounded-full px-2 py-1.5 text-center text-label font-semibold transition-colors duration-150",
+                view === key ? "text-ink" : "vibrancy hover:text-ink-secondary",
+                focusRing,
+              )}
+            >
+              {view === key && (
+                <motion.span
+                  layoutId={`${idPrefix}-view-tab`}
+                  aria-hidden
+                  transition={inkTransition}
+                  className="absolute inset-0 rounded-full bg-[rgb(255_255_255_/_0.12)] shadow-[var(--shadow-plate),var(--shadow-xs)]"
+                />
+              )}
+              <span className="relative">{label}</span>
+            </MotionButton>
+          ))}
+        </div>
       </div>
 
-      {/* ── Search + sort ────────────────────────────────── */}
+      {/* ── Search + sort — frosted pill field, pill chips ── */}
       {conversations.length > 0 && (
-        <div className="shrink-0 space-y-2 border-b border-line px-3 py-3">
+        <div className="shrink-0 space-y-2 px-3 pb-3">
           <div className="relative">
             <IconSearch
               size={14}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
             />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search people…"
               aria-label="Search people"
-              className="w-full rounded-sm border border-line-strong bg-surface py-2 pl-8 pr-8 text-body text-ink placeholder:text-ink-muted outline-none transition-colors duration-150 focus:border-line-gilt focus:ring-[3px] focus:ring-accent/12"
+              className="w-full rounded-full border border-line-strong bg-[rgb(255_255_255_/_0.05)] py-2 pl-9 pr-9 text-body text-ink placeholder:text-ink-muted outline-none transition-colors duration-150 focus:border-line-gilt focus:ring-[3px] focus:ring-accent/15"
             />
             {query && (
               <MotionButton
                 onClick={() => setQuery("")}
                 aria-label="Clear search"
                 className={cx(
-                  "hit absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xs p-1 text-ink-muted transition-colors duration-150 hover:text-ink",
+                  "hit absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-ink-muted transition-colors duration-150 hover:bg-fill hover:text-ink",
                   focusRing,
                 )}
               >
@@ -193,10 +201,10 @@ export function Sidebar({
                 onClick={() => setSort(o.key)}
                 aria-pressed={sort === o.key}
                 className={cx(
-                  "hit-sm inline-flex select-none items-center rounded-xs border px-2 py-1 max-md:py-2 text-folio uppercase transition-colors duration-150",
+                  "hit-sm inline-flex select-none items-center rounded-full border px-2.5 py-1 max-md:py-1.5 text-label transition-colors duration-150",
                   sort === o.key
                     ? "border-line-gilt bg-accent-soft text-accent"
-                    : "border-line-strong text-ink-muted hover:bg-fill hover:text-ink-secondary",
+                    : "border-transparent bg-fill text-ink-secondary hover:bg-fill-hover hover:text-ink",
                   focusRing,
                 )}
               >
@@ -207,9 +215,9 @@ export function Sidebar({
         </div>
       )}
 
-      {/* ── The index ────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="kicker mx-1.5 mb-2 mt-1.5 text-folio uppercase text-ink-muted">
+      {/* ── Conversations — inset-grouped list ── */}
+      <div className="flex-1 overflow-y-auto border-t border-line p-2">
+        <div className="kicker mx-1.5 mb-2 mt-1.5 text-folio text-ink-muted">
           Conversations
         </div>
         {loading ? (
@@ -224,26 +232,21 @@ export function Sidebar({
           </div>
         ) : conversations.length === 0 ? (
           <div className="px-3 py-12 text-center">
-            <p className="font-display text-[15px] italic leading-snug text-ink-secondary">
-              The table of contents is empty.
-            </p>
+            <p className="text-title text-ink">No conversations yet</p>
             <p className="mt-1.5 text-label text-ink-muted">
-              No conversations yet — every good correspondence starts with a name.
+              Add someone and start pasting their messages.
             </p>
             <MotionButton
               onClick={onNew}
-              className={cx(
-                "mt-5 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-sm border border-dashed border-line-strong px-3 py-2 text-label text-ink-secondary transition-colors duration-150 hover:border-line-gilt hover:bg-fill hover:text-accent active:bg-fill-active",
-                focusRing,
-              )}
+              className={buttonClass("ghost", "md", "mt-5 w-full")}
             >
-              + Start one
+              New conversation
             </MotionButton>
           </div>
         ) : visible.length === 0 ? (
           <div className="px-3 py-12 text-center">
-            <p className="font-display text-[15px] italic leading-snug text-ink-secondary">
-              Nothing under “{query.trim()}”.
+            <p className="text-body font-semibold text-ink-secondary">
+              No matches for “{query.trim()}”
             </p>
             <p className="mt-1.5 text-label text-ink-muted">
               Try another name, platform, or phrase.
@@ -251,7 +254,7 @@ export function Sidebar({
           </div>
         ) : (
           <motion.ul
-            className="space-y-0.5"
+            className="space-y-1"
             variants={containerVariants}
             initial={listEnteredRef.current ? false : "initial"}
             animate="enter"
@@ -264,28 +267,26 @@ export function Sidebar({
                     onClick={() => onSelect(c.id)}
                     aria-current={active ? "true" : undefined}
                     className={cx(
-                      "@container relative w-full rounded-md px-3 py-2.5 text-left transition-colors duration-150",
+                      "relative w-full rounded-md px-3.5 py-3 text-left transition-colors duration-150",
                       active
                         ? "bg-fill-active shadow-[var(--shadow-plate)]"
                         : "hover:bg-fill",
                       focusRing,
                     )}
                   >
-                    {/* Ribbon Mark — the champagne rule beside the open entry */}
+                    {/* Ribbon Mark — the gold bar beside the open conversation */}
                     {active && (
                       <motion.span
                         layoutId={`${idPrefix}-conv-ink`}
                         aria-hidden
                         transition={inkTransition}
-                        className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent"
-                        style={{ boxShadow: "0 0 8px rgb(228 197 137 / 0.5)" }}
+                        className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-accent"
+                        style={{ boxShadow: "0 0 10px rgb(255 211 126 / 0.5)" }}
                       />
                     )}
-                    {/* TOC line: name … dot leader … time */}
-                    <div className="flex min-w-0 items-baseline justify-between gap-1">
+                    <div className="flex min-w-0 items-baseline justify-between gap-2">
                       <span className="truncate text-body font-semibold text-ink">{c.name}</span>
-                      <span className="dot-leader hidden @min-[220px]:block" aria-hidden />
-                      <span className="font-display shrink-0 whitespace-nowrap text-marginalia italic text-ink-muted [font-variant-numeric:oldstyle-nums]">
+                      <span className="shrink-0 whitespace-nowrap text-marginalia text-ink-muted tabular-nums">
                         {relativeTime(c.last_message_at ?? c.updated_at)}
                       </span>
                     </div>
@@ -296,7 +297,7 @@ export function Sidebar({
                           {c.message_count} msg{c.message_count === 1 ? "" : "s"}
                         </Tag>
                       )}
-                      <span className={cx("truncate text-body", c.last_message ? "text-ink-muted" : "font-display italic text-ink-faint")}>
+                      <span className="truncate text-body text-ink-muted">
                         {c.last_message ?? "No messages yet"}
                       </span>
                     </div>
@@ -308,9 +309,9 @@ export function Sidebar({
         )}
       </div>
 
-      {/* ── Colophon ─────────────────────────────────────── */}
+      {/* ── Footer ───────────────────────────────────────── */}
       <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line pt-2 pl-4 pr-2 [padding-bottom:max(0.5rem,env(safe-area-inset-bottom))]">
-        <span className="font-display min-w-0 truncate text-marginalia italic text-ink-muted [font-variant-numeric:oldstyle-nums]">
+        <span className="vibrancy min-w-0 truncate text-marginalia tabular-nums">
           {query.trim() && visible.length !== conversations.length ? (
             <>
               {visible.length} of {conversations.length}{" "}

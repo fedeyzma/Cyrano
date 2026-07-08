@@ -45,6 +45,7 @@ import {
   IconEdit,
   IconImport,
   IconMenu,
+  IconQuill,
   IconQuote,
   IconRefresh,
   IconReply,
@@ -61,54 +62,50 @@ import {
   Spinner,
   Tag,
   Textarea,
+  cardClass,
   focusRing,
 } from "./ui";
 
-/* ── Tone chip inks (DESIGN.md §2 — exact, warm-rebalanced) ── */
+/* ── Tone chip inks (DESIGN.md §2/§5 — tinted glass pills) ── */
 
 const TONE_STYLES: Record<string, string> = {
-  dry: "bg-tone-dry/10 text-tone-dry ring-tone-dry/25",
-  playful: "bg-tone-playful/10 text-tone-playful ring-tone-playful/25",
-  curious: "bg-tone-curious/10 text-tone-curious ring-tone-curious/25",
-  flirty: "bg-tone-flirty/10 text-tone-flirty ring-tone-flirty/25",
-  sincere: "bg-tone-sincere/10 text-tone-sincere ring-tone-sincere/25",
-  bold: "bg-tone-bold/10 text-tone-bold ring-tone-bold/25",
+  dry: "bg-tone-dry/12 text-tone-dry ring-tone-dry/30",
+  playful: "bg-tone-playful/12 text-tone-playful ring-tone-playful/30",
+  curious: "bg-tone-curious/12 text-tone-curious ring-tone-curious/30",
+  flirty: "bg-tone-flirty/12 text-tone-flirty ring-tone-flirty/30",
+  sincere: "bg-tone-sincere/12 text-tone-sincere ring-tone-sincere/30",
+  bold: "bg-tone-bold/12 text-tone-bold ring-tone-bold/30",
 };
 
 function toneStyle(tone: string): string {
   return TONE_STYLES[tone.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong";
 }
 
-/** Letterpress tone tag — folio small caps in a tinted frame. */
-const TONE_CHIP =
-  "inline-flex items-center rounded-xs px-1.5 py-0.5 text-folio uppercase tracking-[0.1em] ring-1";
+/** Tone pill — sentence case on a soft tinted wash (§5). */
+const TONE_CHIP = "inline-flex items-center rounded-full px-2 py-0.5 text-folio ring-1";
 
 /** Actions offered by the mobile message action sheet. */
 type SheetAction = "quote" | "target" | "flip" | "up" | "down" | "edit" | "delete";
 
 /* ── Shared class recipes (tokens only) ─────────────────── */
 
-/** Flat inline card (§4): hairline + surface + top-light, no drop shadow. */
-const CARD =
-  "rounded-md border border-line bg-surface shadow-[var(--shadow-plate)] [background-image:linear-gradient(rgb(242_236_222_/_0.02),transparent)]";
-
-/** Generate — the one lit object on the writing desk (§8): letterpress fill
- *  plus the gilt lamp glow; Kiss Impression on :active (translate + shadow
- *  inversion, never scale). Kept inline because .letterpress would override
- *  the composed press+gilt shadow. */
+/** Generate — the one glowing thing (§7E): gold gradient pill wearing the
+ *  gilt halo. Press is the Squish (MotionButton) plus a dimmed fill; never
+ *  a translate. Kept inline because the composed gilt+plate shadow must
+ *  survive every state. */
 const GENERATE_BTN = cx(
-  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm bg-accent-strong px-3.5 py-1.5 text-label font-medium tabular-nums text-on-accent transition-[background-color,box-shadow,transform] duration-150 max-md:py-3",
-  "shadow-[var(--shadow-press),var(--shadow-gilt)] hover:bg-accent",
-  "active:translate-y-[0.5px] active:bg-[color-mix(in_oklch,var(--color-accent-strong)_82%,var(--color-accent-deep))]",
-  "active:shadow-[inset_0_-1.5px_0_rgb(255_255_255/0.25),inset_0_1px_0_rgb(0_0_0/0.3),var(--shadow-gilt)]",
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-label font-semibold tabular-nums text-on-accent transition-[background,box-shadow,filter] duration-150 max-md:py-3",
+  "bg-[linear-gradient(180deg,var(--color-accent),var(--color-accent-strong))]",
+  "shadow-[var(--shadow-plate),var(--shadow-gilt)]",
+  "hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-accent)_90%,white),color-mix(in_srgb,var(--color-accent-strong)_90%,white))]",
+  "active:bg-[linear-gradient(180deg,var(--color-accent-strong),var(--color-accent-strong))]",
   "disabled:pointer-events-none",
   focusRing,
 );
 
-/** "Mark sent" — the commitment completing: sage success treatment on a
- *  ghost skeleton (custom because the stock ghost warms to champagne). */
+/** "Mark sent" — the commitment completing: laurel ghost pill (§7B). */
 const SEND_BTN = cx(
-  "inline-flex min-h-7 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border border-line-laurel px-2.5 py-1 text-label font-medium text-laurel transition-colors duration-150",
+  "inline-flex min-h-7 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-line-laurel px-3 py-1 text-label font-medium text-laurel transition-colors duration-150",
   "hover:border-laurel-strong hover:bg-laurel-soft active:bg-laurel-soft",
   "disabled:pointer-events-none disabled:opacity-50",
   focusRing,
@@ -116,9 +113,9 @@ const SEND_BTN = cx(
 
 /* ── Local variants (composed from the canonical springs) ── */
 
-/** The Galleys panel rises y 12→0 on SPRING_SHEET (§7A). */
+/** The suggestions panel rises y 16→0 on SPRING_SHEET (§7A). */
 const panelVariants: Variants = {
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 0, y: 16 },
   enter: { opacity: 1, y: 0, transition: SPRING_SHEET },
   exit: { opacity: 0, y: 8, transition: { duration: 0.15, ease: EASE_INK } },
 };
@@ -126,11 +123,11 @@ const panelVariants: Variants = {
 /** Melt — a card leaving during a per-card regenerate (§6.7). */
 const cardMeltExit: TargetAndTransition = {
   opacity: 0,
-  filter: "blur(2px)",
-  transition: { duration: DUR.hair, ease: EASE_INK },
+  filter: "blur(4px)",
+  transition: { duration: 0.14, ease: EASE_INK },
 };
 
-/** The deal (first arrival of a set) — §7A(3), custom={i}. */
+/** The Float In (first arrival of a set) — §7A(3), custom={i}. */
 const dealCardVariants: Variants = { ...suggestionCardVariants, exit: cardMeltExit };
 
 /** Swapped-in card after a per-card regenerate: y 4→0, 180ms. */
@@ -154,7 +151,7 @@ const chipVariants: Variants = {
   exit: { opacity: 0, scale: 0.9, transition: { duration: 0.14, ease: EASE_INK } },
 };
 
-/** Context note: an editor's aside settling straight down — not a speaker. */
+/** Context note: a floating chip settling straight down — not a speaker. */
 const contextNoteVariants: Variants = {
   initial: { opacity: 0, y: -4 },
   enter: { opacity: 1, y: 0, transition: SPRING_SETTLE },
@@ -172,7 +169,7 @@ function withEnterDelay(variants: Variants, delay: number): Variants {
   };
 }
 
-/* ── Match Strike (§6.8) — check flares champagne, cools to sage ── */
+/* ── Match Strike (§6.8) — check flares gold, cools to laurel ── */
 
 function StrikeCheck({ reduced, size = 13 }: { reduced: boolean; size?: number }) {
   if (reduced) {
@@ -194,7 +191,7 @@ function StrikeCheck({ reduced, size = 13 }: { reduced: boolean; size?: number }
   );
 }
 
-/* ── Compositor's Rail button (§7C) ─────────────────────── */
+/* ── Capsule toolbar button (§7C) ───────────────────────── */
 
 function RailButton({
   label,
@@ -349,7 +346,7 @@ export function ConversationView({
   const reduced = useAppReducedMotion();
   const isCoarse = useIsCoarsePointer();
 
-  /* Mount-cascade bookkeeping (§6.4 Ink Rise): on conversation mount the
+  /* Mount-cascade bookkeeping (§6.4 Float In): on conversation mount the
      last 8 messages cascade in at 35ms stagger; everything older renders
      instantly; messages appended after mount animate individually. `seen`
      ids never re-animate, so a long thread does not re-stagger on
@@ -372,16 +369,16 @@ export function ConversationView({
     for (const m of messages) seen.add(m.id);
   }, [messages, seen]);
 
-  /* §7A — distinguishes the full deal-out (fresh set) from a per-card swap. */
+  /* §7A — distinguishes the full float-in (fresh set) from a per-card swap. */
   const dealtRef = useRef(false);
   useEffect(() => {
     if (suggesting) dealtRef.current = false;
     else if (suggestions) dealtRef.current = true;
   }, [suggesting, suggestions]);
 
-  /* §7A(4) — the Reading Lamp turns up when Cyrano speaks: pulse the
-     `.speaking` hook on the app backdrop for ~1.6s when results arrive.
-     Opacity-only, so it is kept under reduced motion (DESIGN.md §6). */
+  /* §7A(4) — the aurora surges while Cyrano speaks: pulse the `.speaking`
+     hook on the app backdrop for ~1.6s when results arrive. Opacity-only,
+     so it is kept under reduced motion (DESIGN.md §6). */
   useEffect(() => {
     if (suggesting || !suggestions) return;
     const el = document.querySelector(".app-backdrop");
@@ -503,7 +500,7 @@ export function ConversationView({
     setEditText("");
   }
 
-  /** Escape inside the Compositor's Rail hides it by returning focus to the page. */
+  /** Escape inside the capsule toolbar hides it by returning focus to the page. */
   function railKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Escape") {
       e.stopPropagation();
@@ -519,7 +516,7 @@ export function ConversationView({
 
   return (
     <div className="flex h-full flex-col">
-      {/* ── Header — the plate (§8 Conversation header) ────── */}
+      {/* ── Header — thin glass bar (§8 Conversation header) ── */}
       <motion.header
         variants={rmHeader}
         initial="initial"
@@ -531,7 +528,7 @@ export function ConversationView({
             onClick={onOpenMenu}
             aria-label="Open conversations"
             className={cx(
-              "hit mr-0.5 shrink-0 rounded-sm p-2 text-ink-secondary transition-colors duration-150 hover:bg-fill hover:text-ink md:hidden",
+              "hit mr-0.5 shrink-0 rounded-full p-2 text-ink-secondary transition-colors duration-150 hover:bg-fill hover:text-ink md:hidden",
               focusRing,
             )}
           >
@@ -543,13 +540,13 @@ export function ConversationView({
           onClick={onOpenProfile}
           title="Edit profile"
           className={cx(
-            "group/profile flex min-w-0 items-center gap-3 rounded-sm px-1.5 py-1 text-left transition-colors duration-150 hover:bg-fill",
+            "group/profile flex min-w-0 items-center gap-3 rounded-md px-1.5 py-1 text-left transition-colors duration-150 hover:bg-fill",
             focusRing,
           )}
         >
           <span className="relative grid h-9 w-9 shrink-0 place-items-center">
             <SealDisc initial={conversation.name || "?"} size={36} />
-            {/* §8 — the avatar's gilt ring Rule Draws once per conversation switch */}
+            {/* §8 — the gem disc's gold ring plays Light Streak on switch */}
             <motion.svg
               key={conversation.id}
               aria-hidden="true"
@@ -561,7 +558,7 @@ export function ConversationView({
                 cy="18"
                 r="17.25"
                 fill="none"
-                stroke="rgb(228 197 137 / 0.5)"
+                stroke="rgb(255 211 126 / 0.5)"
                 strokeWidth="1.25"
                 strokeLinecap="round"
                 initial={reduced ? false : { pathLength: 0 }}
@@ -572,16 +569,16 @@ export function ConversationView({
           </span>
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-1.5">
-              {/* Her name in ink — Fraunces persona italic, pen-stroke reveal */}
+              {/* Her name — big tight sans with the clip reveal */}
               <span
                 key={conversation.id}
-                className="animate-ink min-w-0 truncate font-display text-persona italic text-ink"
+                className="animate-ink min-w-0 truncate text-persona text-ink"
               >
                 {conversation.name}
               </span>
               <IconEdit
                 size={12}
-                className="shrink-0 text-ink-faint opacity-0 transition-opacity duration-150 group-hover/profile:opacity-100 group-focus-visible/profile:opacity-100"
+                className="shrink-0 text-ink-muted opacity-0 transition-opacity duration-150 group-hover/profile:opacity-100 group-focus-visible/profile:opacity-100"
               />
             </div>
             {conversation.platform && (
@@ -612,21 +609,21 @@ export function ConversationView({
         </div>
       </motion.header>
 
-      {/* ── Thread — "The Correspondence" (§8) ─────────────── */}
+      {/* ── Thread (§8 Thread & bubbles) ───────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 pb-6 pt-10 sm:px-6">
         <div className="mx-auto max-w-[44rem] space-y-3">
           {messages.length === 0 && (
             <motion.div variants={rm(reduced, fadeUp(6))} initial="initial" animate="enter">
               <EmptyState
-                title="A blank page."
+                title="No messages yet"
                 action={
                   <Button variant="ghost" onClick={onOpenImport}>
                     <IconImport size={14} /> Import an existing thread
                   </Button>
                 }
               >
-                Paste what {conversation.name} said in the box below and press Generate — Cyrano
-                will set a few replies in type for you to choose from.
+                Paste what {conversation.name} said in the box below and hit Generate — Cyrano
+                will draft a few replies for you to pick from.
               </EmptyState>
             </motion.div>
           )}
@@ -637,8 +634,8 @@ export function ConversationView({
               const isEditing = editingId === m.id;
               const isNew = !seen.has(m.id);
 
-              // Context notes are editor's asides, not a speaker: centered
-              // Fraunces italic under an asterism, no bubble, no hairlines.
+              // Context notes are asides, not a speaker: a centered floating
+              // chip with a small quill — no bubble, no side.
               if (m.role === "context") {
                 return (
                   <motion.div
@@ -648,7 +645,7 @@ export function ConversationView({
                     initial={isNew ? "initial" : false}
                     animate="enter"
                     exit="exit"
-                    className="group flex flex-col items-center py-1"
+                    className="group flex items-center justify-center gap-1.5 py-1"
                   >
                     {isEditing ? (
                       <MessageEditor
@@ -660,41 +657,39 @@ export function ConversationView({
                       />
                     ) : (
                       <>
-                        <span aria-hidden="true" className="select-none text-sm leading-none text-ink-faint">
-                          ⁂
-                        </span>
-                        <div className="mt-1.5 flex max-w-[85%] items-start justify-center gap-1.5">
-                          <div
-                            title={clockTime(m.created_at)}
-                            onClick={isCoarse ? () => setSheetId(m.id) : undefined}
-                            className="whitespace-pre-wrap break-words text-center font-display text-[13px] italic leading-5 text-ink-secondary"
-                          >
+                        <div
+                          title={clockTime(m.created_at)}
+                          onClick={isCoarse ? () => setSheetId(m.id) : undefined}
+                          className="flex max-w-[85%] items-start gap-2 rounded-full border border-line bg-fill px-3.5 py-1.5 text-label text-ink-secondary shadow-[var(--shadow-plate)]"
+                        >
+                          <IconQuill size={13} className="mt-px shrink-0 text-ink-muted" />
+                          <span className="min-w-0 whitespace-pre-wrap break-words">
                             {m.content}
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1 pt-0.5 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
-                            <MotionButton
-                              onClick={() => startEdit(m.id, m.content)}
-                              aria-label="Edit context"
-                              title="Edit context"
-                              className={cx(
-                                "hit-sm rounded-xs text-ink-faint transition-colors duration-150 hover:text-ink",
-                                focusRing,
-                              )}
-                            >
-                              <IconEdit size={13} />
-                            </MotionButton>
-                            <MotionButton
-                              onClick={() => onDeleteMessage(m.id)}
-                              aria-label="Delete context"
-                              title="Delete context"
-                              className={cx(
-                                "hit-sm rounded-xs text-ink-faint transition-colors duration-150 hover:text-danger",
-                                focusRing,
-                              )}
-                            >
-                              <IconTrash size={13} />
-                            </MotionButton>
-                          </div>
+                          </span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
+                          <MotionButton
+                            onClick={() => startEdit(m.id, m.content)}
+                            aria-label="Edit context"
+                            title="Edit context"
+                            className={cx(
+                              "hit-sm rounded-full text-ink-muted transition-colors duration-150 hover:text-ink",
+                              focusRing,
+                            )}
+                          >
+                            <IconEdit size={13} />
+                          </MotionButton>
+                          <MotionButton
+                            onClick={() => onDeleteMessage(m.id)}
+                            aria-label="Delete context"
+                            title="Delete context"
+                            className={cx(
+                              "hit-sm rounded-full text-ink-muted transition-colors duration-150 hover:text-danger",
+                              focusRing,
+                            )}
+                          >
+                            <IconTrash size={13} />
+                          </MotionButton>
                         </div>
                       </>
                     )}
@@ -743,16 +738,17 @@ export function ConversationView({
                         isMe ? "items-end" : "items-start",
                       )}
                     >
-                      {/* ¶ marginalia tag — targeted for reply (§8) */}
+                      {/* Laurel tag — targeted for reply (§8) */}
                       {isTarget && (
-                        <span className="mb-1 px-1 font-display text-marginalia italic text-laurel">
-                          ¶ replying to this
+                        <span className="mb-1 inline-flex items-center rounded-full bg-laurel-soft px-2 py-0.5 text-folio text-laurel">
+                          Replying to this
                         </span>
                       )}
 
-                      {/* Compositor's Rail (§7C) — fine pointer only; the
+                      {/* Capsule toolbar (§7C) — fine pointer only; a frosted
                           floating pill fades in above the bubble's margin
-                          side, nothing reflows. */}
+                          side, nothing reflows. Blur is applied only while
+                          revealed so the §9 budget holds across the thread. */}
                       {!isCoarse && (
                         <div
                           className={cx(
@@ -764,7 +760,13 @@ export function ConversationView({
                           )}
                           onKeyDown={railKeyDown}
                         >
-                          <div className="flex items-center gap-0.5 whitespace-nowrap rounded-full border border-line-strong bg-surface-high px-1 py-0.5 shadow-[var(--shadow-md),var(--shadow-plate)]">
+                          <div
+                            className={cx(
+                              "flex items-center gap-0.5 whitespace-nowrap rounded-full border border-line-strong bg-glass px-1.5 py-1 shadow-[var(--shadow-md),var(--shadow-plate)]",
+                              "group-hover:backdrop-blur-[24px] group-hover:backdrop-saturate-150",
+                              "group-focus-within:backdrop-blur-[24px] group-focus-within:backdrop-saturate-150",
+                            )}
+                          >
                             <RailButton
                               label={isQuoteSource ? "Stop quoting this" : "Quote in next message"}
                               active={isQuoteSource}
@@ -810,20 +812,19 @@ export function ConversationView({
                         </div>
                       )}
 
-                      {/* The bubble — gilt-edged for me, hairlined for them */}
+                      {/* The bubble — gold-tinted glass for me, neutral glass
+                          for them; the small corner tucks toward the sender. */}
                       <div
                         id={`msg-${m.id}`}
                         title={clockTime(m.created_at)}
                         onClick={isCoarse ? () => setSheetId(m.id) : undefined}
                         className={cx(
-                          "rounded-lg border px-3.5 py-2 text-bubble text-ink",
+                          "rounded-[20px] px-4 py-2.5 text-bubble text-ink",
                           isMe
-                            ? "rounded-br-[4px] border-line-gilt bg-accent-soft"
+                            ? "rounded-br-[6px] border border-line-gilt bg-accent-soft shadow-[var(--shadow-plate)]"
                             : cx(
-                                "rounded-bl-[4px]",
-                                isTarget
-                                  ? "border-line-laurel bg-laurel-faint"
-                                  : "border-line bg-surface",
+                                "glass-card rounded-bl-[6px]",
+                                isTarget && "border-line-laurel bg-laurel-faint",
                               ),
                           isQuoteSource && "ring-1 ring-accent/45",
                         )}
@@ -839,11 +840,15 @@ export function ConversationView({
                             }}
                             title="Jump to the quoted message"
                             className={cx(
-                              "mb-1.5 flex w-full items-center gap-1.5 rounded-xs border-l-2 border-accent/70 py-0.5 pl-2 pr-1 text-left transition-colors duration-150 hover:bg-fill",
+                              "mb-1.5 flex w-full items-center gap-2 rounded-[10px] bg-fill px-2 py-1 text-left transition-colors duration-150 hover:bg-fill-hover",
                               focusRing,
                             )}
                           >
-                            <span className="min-w-0 truncate font-display text-marginalia italic text-ink-muted">
+                            <span
+                              aria-hidden="true"
+                              className="w-0.5 shrink-0 self-stretch rounded-full bg-accent/70"
+                            />
+                            <span className="min-w-0 truncate text-marginalia text-ink-muted">
                               <span className="text-accent">
                                 {quoted.role === "me" ? "You" : conversation.name}:
                               </span>{" "}
@@ -854,13 +859,13 @@ export function ConversationView({
                         <span className="whitespace-pre-wrap break-words">{m.content}</span>
                       </div>
 
-                      {/* Timestamps — Fraunces marginalia. ≥md they live in
-                          the margin beside the bubble (Marginalia hover);
-                          on touch they sit quietly beneath. */}
+                      {/* Timestamps — quiet meta. ≥md they live in the margin
+                          beside the bubble (Capsule Reveal); on touch they
+                          sit quietly beneath. */}
                       {!isCoarse && (
                         <span
                           className={cx(
-                            "pointer-events-none absolute top-1/2 hidden -translate-y-1/2 whitespace-nowrap font-display text-marginalia italic text-ink-muted opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 md:block",
+                            "pointer-events-none absolute top-1/2 hidden -translate-y-1/2 whitespace-nowrap text-marginalia tabular-nums text-ink-muted opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 md:block",
                             isMe ? "right-full mr-2.5" : "left-full ml-2.5",
                           )}
                         >
@@ -868,7 +873,7 @@ export function ConversationView({
                         </span>
                       )}
                       {isCoarse && (
-                        <span className="mt-1 px-1 font-display text-marginalia italic text-ink-muted">
+                        <span className="mt-1 px-1 text-marginalia tabular-nums text-ink-muted">
                           {clockTime(m.created_at)}
                         </span>
                       )}
@@ -879,7 +884,7 @@ export function ConversationView({
             })}
           </AnimatePresence>
 
-          {/* ── The Galleys — "Pulling the Proof" (§7A) ─────── */}
+          {/* ── Suggestions — floating glass panel (§7A) ────── */}
           <AnimatePresence>
             {(suggesting || suggestions || suggestError) && (
               <motion.div
@@ -889,15 +894,20 @@ export function ConversationView({
                 animate="enter"
                 exit="exit"
                 className={cx(
-                  "gilt-rule rule-garnet !mt-8 pt-4",
+                  "glass-panel gilt-rule rule-garnet !mt-8 rounded-lg p-4",
                   !suggesting && suggestions && "drawing",
                 )}
               >
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <div className="flex items-center gap-2">
                     <IconSparkles size={14} className="text-garnet" />
-                    <span className="text-folio uppercase text-ink-secondary">The proofs</span>
-                    {suggesting && <span className="animate-thinking">Setting type…</span>}
+                    <span className="text-folio text-ink-secondary">Suggestions</span>
+                    {!suggesting && suggestions && (
+                      <span className="inline-flex items-center rounded-full bg-fill px-2 py-px text-folio tabular-nums text-ink-secondary">
+                        {suggestions.length}
+                      </span>
+                    )}
+                    {suggesting && <span className="animate-thinking">Thinking…</span>}
                   </div>
                   {!suggesting && (suggestions || suggestError) && (
                     <div className="flex items-center gap-1">
@@ -920,7 +930,7 @@ export function ConversationView({
                 <div className="mt-3">
                   <AnimatePresence mode="popLayout" initial={false}>
                     {suggesting && (
-                      /* Skeleton galleys — layout reserved so arrival is a
+                      /* Skeleton cards — layout reserved so arrival is a
                          cross-fade, not a reflow jump. They Melt out. */
                       <motion.div
                         key="skeletons"
@@ -931,17 +941,17 @@ export function ConversationView({
                             ? { opacity: 0, transition: { duration: DUR.hair, ease: EASE_INK } }
                             : {
                                 opacity: 0,
-                                filter: "blur(2px)",
-                                transition: { duration: DUR.hair, ease: EASE_INK },
+                                filter: "blur(4px)",
+                                transition: { duration: 0.14, ease: EASE_INK },
                               }
                         }
                         transition={{ duration: DUR.hair, ease: EASE_INK }}
                         className="space-y-2"
                       >
                         {Array.from({ length: 3 }).map((_, i) => (
-                          <div key={i} className={cx(CARD, "p-4")}>
+                          <div key={i} className={cx(cardClass, "p-4")}>
                             <div className="flex items-center justify-between">
-                              <div className="skeleton h-4 w-16 rounded-xs" />
+                              <div className="skeleton h-4 w-16 rounded-full" />
                               <div className="skeleton h-3 w-8" />
                             </div>
                             <div className="skeleton mt-3.5 h-3.5 w-full" />
@@ -963,8 +973,8 @@ export function ConversationView({
                         transition={{ duration: DUR.leaf, ease: EASE_INK }}
                         className="rounded-md border border-danger/30 bg-danger-soft p-4"
                       >
-                        <p className="font-display text-body italic text-danger">{suggestError}</p>
-                        <Button variant="danger" size="sm" className="mt-3 hit-sm" onClick={regenerate}>
+                        <p className="text-body text-danger">{suggestError}</p>
+                        <Button variant="ghost" size="sm" className="mt-3 hit-sm" onClick={regenerate}>
                           <IconRefresh size={13} /> Try again
                         </Button>
                       </motion.div>
@@ -982,7 +992,7 @@ export function ConversationView({
                             const busy = regenIndex === i;
                             const isSwap = dealtRef.current;
                             const cardV = rm(reduced, isSwap ? swapCardVariants : dealCardVariants);
-                            const chipDelay = reduced ? 0 : isSwap ? 0.06 : i * 0.07 + 0.06;
+                            const chipDelay = reduced ? 0 : isSwap ? 0.06 : i * 0.06 + 0.06;
                             const multi = opt.texts.length > 1;
                             return (
                               <motion.div
@@ -994,12 +1004,12 @@ export function ConversationView({
                                 animate="enter"
                                 exit="exit"
                                 className={cx(
-                                  CARD,
+                                  cardClass,
                                   "p-4 transition-colors duration-150 hover:border-line-strong",
                                   busy && "wick-ring",
                                 )}
                               >
-                                {/* Top row: tone ink left, № folio right */}
+                                {/* Top row: tone pill left, quiet index right */}
                                 <div className="flex items-start justify-between gap-2">
                                   <motion.span
                                     initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.8 }}
@@ -1013,17 +1023,17 @@ export function ConversationView({
                                   >
                                     {opt.tone}
                                     {multi && (
-                                      <span className="ml-1 normal-case tabular-nums tracking-normal opacity-70">
+                                      <span className="ml-1 tabular-nums opacity-70">
                                         · {opt.texts.length} texts
                                       </span>
                                     )}
                                   </motion.span>
-                                  <span className="shrink-0 font-display text-marginalia italic text-ink-faint [font-variant-numeric:oldstyle-nums]">
-                                    № {i + 1}
+                                  <span className="shrink-0 text-marginalia tabular-nums text-ink-faint">
+                                    {i + 1}
                                   </span>
                                 </div>
 
-                                {/* Body — card № 1 carries the drop cap */}
+                                {/* Body */}
                                 <div
                                   className={cx(
                                     "mt-2.5 transition-opacity duration-150",
@@ -1031,12 +1041,7 @@ export function ConversationView({
                                   )}
                                 >
                                   {!multi ? (
-                                    <p
-                                      className={cx(
-                                        "whitespace-pre-wrap break-words text-bubble text-ink",
-                                        i === 0 && "drop-cap",
-                                      )}
-                                    >
+                                    <p className="whitespace-pre-wrap break-words text-bubble text-ink">
                                       {opt.texts[0]}
                                     </p>
                                   ) : (
@@ -1045,14 +1050,12 @@ export function ConversationView({
                                         {j > 0 && (
                                           <div
                                             aria-hidden="true"
-                                            className="flex justify-center py-1 text-xs leading-none text-ink-faint"
-                                          >
-                                            ⁂
-                                          </div>
+                                            className="mx-6 my-2 border-t border-line"
+                                          />
                                         )}
                                         <div className="flex items-start gap-2.5">
-                                          <span className="mt-1 shrink-0 font-display text-marginalia italic text-ink-faint [font-variant-numeric:oldstyle-nums]">
-                                            № {j + 1}/{opt.texts.length}
+                                          <span className="mt-1 shrink-0 text-marginalia tabular-nums text-ink-muted">
+                                            {j + 1} of {opt.texts.length}
                                           </span>
                                           <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-bubble text-ink">
                                             {t}
@@ -1063,7 +1066,7 @@ export function ConversationView({
                                             aria-label="Copy this text"
                                             title="Copy this text"
                                             className={cx(
-                                              "hit-sm mt-1 shrink-0 rounded-xs text-ink-muted transition-colors duration-150 hover:text-ink disabled:opacity-50",
+                                              "hit-sm mt-1 shrink-0 rounded-full text-ink-muted transition-colors duration-150 hover:text-ink disabled:opacity-50",
                                               focusRing,
                                             )}
                                           >
@@ -1117,7 +1120,7 @@ export function ConversationView({
                                   >
                                     <span
                                       aria-hidden="true"
-                                      className="h-2 w-2 rounded-full bg-seal shadow-[inset_0_1px_1px_rgb(0_0_0/0.5),inset_0_-1px_0_rgb(255_255_255/0.08)]"
+                                      className="seal-emboss h-2 w-2 rounded-full"
                                     />
                                     Queue
                                   </Button>
@@ -1138,9 +1141,8 @@ export function ConversationView({
                             );
                           })}
                         </AnimatePresence>
-                        <p className="px-1 pt-1 font-display text-marginalia italic text-ink-muted">
-                          “Use” sends now (logs to the thread); “Queue” saves it as a draft for
-                          later.
+                        <p className="px-1 pt-1 text-marginalia text-ink-muted">
+                          Use logs it to the thread now · Queue saves it as a draft for later
                         </p>
                       </motion.div>
                     )}
@@ -1154,9 +1156,9 @@ export function ConversationView({
         </div>
       </div>
 
-      {/* ── The Writing Desk — dock never moves (§8) ────────── */}
-      <div className="plate z-20 shrink-0 border-t border-line px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6">
-        {/* Outbox, sealed — the reply queue (§7B) */}
+      {/* ── The floating dock (§8 Targeting bar & composer) ── */}
+      <div className="z-20 shrink-0 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-1 sm:px-4">
+        {/* Reply queue — collapsible glass tray (§7B) */}
         <AnimatePresence initial={false}>
           {queued.length > 0 && (
             <motion.div
@@ -1168,26 +1170,26 @@ export function ConversationView({
               className="mx-auto w-full max-w-[44rem] overflow-hidden"
             >
               <div className="pb-2">
-                <div className={CARD}>
+                <div className={cx(cardClass, "border-line-garnet")}>
                   <MotionButton
                     onClick={() => setQueueOpen((o) => !o)}
                     className={cx(
-                      "flex w-full items-center justify-between rounded-md px-3 py-2.5 transition-colors duration-150 hover:bg-fill",
+                      "flex w-full items-center justify-between rounded-md px-3.5 py-2.5 transition-colors duration-150 hover:bg-fill",
                       focusRing,
                     )}
                   >
-                    <span className="flex items-center gap-2 text-folio uppercase text-ink-secondary">
+                    <span className="flex items-center gap-2 text-folio text-ink-secondary">
                       <span
                         aria-hidden="true"
-                        className="h-2 w-2 rounded-full bg-seal shadow-[inset_0_1px_1px_rgb(0_0_0/0.5),inset_0_-1px_0_rgb(255_255_255/0.08)]"
+                        className="h-1.5 w-1.5 rounded-full bg-garnet shadow-[0_0_8px_rgb(255_138_150_/_0.4)]"
                       />
-                      Sealed &amp; waiting
-                      <span className="font-display text-marginalia italic normal-case tracking-normal text-garnet [font-variant-numeric:oldstyle-nums]">
-                        № {queued.length}
+                      Queue
+                      <span className="inline-flex items-center rounded-full bg-garnet-soft px-2 py-px text-folio tabular-nums text-garnet">
+                        {queued.length}
                       </span>
                     </span>
-                    <span className="font-display text-marginalia italic text-ink-muted">
-                      {queueOpen ? "hide" : "show"}
+                    <span className="text-marginalia text-ink-muted">
+                      {queueOpen ? "Hide" : "Show"}
                     </span>
                   </MotionButton>
                   <AnimatePresence initial={false}>
@@ -1215,10 +1217,10 @@ export function ConversationView({
                                   initial="initial"
                                   animate="enter"
                                   exit="exit"
-                                  className="rounded-md border border-line bg-fill p-2.5 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
+                                  className="rounded-md border border-line bg-fill p-3 transition-colors duration-150 hover:border-line-strong hover:bg-fill-hover"
                                 >
                                   <div className="flex items-start gap-2.5">
-                                    {/* The Wax Seal — stamps in 80ms after the row */}
+                                    {/* The gem disc — Gem Pops in after its row */}
                                     <motion.span
                                       variants={rmSeal}
                                       initial="initial"
@@ -1229,7 +1231,7 @@ export function ConversationView({
                                     </motion.span>
                                     <div className="min-w-0 flex-1">
                                       {tm && (
-                                        <div className="mb-0.5 flex items-center gap-1.5 font-display text-marginalia italic text-ink-muted">
+                                        <div className="mb-0.5 flex items-center gap-1.5 text-marginalia text-ink-muted">
                                           <IconReply size={11} className="shrink-0" />
                                           <span className="truncate">{tm.content}</span>
                                         </div>
@@ -1292,199 +1294,203 @@ export function ConversationView({
           )}
         </AnimatePresence>
 
-        {/* Targeting strip — letterpress tags with × (§8) */}
-        <AnimatePresence initial={false}>
-          {targets.length > 0 && (
-            <motion.div
-              key="targeting"
-              variants={rmCollapse}
-              initial="initial"
-              animate="enter"
-              exit="exit"
-              className="mx-auto w-full max-w-[44rem] overflow-hidden"
-            >
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pb-2">
-                <span className="font-display text-marginalia italic tabular-nums text-laurel">
-                  ¶ replying to {targets.length} message{targets.length > 1 ? "s" : ""}
-                </span>
-                <AnimatePresence initial={false}>
-                  {targets.map((tid) => {
-                    const tm = messageById.get(tid);
-                    if (!tm) return null;
-                    return (
-                      <motion.span
-                        key={tid}
-                        layout={reduced ? false : "position"}
-                        variants={rmChip}
-                        initial="initial"
-                        animate="enter"
-                        exit="exit"
-                        className="inline-flex max-w-[13rem] items-center gap-1.5 rounded-xs border border-line-laurel bg-laurel-faint px-1.5 py-0.5"
-                      >
-                        <span className="truncate text-label text-ink-secondary">{tm.content}</span>
-                        <MotionButton
-                          onClick={() => toggleTarget(tid)}
-                          aria-label="Remove target"
-                          className={cx(
-                            "hit shrink-0 rounded-xs text-ink-muted transition-colors duration-150 hover:text-ink",
-                            focusRing,
-                          )}
-                        >
-                          <IconClose size={11} />
-                        </MotionButton>
-                      </motion.span>
-                    );
-                  })}
-                </AnimatePresence>
-                <MotionButton
-                  onClick={() => setTargets([])}
-                  className={cx(
-                    "hit rounded-xs text-label text-ink-muted transition-colors duration-150 hover:text-ink",
-                    focusRing,
-                  )}
-                >
-                  clear
-                </MotionButton>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Composer — one framed instrument */}
-        <div className="mx-auto max-w-[44rem]">
-          <div className="rounded-lg border border-line-strong bg-surface shadow-[var(--shadow-plate)] transition-colors duration-150 focus-within:border-line-gilt focus-within:ring-[3px] focus-within:ring-accent/12">
-            {/* Steer — the secondary field, folio-kickered */}
-            <div className="flex items-center gap-2.5 border-b border-line px-3 py-1.5">
-              <span className="shrink-0 text-folio uppercase text-ink-muted">Steer</span>
-              <input
-                value={steer}
-                onChange={(e) => setSteer(e.target.value)}
-                placeholder="optional: “be flirtier”, “ask her out”, “say something like…”"
-                className="min-w-0 flex-1 bg-transparent py-0.5 text-label text-ink-secondary outline-none placeholder:text-ink-muted"
-              />
-              {steer && (
-                <MotionButton
-                  onClick={() => setSteer("")}
-                  aria-label="Clear steer"
-                  className={cx(
-                    "hit shrink-0 rounded-xs text-ink-faint transition-colors duration-150 hover:text-ink",
-                    focusRing,
-                  )}
-                >
-                  <IconClose size={13} />
-                </MotionButton>
-              )}
-            </div>
-
-            {/* Quoted-reply strip — gilt rule + Fraunces excerpt (§8) */}
-            <AnimatePresence initial={false}>
-              {replyTo !== null && messageById.has(replyTo) && (
-                <motion.div
-                  key="quote-chip"
-                  variants={rmChip}
-                  initial="initial"
-                  animate="enter"
-                  exit="exit"
-                  className="flex items-center gap-2 border-b border-line px-3 py-1.5"
-                >
-                  <span aria-hidden="true" className="w-0.5 shrink-0 self-stretch rounded-full bg-accent/70" />
-                  <span className="min-w-0 flex-1 truncate font-display text-marginalia italic text-ink-muted">
-                    <span className="text-accent">
-                      replies to{" "}
-                      {messageById.get(replyTo)!.role === "me" ? "you" : conversation.name}:
-                    </span>{" "}
-                    {messageById.get(replyTo)!.content}
+        {/* Composer — thin glass, visually detached from the edges */}
+        <div className="plate mx-auto w-full max-w-[44rem] rounded-lg border border-line p-3 shadow-[var(--shadow-md),var(--shadow-plate)]">
+          {/* Targeting strip — laurel pills with × (§8) */}
+          <AnimatePresence initial={false}>
+            {targets.length > 0 && (
+              <motion.div
+                key="targeting"
+                variants={rmCollapse}
+                initial="initial"
+                animate="enter"
+                exit="exit"
+                className="overflow-hidden"
+              >
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pb-2.5">
+                  <span className="text-marginalia tabular-nums text-laurel">
+                    Replying to {targets.length} message{targets.length > 1 ? "s" : ""}
                   </span>
+                  <AnimatePresence initial={false}>
+                    {targets.map((tid) => {
+                      const tm = messageById.get(tid);
+                      if (!tm) return null;
+                      return (
+                        <motion.span
+                          key={tid}
+                          layout={reduced ? false : "position"}
+                          variants={rmChip}
+                          initial="initial"
+                          animate="enter"
+                          exit="exit"
+                          className="inline-flex max-w-[13rem] items-center gap-1.5 rounded-full border border-line-laurel bg-laurel-faint px-2.5 py-0.5"
+                        >
+                          <span className="truncate text-label text-ink-secondary">{tm.content}</span>
+                          <MotionButton
+                            onClick={() => toggleTarget(tid)}
+                            aria-label="Remove target"
+                            className={cx(
+                              "hit shrink-0 rounded-full text-ink-muted transition-colors duration-150 hover:text-ink",
+                              focusRing,
+                            )}
+                          >
+                            <IconClose size={11} />
+                          </MotionButton>
+                        </motion.span>
+                      );
+                    })}
+                  </AnimatePresence>
                   <MotionButton
-                    onClick={() => setReplyTo(null)}
-                    aria-label="Remove quote link"
+                    onClick={() => setTargets([])}
                     className={cx(
-                      "hit shrink-0 rounded-xs text-ink-muted transition-colors duration-150 hover:text-ink",
+                      "hit rounded-full text-label text-ink-muted transition-colors duration-150 hover:text-ink",
                       focusRing,
                     )}
                   >
-                    <IconClose size={12} />
+                    Clear
                   </MotionButton>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-            {/* The field */}
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                // Touch keyboards: Enter inserts a newline; Generate is the button.
-                if (e.key === "Enter" && !e.shiftKey && !isCoarse) {
-                  e.preventDefault();
-                  if (canGenerate) handleGenerate();
-                }
-              }}
-              rows={2}
-              placeholder={`Paste ${conversation.name}'s latest message…`}
-              className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-3 py-2.5 text-bubble text-ink outline-none placeholder:text-ink-muted"
-            />
-
-            {/* Action row */}
-            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-line px-2 py-1.5">
-              <div className="flex items-center gap-0.5">
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  className="hit"
-                  disabled={!text.trim()}
-                  onClick={() => addAs("me")}
-                >
-                  <span className="sm:hidden">+ Me</span>
-                  <span className="hidden sm:inline">Add as me</span>
-                </Button>
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  className="hit"
-                  disabled={!text.trim()}
-                  onClick={() => addAs("them")}
-                >
-                  <span className="sm:hidden">+ Them</span>
-                  <span className="hidden sm:inline">Add as them</span>
-                </Button>
-                <Button
-                  variant="subtle"
-                  size="sm"
-                  className="hit"
-                  disabled={!text.trim()}
-                  title="Drop in a situational note for Cyrano (not a message)"
-                  onClick={() => addAs("context")}
-                >
-                  <span className="sm:hidden">+ Note</span>
-                  <span className="hidden sm:inline">Add as context</span>
-                </Button>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="hidden items-center gap-1.5 font-display text-marginalia italic text-ink-muted sm:flex">
-                  <span className="kbd not-italic">↵</span> generate ·{" "}
-                  <span className="kbd not-italic">⇧↵</span> newline
+          {/* Quoted-reply strip — inset with the gold bar (§8) */}
+          <AnimatePresence initial={false}>
+            {replyTo !== null && messageById.has(replyTo) && (
+              <motion.div
+                key="quote-chip"
+                variants={rmChip}
+                initial="initial"
+                animate="enter"
+                exit="exit"
+                className="mb-2 flex items-center gap-2 rounded-[10px] bg-fill px-2.5 py-1.5"
+              >
+                <span aria-hidden="true" className="w-0.5 shrink-0 self-stretch rounded-full bg-accent/70" />
+                <span className="min-w-0 flex-1 truncate text-marginalia text-ink-muted">
+                  <span className="text-accent">
+                    Replying to{" "}
+                    {messageById.get(replyTo)!.role === "me" ? "you" : conversation.name}:
+                  </span>{" "}
+                  {messageById.get(replyTo)!.content}
                 </span>
-                {/* Generate — the lamp; conic gilt ring while setting type */}
                 <MotionButton
-                  onClick={handleGenerate}
-                  disabled={!canGenerate || suggesting}
-                  className={cx(GENERATE_BTN, suggesting ? "wick-ring" : "disabled:opacity-40")}
+                  onClick={() => setReplyTo(null)}
+                  aria-label="Remove quote link"
+                  className={cx(
+                    "hit shrink-0 rounded-full text-ink-muted transition-colors duration-150 hover:text-ink",
+                    focusRing,
+                  )}
                 >
-                  {suggesting ? <Spinner size={14} /> : <IconSparkles size={15} />}
-                  {targets.length > 0
-                    ? `Reply to ${targets.length}`
-                    : text.trim() || !canRegenerate
-                      ? "Generate replies"
-                      : "Regenerate"}
+                  <IconClose size={12} />
                 </MotionButton>
-              </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* The field */}
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              // Touch keyboards: Enter inserts a newline; Generate is the button.
+              if (e.key === "Enter" && !e.shiftKey && !isCoarse) {
+                e.preventDefault();
+                if (canGenerate) handleGenerate();
+              }
+            }}
+            rows={2}
+            placeholder={`Paste ${conversation.name}'s latest message…`}
+            className="max-h-40 min-h-[44px] w-full resize-none rounded-sm border border-line-strong bg-[rgb(255_255_255_/_0.05)] px-3.5 py-2.5 text-bubble text-ink outline-none transition-colors duration-150 placeholder:text-ink-muted focus:border-line-gilt focus:ring-[3px] focus:ring-accent/15"
+          />
+
+          {/* Action row */}
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <div className="flex items-center gap-0.5">
+              <Button
+                variant="subtle"
+                size="sm"
+                className="hit"
+                disabled={!text.trim()}
+                onClick={() => addAs("me")}
+              >
+                <span className="sm:hidden">+ Me</span>
+                <span className="hidden sm:inline">Add as me</span>
+              </Button>
+              <Button
+                variant="subtle"
+                size="sm"
+                className="hit"
+                disabled={!text.trim()}
+                onClick={() => addAs("them")}
+              >
+                <span className="sm:hidden">+ Them</span>
+                <span className="hidden sm:inline">Add as them</span>
+              </Button>
+              <Button
+                variant="subtle"
+                size="sm"
+                className="hit"
+                disabled={!text.trim()}
+                title="Drop in a situational note for Cyrano (not a message)"
+                onClick={() => addAs("context")}
+              >
+                <span className="sm:hidden">+ Note</span>
+                <span className="hidden sm:inline">Add as context</span>
+              </Button>
             </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden items-center gap-1.5 text-marginalia text-ink-muted sm:flex">
+                <span className="kbd">↵</span> generate ·{" "}
+                <span className="kbd">⇧↵</span> newline
+              </span>
+              {/* Generate — the one glowing thing; conic ring while thinking */}
+              <MotionButton
+                onClick={handleGenerate}
+                disabled={!canGenerate || suggesting}
+                className={cx(GENERATE_BTN, suggesting ? "wick-ring" : "disabled:opacity-40")}
+              >
+                {suggesting ? <Spinner size={14} /> : <IconSparkles size={15} />}
+                {targets.length > 0
+                  ? `Reply to ${targets.length}`
+                  : text.trim() || !canRegenerate
+                    ? "Generate replies"
+                    : "Regenerate"}
+              </MotionButton>
+            </div>
+          </div>
+
+          {/* Steer — glow-dot labeled secondary field (§8) */}
+          <div className="mt-2.5 flex items-center gap-2.5 border-t border-line px-1 pt-2">
+            <span className="flex shrink-0 items-center gap-1.5 text-folio text-ink-muted">
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgb(255_211_126_/_0.4)]"
+              />
+              Steer
+            </span>
+            <input
+              value={steer}
+              onChange={(e) => setSteer(e.target.value)}
+              placeholder="optional: “be flirtier”, “ask her out”, “say something like…”"
+              className="min-w-0 flex-1 bg-transparent py-0.5 text-label text-ink-secondary outline-none placeholder:text-ink-muted"
+            />
+            {steer && (
+              <MotionButton
+                onClick={() => setSteer("")}
+                aria-label="Clear steer"
+                className={cx(
+                  "hit shrink-0 rounded-full text-ink-muted transition-colors duration-150 hover:text-ink",
+                  focusRing,
+                )}
+              >
+                <IconClose size={13} />
+              </MotionButton>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Mobile message action sheet — touch replacement for the rail */}
+      {/* Mobile message action sheet — touch replacement for the capsule */}
       <AnimatePresence>
         {sheetId !== null &&
           (() => {
@@ -1512,7 +1518,7 @@ export function ConversationView({
 }
 
 /** Bottom sheet with labeled message actions — the touch replacement for the
- *  desktop Compositor's Rail. Sheet physics per DESIGN.md §7D. */
+ *  desktop capsule toolbar. Thick glass, iOS sheet physics (DESIGN.md §7D). */
 function MessageActionsSheet({
   message,
   conversationName,
@@ -1604,18 +1610,18 @@ function MessageActionsSheet({
         exit="exit"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-[rgb(8_7_6/0.72)] backdrop-blur-[8px]"
+        className="absolute inset-0 bg-[rgb(4_5_10_/_0.60)] backdrop-blur-[12px]"
       />
       <motion.div
         variants={rm(reduced, sheetVariants)}
         initial="initial"
         animate="enter"
         exit="exit"
-        className="absolute inset-x-0 bottom-0 rounded-t-xl border-t border-line-strong bg-surface-high pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-lg),var(--shadow-plate)]"
+        className="glass-modal absolute inset-x-0 bottom-0 rounded-t-xl border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)]"
       >
-        <div aria-hidden="true" className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-line-strong" />
+        <div aria-hidden="true" className="mx-auto mt-2.5 h-[5px] w-9 rounded-full bg-[rgb(255_255_255_/_0.25)]" />
         <div className="border-b border-line px-5 py-3">
-          <p className="truncate font-display text-marginalia italic text-ink-muted">
+          <p className="truncate text-marginalia text-ink-muted">
             <span className="text-ink-secondary">{speaker}</span> · {message.content}
           </p>
         </div>

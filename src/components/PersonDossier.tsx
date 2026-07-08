@@ -19,56 +19,63 @@ import type { ConversationDetail, FactCategory } from "@/lib/types";
 import { FACT_CATEGORIES, FACT_CATEGORY_LABELS } from "@/lib/types";
 import { IconEdit, IconPlus, IconReply, IconScan, IconSearch } from "./icons";
 
-/** The dossier sheet rises like a page laid on the desk (DESIGN.md §8). */
+/** The profile sheet rises and settles like glass (DESIGN.md v2 §8). */
 const dossierVariants: Variants = {
   initial: { opacity: 0, y: 24 },
   enter: { opacity: 1, y: 0, transition: SPRING_SHEET },
   exit: { opacity: 0, y: 12, transition: { duration: DUR.exitBase, ease: EASE_INK } },
 };
 
-/** Editorial section head — folio caps over the signature double rule. */
-function SectionHead({ label, aside }: { label: string; aside?: React.ReactNode }) {
+/** Glow-dot section head — sentence case beside the dot; laurel = memory. */
+function SectionHead({
+  label,
+  aside,
+  memory = false,
+}: {
+  label: string;
+  aside?: React.ReactNode;
+  memory?: boolean;
+}) {
   return (
-    <div className="mb-4">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h2 className="text-folio uppercase text-ink-muted">{label}</h2>
-        {aside}
-      </div>
-      <div className="rule-double" aria-hidden />
+    <div
+      className={cx(
+        "kicker mb-4 flex items-baseline justify-between gap-3",
+        memory && "kicker-laurel",
+      )}
+    >
+      <h2 className="text-folio text-ink-muted">{label}</h2>
+      {aside}
     </div>
   );
 }
 
-/** Marginalia-column stat: italic label, dot leader, tabular value. */
-function IndexStat({ label, value }: { label: string; value: string | number }) {
+/** "At a glance" row — quiet label left, tabular value right. */
+function GlanceRow({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="flex items-baseline">
-      <span className="font-display shrink-0 text-marginalia italic text-ink-muted">{label}</span>
-      <span className="dot-leader" aria-hidden />
-      <span className="min-w-0 truncate text-right text-label tabular-nums text-ink-secondary">
+    <div className="flex items-baseline justify-between gap-3 px-3.5 py-2.5">
+      <span className="shrink-0 text-label text-ink-muted">{label}</span>
+      <span className="min-w-0 truncate text-right text-label tabular-nums text-ink">
         {value}
       </span>
     </div>
   );
 }
 
-/** Telemetry cell — the below-lg stat strip under the masthead. */
-function TelemetryCell({ label, value }: { label: string; value: string | number }) {
+/** Stat pill — the below-lg strip under the masthead. Simulated glass. */
+function StatPill({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="min-w-0 px-2.5 py-3 first:pl-0 sm:px-4">
-      <div className="truncate text-title tabular-nums text-ink">{value}</div>
-      <div className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-[0.08em] text-ink-muted">
-        {label}
-      </div>
-    </div>
+    <span className="glass-card inline-flex items-baseline gap-1.5 rounded-full px-3.5 py-1.5">
+      <span className="text-label font-semibold tabular-nums text-ink">{value}</span>
+      <span className="text-marginalia text-ink-muted">{label}</span>
+    </span>
   );
 }
 
 /**
- * PersonDossier — «The Profile Spread» (DESIGN.md §8). A full-region sheet
- * over the chat: seal-monogram masthead, spread-set name, pull-quote aside,
- * then a two-column editorial spread (bio + fact index left, marginalia
- * stats right) that collapses to a telemetry strip below lg.
+ * PersonDossier — the glass profile page (DESIGN.md v2 §8). A full-region
+ * thick-glass sheet over the chat: gem-disc avatar masthead, big tight name,
+ * a standout-fact pull-quote, then bio + grouped facts with an "At a glance"
+ * stat card on the right (folds into a stat-pill strip below lg).
  */
 export function PersonDossier({
   detail,
@@ -153,28 +160,18 @@ export function PersonDossier({
       initial="initial"
       animate="enter"
       exit="exit"
-      className="absolute inset-0 z-20 flex flex-col overflow-hidden bg-canvas shadow-[var(--shadow-lg)]"
+      className="glass-modal absolute inset-0 z-20 flex flex-col overflow-hidden"
     >
-      {/* The dossier's own reading lamp — warm pool over the masthead */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(900px 520px at 20% -10%, rgb(228 197 137 / 0.06), transparent 62%)",
-        }}
-      />
-
-      <header className="plate relative flex h-16 shrink-0 items-center justify-between border-b border-line px-4 sm:px-6">
+      <header className="relative flex h-16 shrink-0 items-center justify-between border-b border-line px-4 sm:px-6">
         <Button variant="ghost" onClick={onClose} className="hit">
           <IconReply size={15} />
           Back to chat
         </Button>
         <span
           aria-hidden
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-folio uppercase text-ink-muted max-sm:hidden"
+          className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-folio text-ink-muted max-sm:hidden"
         >
-          The dossier
+          Profile
         </span>
         <Button variant="ghost" onClick={onEditProfile} className="hit">
           <IconEdit size={15} />
@@ -191,13 +188,13 @@ export function PersonDossier({
         >
           {/* ── Masthead ── */}
           <motion.div variants={sectionItem}>
-            <div className="flex flex-wrap items-end gap-x-5 gap-y-4">
-              <SealDisc initial={conversation.name.trim() || "?"} size={64} className="mb-1.5" />
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-4">
+              <SealDisc initial={conversation.name.trim() || "?"} size={64} />
               <div className="min-w-0 flex-1">
                 <h1 className="text-spread break-words text-ink">{conversation.name}</h1>
-                <p className="font-display mt-2 text-marginalia italic text-ink-muted">
-                  in conversation since {since} ·{" "}
-                  {messages.length === 1 ? "1 letter" : `${messages.length} letters`}
+                <p className="mt-2 text-marginalia text-ink-muted">
+                  In conversation since {since} ·{" "}
+                  {messages.length === 1 ? "1 message" : `${messages.length} messages`}
                   {conversation.platform ? ` · via ${conversation.platform}` : ""}
                 </p>
               </div>
@@ -205,37 +202,28 @@ export function PersonDossier({
             <div className="rule-double mt-6" aria-hidden />
           </motion.div>
 
-          {/* ── Pull-quote — Cyrano's aside, one standout fact ── */}
+          {/* ── Pull-quote — one standout fact ── */}
           {standout && (
-            <motion.figure
-              variants={sectionItem}
-              className="gilt-rule drawing mt-8 max-w-xl pt-5"
-            >
-              <blockquote className="font-display text-[20px] italic leading-7 text-accent">
-                “{standout.content}”
+            <motion.figure variants={sectionItem} className="mt-8 max-w-xl">
+              <div className="kicker text-folio text-ink-muted">Worth remembering</div>
+              <blockquote className="mt-2 text-[18px] font-medium leading-7 text-accent">
+                {standout.content}
               </blockquote>
-              <figcaption className="font-display mt-1.5 text-marginalia italic text-ink-muted">
-                — from the fact library
-              </figcaption>
             </motion.figure>
           )}
 
-          {/* ── Telemetry strip (below lg the marginalia column folds here) ── */}
-          <motion.div
-            variants={sectionItem}
-            className="mt-8 grid grid-cols-4 divide-x divide-line border-y border-line lg:hidden"
-          >
-            <TelemetryCell label="Messages" value={messages.length} />
-            <TelemetryCell label="Facts" value={facts.length} />
-            <TelemetryCell label="Queued" value={queued.length} />
-            <TelemetryCell label="Last seen" value={relativeTime(lastActive) || "—"} />
+          {/* ── Stat pills (below lg the glance column folds here) ── */}
+          <motion.div variants={sectionItem} className="mt-8 flex flex-wrap gap-2 lg:hidden">
+            <StatPill value={messages.length} label={messages.length === 1 ? "message" : "messages"} />
+            <StatPill value={facts.length} label={facts.length === 1 ? "fact" : "facts"} />
+            <StatPill value={queued.length} label="in queue" />
+            <StatPill value={relativeTime(lastActive) || "—"} label="last active" />
           </motion.div>
 
-          {/* ── The spread ── */}
-          <div className="mt-10 grid gap-10 lg:mt-12 lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-12">
+          {/* ── The body ── */}
+          <div className="mt-10 grid gap-10 lg:mt-12 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-12">
             <div className="min-w-0 space-y-10">
-              {/* Notes — user-authored text, so no drop cap (it mangles short
-                  or lowercase notes; the cap stays on authored empty-state copy) */}
+              {/* Notes — the user's own context */}
               {conversation.notes && (
                 <motion.section variants={sectionItem}>
                   <SectionHead label="Your notes" />
@@ -245,32 +233,36 @@ export function PersonDossier({
                 </motion.section>
               )}
 
-              {/* Fact library — the index */}
+              {/* Facts — the memory library */}
               <motion.section variants={sectionItem}>
                 <SectionHead
-                  label="Fact library"
+                  label="Facts"
+                  memory
                   aside={
-                    <span className="font-display text-marginalia italic tabular-nums text-ink-muted">
-                      {facts.length} filed
+                    <span className="rounded-full bg-fill px-2 py-px text-folio tabular-nums text-ink-muted">
+                      {facts.length}
                     </span>
                   }
                 />
 
                 <div className="flex flex-wrap items-center gap-2">
                   {messages.length > 0 && (
-                    <Button
-                      variant="ghost"
+                    <button
+                      type="button"
                       onClick={onScanFacts}
                       disabled={scanning}
-                      className="hit-sm"
+                      className={cx(
+                        "hit-sm inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3.5 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-line-laurel hover:bg-laurel-faint hover:text-laurel active:bg-laurel-soft disabled:pointer-events-none disabled:opacity-60",
+                        focusRing,
+                      )}
                     >
                       {scanning ? <Spinner size={13} /> : <IconScan size={14} />}
                       {scanning ? (
-                        <span className="animate-thinking">Reading the whole thread…</span>
+                        <span className="animate-thinking">Reading the thread…</span>
                       ) : (
                         "Scan thread for details"
                       )}
-                    </Button>
+                    </button>
                   )}
                   {facts.length > 8 && (
                     <div className="relative ml-auto w-full sm:w-56">
@@ -281,7 +273,7 @@ export function PersonDossier({
                       <Input
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="search the library…"
+                        placeholder="Search facts…"
                         className="py-1.5 pl-8"
                       />
                     </div>
@@ -299,7 +291,7 @@ export function PersonDossier({
                           addFact();
                         }
                       }}
-                      placeholder="add a detail to remember…"
+                      placeholder="Add something to remember…"
                       className="min-w-0 flex-1 py-1.5"
                     />
                     <button
@@ -331,18 +323,14 @@ export function PersonDossier({
 
                 {facts.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-line-strong px-6 py-12 text-center">
-                    <p className="font-display text-[17px] italic leading-6 text-ink-secondary">
-                      Nothing filed yet.
-                    </p>
+                    <p className="text-title text-ink">No facts yet</p>
                     <p className="mx-auto mt-2 max-w-sm text-body text-ink-muted">
-                      Scan the thread to build a library of the little things about{" "}
-                      {conversation.name}.
+                      Scan the thread to pick up the little things about{" "}
+                      {conversation.name}, or add one above.
                     </p>
                   </div>
                 ) : groups.length === 0 ? (
-                  <p className="font-display text-[13px] italic leading-5 text-ink-muted">
-                    No details match that.
-                  </p>
+                  <p className="text-body text-ink-muted">Nothing matches that.</p>
                 ) : (
                   <div className="space-y-7">
                     {groups.map((g) => (
@@ -355,13 +343,13 @@ export function PersonDossier({
                         >
                           <h3
                             className={cx(
-                              "text-folio uppercase",
+                              "text-folio",
                               g.key === "pinned" ? "text-accent" : "text-ink-muted",
                             )}
                           >
                             {g.label}
                           </h3>
-                          <span className="font-display text-marginalia italic tabular-nums text-ink-faint">
+                          <span className="text-marginalia tabular-nums text-ink-muted">
                             {g.items.length}
                           </span>
                         </div>
@@ -386,18 +374,18 @@ export function PersonDossier({
               </motion.section>
             </div>
 
-            {/* ── Marginalia column (lg+) ── */}
+            {/* ── At a glance (lg+) ── */}
             <motion.aside variants={sectionItem} className="hidden lg:block">
-              <div className="sticky top-8 space-y-4 border-l border-line pl-6">
-                <div className="kicker kicker-laurel text-folio uppercase text-ink-muted">Marginalia</div>
-                <div className="space-y-2.5">
-                  <IndexStat label="letters" value={messages.length} />
-                  <IndexStat label="facts filed" value={facts.length} />
-                  <IndexStat label="sealed & waiting" value={queued.length} />
-                  <IndexStat label="last heard" value={relativeTime(lastActive) || "—"} />
-                  <IndexStat label="matched" value={since} />
+              <div className="sticky top-8 space-y-3">
+                <div className="kicker text-folio text-ink-muted">At a glance</div>
+                <div className="glass-card divide-y divide-line overflow-hidden rounded-md">
+                  <GlanceRow label="Messages" value={messages.length} />
+                  <GlanceRow label="Facts" value={facts.length} />
+                  <GlanceRow label="In queue" value={queued.length} />
+                  <GlanceRow label="Last active" value={relativeTime(lastActive) || "—"} />
+                  <GlanceRow label="Matched" value={since} />
                   {conversation.platform && (
-                    <IndexStat label="met on" value={conversation.platform} />
+                    <GlanceRow label="Platform" value={conversation.platform} />
                   )}
                 </div>
               </div>

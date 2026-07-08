@@ -11,9 +11,11 @@ import { FACT_CATEGORIES, FACT_CATEGORY_LABELS } from "@/lib/types";
 import { IconClose, IconPlus, IconScan, IconSearch } from "./icons";
 
 /**
- * FactsPanel — «The Index» (DESIGN.md §8). The compact-density sibling of the
- * dossier spread: about fields, then the fact library as kicker-headed index
- * entries. Lives inline at xl+ and inside the right drawer below xl.
+ * FactsPanel — the frosted memory inspector (DESIGN.md v2 §8). The
+ * compact-density sibling of the dossier: about fields, then the fact
+ * library as soft rows under glow-dot section labels. Laurel is memory's
+ * pigment throughout. Lives inline at xl+ and inside the right drawer below
+ * xl (the drawer supplies the glass; this panel stays blur-free).
  */
 export function FactsPanel({
   detail,
@@ -98,13 +100,18 @@ export function FactsPanel({
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
-      <header className="plate flex h-16 shrink-0 items-center justify-between border-b border-line px-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-folio uppercase text-ink-muted">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-laurel-strong" />
-            The index
+      <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-line px-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="h-2 w-2 shrink-0 rounded-full bg-laurel [box-shadow:0_0_8px_color-mix(in_srgb,var(--color-laurel)_40%,transparent)]"
+          />
+          <div className="min-w-0">
+            <div className="truncate text-title text-ink">Memory</div>
+            <div className="truncate text-marginalia text-ink-muted">
+              What Cyrano knows about {conversation.name}
+            </div>
           </div>
-          <div className="font-display truncate text-[17px] italic leading-6 text-ink">Memory</div>
         </div>
         {onClose && (
           <IconButton label="Close memory panel" onClick={onClose}>
@@ -114,9 +121,9 @@ export function FactsPanel({
       </header>
 
       <div className="flex-1 space-y-9 overflow-y-auto p-4 pt-5">
-        {/* About — the editor's own margin notes */}
+        {/* About — context only the user knows */}
         <section>
-          <h3 className="kicker kicker-laurel mb-3 truncate text-folio uppercase text-ink-muted">
+          <h3 className="kicker kicker-laurel mb-3 truncate text-folio text-ink-muted">
             About {conversation.name}
           </h3>
           <div className="space-y-3">
@@ -135,18 +142,18 @@ export function FactsPanel({
                 onChange={(e) => setNotes(e.target.value)}
                 onBlur={saveNotes}
                 rows={3}
-                placeholder="context only you know…"
+                placeholder="Context only you know…"
               />
             </Field>
           </div>
         </section>
 
-        {/* Fact library — the index proper */}
+        {/* Facts — the memory library */}
         <section>
           <div className="kicker kicker-laurel mb-3 flex items-baseline justify-between gap-3">
-            <h3 className="text-folio uppercase text-ink-muted">Fact library</h3>
-            <span className="font-display text-marginalia italic tabular-nums text-ink-muted">
-              {facts.length} filed
+            <h3 className="text-folio text-ink-muted">Facts</h3>
+            <span className="rounded-full bg-fill px-2 py-px text-folio tabular-nums text-ink-muted">
+              {facts.length}
             </span>
           </div>
 
@@ -156,13 +163,13 @@ export function FactsPanel({
               onClick={onScanFacts}
               disabled={scanning}
               className={cx(
-                "hit-sm mb-3 flex w-full items-center justify-center gap-1.5 rounded-sm border border-line-strong px-3 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-line-laurel hover:bg-laurel-faint hover:text-laurel active:bg-laurel-soft disabled:pointer-events-none disabled:opacity-60",
+                "hit-sm mb-3 flex w-full items-center justify-center gap-1.5 rounded-full border border-line-strong px-3.5 py-1.5 text-label text-ink-secondary transition-colors duration-150 hover:border-line-laurel hover:bg-laurel-faint hover:text-laurel active:bg-laurel-soft disabled:pointer-events-none disabled:opacity-60",
                 focusRing,
               )}
             >
               {scanning ? <Spinner size={13} /> : <IconScan size={14} />}
               {scanning ? (
-                <span className="animate-thinking">Reading the whole thread…</span>
+                <span className="animate-thinking">Reading the thread…</span>
               ) : (
                 "Scan thread for details"
               )}
@@ -179,7 +186,7 @@ export function FactsPanel({
                   addFact();
                 }
               }}
-              placeholder="add a detail to remember…"
+              placeholder="Add something to remember…"
               className="min-w-0 flex-1 py-1.5"
             />
             <button
@@ -198,9 +205,9 @@ export function FactsPanel({
           <div className="mt-2 flex items-center gap-2">
             <label
               htmlFor={`fact-cat-${conversation.id}`}
-              className="shrink-0 text-folio uppercase text-ink-muted"
+              className="shrink-0 text-folio text-ink-muted"
             >
-              File under
+              Category
             </label>
             <select
               id={`fact-cat-${conversation.id}`}
@@ -225,21 +232,19 @@ export function FactsPanel({
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="search the library…"
+                placeholder="Search facts…"
                 className="py-1.5 pl-8"
               />
             </div>
           )}
 
           {facts.length === 0 ? (
-            <p className="font-display mt-4 text-[13px] italic leading-5 text-ink-muted">
-              Nothing filed yet. Scan the thread to build a library of the little things about{" "}
-              {conversation.name} — or jot one down yourself.
+            <p className="mt-4 text-body text-ink-muted">
+              No facts yet. Scan the thread to pick up the little things about{" "}
+              {conversation.name}, or add one yourself.
             </p>
           ) : groups.length === 0 ? (
-            <p className="font-display mt-4 text-[13px] italic leading-5 text-ink-muted">
-              No details match that.
-            </p>
+            <p className="mt-4 text-body text-ink-muted">Nothing matches that.</p>
           ) : (
             <motion.div
               key={conversation.id}
@@ -250,16 +255,16 @@ export function FactsPanel({
             >
               {groups.map((g) => (
                 <div key={g.key}>
-                  <div className="mb-1 flex items-baseline justify-between gap-3 px-2">
+                  <div className="mb-1 flex items-baseline justify-between gap-3 px-2.5">
                     <span
                       className={cx(
-                        "text-folio uppercase",
+                        "text-folio",
                         g.key === "pinned" ? "text-accent" : "text-ink-muted",
                       )}
                     >
                       {g.label}
                     </span>
-                    <span className="font-display text-marginalia italic tabular-nums text-ink-faint">
+                    <span className="text-marginalia tabular-nums text-ink-muted">
                       {g.items.length}
                     </span>
                   </div>

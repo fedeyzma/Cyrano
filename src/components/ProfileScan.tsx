@@ -28,18 +28,19 @@ import {
   focusRing,
 } from "./ui";
 
-/* ── Tone → tone ink (DESIGN.md §2 tone table; warm-rebalanced) ── */
+/* ── Tone → tone ink (DESIGN.md §2 tone table; §5 pill recipe:
+   tone/12% fill, tone/30 ring, full-value text, sentence case) ── */
 const TONE_CHIP: Record<string, string> = {
-  dry: "bg-tone-dry/10 text-tone-dry ring-tone-dry/25",
-  playful: "bg-tone-playful/10 text-tone-playful ring-tone-playful/25",
-  curious: "bg-tone-curious/10 text-tone-curious ring-tone-curious/25",
-  flirty: "bg-tone-flirty/10 text-tone-flirty ring-tone-flirty/25",
-  sincere: "bg-tone-sincere/10 text-tone-sincere ring-tone-sincere/25",
-  bold: "bg-tone-bold/10 text-tone-bold ring-tone-bold/25",
+  dry: "bg-tone-dry/12 text-tone-dry ring-tone-dry/30",
+  playful: "bg-tone-playful/12 text-tone-playful ring-tone-playful/30",
+  curious: "bg-tone-curious/12 text-tone-curious ring-tone-curious/30",
+  flirty: "bg-tone-flirty/12 text-tone-flirty ring-tone-flirty/30",
+  sincere: "bg-tone-sincere/12 text-tone-sincere ring-tone-sincere/30",
+  bold: "bg-tone-bold/12 text-tone-bold ring-tone-bold/30",
 };
 const toneChipClass = (t: string) =>
   cx(
-    "inline-flex min-w-0 items-center rounded-xs px-2 py-0.5 text-folio uppercase ring-1",
+    "inline-flex min-w-0 items-center rounded-full px-2.5 py-0.5 text-folio ring-1",
     TONE_CHIP[t.toLowerCase().trim()] ?? "bg-fill text-ink-secondary ring-line-strong",
   );
 
@@ -47,10 +48,11 @@ const PLATFORMS = ["Hinge", "Tinder", "Bumble"];
 const LANGUAGES = ["Français", "English", "Español", "Italiano"];
 const MOODS = ["funny", "flirty", "dry", "sincere", "curious", "bold"];
 
-/* Match Strike (§6.8): compiled values of --color-accent / --color-success —
-   motion can't interpolate var() strings. */
-const STRIKE_FLARE = "#E4C589";
-const STRIKE_SAGE = "#A9C48F";
+/* Match Strike (§6.8): the check flares gold, cools to laurel. Compiled
+   values of --color-accent / --color-laurel — motion can't interpolate
+   var() strings. */
+const STRIKE_FLARE = "#FFD37E";
+const STRIKE_COOL = "#7DE8B4";
 
 function CopySwap({ active, reduced }: { active: boolean; reduced: boolean }) {
   return (
@@ -59,11 +61,11 @@ function CopySwap({ active, reduced }: { active: boolean; reduced: boolean }) {
         <motion.span
           key="struck"
           className="inline-flex items-center gap-1"
-          initial={reduced ? { opacity: 0, color: STRIKE_SAGE } : { opacity: 0, scale: 0.7, color: STRIKE_FLARE }}
+          initial={reduced ? { opacity: 0, color: STRIKE_COOL } : { opacity: 0, scale: 0.7, color: STRIKE_FLARE }}
           animate={
             reduced
-              ? { opacity: 1, color: STRIKE_SAGE, transition: { duration: 0.12 } }
-              : { opacity: 1, scale: 1, color: STRIKE_SAGE, transition: { duration: 0.4, ease: EASE_INK } }
+              ? { opacity: 1, color: STRIKE_COOL, transition: { duration: 0.12 } }
+              : { opacity: 1, scale: 1, color: STRIKE_COOL, transition: { duration: 0.4, ease: EASE_INK } }
           }
           exit={{ opacity: 0, transition: { duration: 0.1, ease: EASE_INK } }}
         >
@@ -185,7 +187,7 @@ export function ProfileScan({
     return () => window.removeEventListener("paste", onPaste);
   }, [addFiles]);
 
-  // The lamp brightens while a page is held over the dropzone (§8 The Scanner).
+  // The aurora surges while screenshots hover over the dropzone (§8 Scan).
   // Guarded: if the LLM in-flight counter already lit it, leave it alone.
   useEffect(() => {
     if (!dragOver) return;
@@ -285,7 +287,7 @@ export function ProfileScan({
     }
   }
 
-  const groupLabel = "mb-1.5 block text-folio uppercase text-ink-muted";
+  const groupLabel = "mb-1.5 block text-folio text-ink-muted";
 
   /* ── Motion recipes (all rm-gated) ── */
   const cardVariants = rm(reduced, suggestionCardVariants);
@@ -311,12 +313,12 @@ export function ProfileScan({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-[calc(3rem_+_env(safe-area-inset-bottom))] pt-10 sm:px-6">
-        {/* ── Scene masthead — kicker over Fraunces title (§8) ── */}
+        {/* ── Scene masthead — glow-dot kicker over the scene title (§8) ── */}
         <header>
           <SectionLabel>Profile scan</SectionLabel>
-          <h1 className="font-display mt-3 text-scene text-ink">The Scanner</h1>
-          <p className="font-display mt-1.5 text-marginalia italic text-ink-muted">
-            Screenshots in — a read, the ways to open, openers out.
+          <h1 className="mt-3 text-scene text-ink">Scan a profile</h1>
+          <p className="mt-1.5 text-body text-ink-muted">
+            Screenshots in, openers out.
           </p>
         </header>
 
@@ -334,7 +336,7 @@ export function ProfileScan({
               void addFiles(Array.from(e.dataTransfer.files));
             }}
             className={cx(
-              "group flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-[1.5px] border-dashed px-4 py-9 text-center transition-colors duration-150",
+              "group flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-[1.5px] border-dashed bg-[rgb(255_255_255_/_0.03)] px-4 py-9 text-center shadow-[var(--shadow-plate)] transition-colors duration-150",
               dragOver
                 ? "border-line-gilt bg-accent-faint"
                 : "border-line-strong hover:border-line-gilt hover:bg-fill",
@@ -347,12 +349,11 @@ export function ProfileScan({
                 dragOver ? "text-accent" : "text-ink-muted group-hover:text-accent",
               )}
             />
-            <span className="font-display text-[17px] italic leading-6 text-ink-secondary">
-              Lay the page here
+            <span className="text-title text-ink-secondary">
+              Drop screenshots here
             </span>
             <span className="text-label text-ink-muted">
-              Drop, paste, or click to add profile screenshots — they span a few screens, add them
-              all (up to 6)
+              Drop, paste, or click to add her profile screenshots (up to 6)
             </span>
             <input
               type="file"
@@ -407,8 +408,8 @@ export function ProfileScan({
                   ))}
                 </AnimatePresence>
               </div>
-              <p className="font-display mt-2 text-marginalia italic text-ink-muted [font-variant-numeric:oldstyle-nums]">
-                {images.length} of 6 pages laid out
+              <p className="mt-2 text-marginalia tabular-nums text-ink-muted">
+                {images.length} of 6 added
               </p>
             </div>
           )}
@@ -438,8 +439,7 @@ export function ProfileScan({
 
           <div>
             <label htmlFor="scan-mood" className={groupLabel}>
-              Mood{" "}
-              <span className="font-display normal-case italic tracking-normal text-ink-muted">— optional</span>
+              Mood <span className="font-normal text-ink-muted">(optional)</span>
             </label>
             <Input
               id="scan-mood"
@@ -461,10 +461,10 @@ export function ProfileScan({
             </div>
           </div>
 
-          {/* Scan — the one lit object on the desk (gilt glow + wick ring) */}
+          {/* Scan — this view's one glow (gilt halo + conic ring, Law 4) */}
           <div
             className={cx(
-              "rounded-sm",
+              "rounded-full",
               (canScan || loading) && "shadow-[var(--shadow-gilt)]",
               loading && "wick-ring",
             )}
@@ -475,7 +475,7 @@ export function ProfileScan({
               className={buttonClass("primary", "md", "min-h-11 w-full gap-2")}
             >
               {loading ? <Spinner size={14} /> : <IconSparkles size={15} />}
-              {analysis ? "Scan again" : "Find the ways in"}
+              {analysis ? "Scan again" : "Scan profile"}
             </MotionButton>
           </div>
         </section>
@@ -492,7 +492,7 @@ export function ProfileScan({
               exit="exit"
               className="rounded-md border border-danger/30 bg-danger-soft p-4"
             >
-              <p className="font-display text-body italic text-danger">The scanner lost the page.</p>
+              <p className="text-body font-medium text-danger">Something went wrong.</p>
               <p className="mt-1 text-body text-ink-secondary">{error}</p>
             </motion.div>
           )}
@@ -509,7 +509,7 @@ export function ProfileScan({
               exit="exit"
               className="space-y-3"
             >
-              <p className="animate-thinking px-1">Cyrano is reading her profile…</p>
+              <p className="animate-thinking px-1">Reading her profile…</p>
               <div className={cx(cardClass, "p-4")}>
                 <div className="skeleton h-3.5 w-full" />
                 <div className="skeleton mt-2 h-3.5 w-4/5" />
@@ -534,7 +534,7 @@ export function ProfileScan({
               exit="exit"
               className="space-y-6"
             >
-              {/* The read — Cyrano's aside, set as a pull-quote */}
+              {/* The read — Cyrano's take, set as a quiet pull-quote */}
               {analysis.read && (
                 <motion.div
                   custom={0}
@@ -544,7 +544,7 @@ export function ProfileScan({
                   className="px-1"
                 >
                   <div aria-hidden="true" className="h-0.5 w-10 rounded-full bg-line-gilt" />
-                  <p className="font-display mt-3 text-[17px] italic leading-relaxed text-ink-secondary">
+                  <p className="mt-3 text-[17px] font-medium leading-relaxed text-ink-secondary">
                     {analysis.read}
                   </p>
                 </motion.div>
@@ -571,17 +571,17 @@ export function ProfileScan({
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                          <h3 className="font-display min-w-0 text-[17px] font-medium italic leading-6 text-ink">
+                          <h3 className="min-w-0 text-title text-ink">
                             {a.angle}
                           </h3>
                           <Tag>{a.type}</Tag>
                         </div>
-                        <span className="font-display shrink-0 text-marginalia italic text-ink-faint [font-variant-numeric:oldstyle-nums]">
-                          № {ai + 1}
+                        <span className="shrink-0 text-marginalia tabular-nums text-ink-faint">
+                          {ai + 1}
                         </span>
                       </div>
 
-                      <blockquote className="font-display mt-2.5 border-l-2 border-line-gilt pl-3 text-[15px] italic leading-relaxed text-ink-secondary">
+                      <blockquote className="mt-2.5 rounded-[10px] border-l-2 border-line-gilt bg-fill py-2 pl-3 pr-3 text-[15px] leading-relaxed text-ink-secondary">
                         “{a.target}”
                       </blockquote>
                       <p className="mt-2 text-body text-ink-muted">{a.reason}</p>
@@ -636,7 +636,7 @@ export function ProfileScan({
                                       >
                                         <CopySwap active={copied === key} reduced={reduced} />
                                       </MotionButton>
-                                      {/* Start = a commitment — it carries the seal, not the metal */}
+                                      {/* Start = a commitment — it carries the garnet gem dot, not gold */}
                                       <MotionButton
                                         onClick={() =>
                                           onStart({
@@ -694,14 +694,14 @@ export function ProfileScan({
                   );
                 })}
                 {anyOpeners && (
-                  <p className="font-display px-1 pt-1 text-marginalia italic text-ink-muted">
+                  <p className="px-1 pt-1 text-marginalia text-ink-muted">
                     Start opens a new conversation with her — facts saved, opener dropped into the
                     thread and copied.
                   </p>
                 )}
               </div>
 
-              {/* Extracted facts — index entries with dot leaders */}
+              {/* Extracted facts — quiet rows, category pill right (§8) */}
               {analysis.extractedFacts.length > 0 && (
                 <motion.div
                   custom={factsIdx}
@@ -710,17 +710,12 @@ export function ProfileScan({
                   animate="enter"
                   className={cx(cardClass, "p-4")}
                 >
-                  <div className="text-folio uppercase text-ink-muted">Picked up about her</div>
+                  <div className="text-folio text-ink-secondary">Picked up about her</div>
                   <ul className="mt-3 space-y-1.5">
                     {analysis.extractedFacts.map((f, i) => (
-                      <li key={i} className="flex items-baseline">
+                      <li key={i} className="flex items-baseline justify-between gap-3">
                         <span className="min-w-0 text-body text-ink-secondary">{f.fact}</span>
-                        {f.category ? (
-                          <>
-                            <span aria-hidden="true" className="dot-leader" />
-                            <Tag className="shrink-0">{f.category}</Tag>
-                          </>
-                        ) : null}
+                        {f.category ? <Tag className="shrink-0">{f.category}</Tag> : null}
                       </li>
                     ))}
                   </ul>
@@ -735,10 +730,9 @@ export function ProfileScan({
               animate="enter"
               exit="exit"
             >
-              <EmptyState title="Every profile leaves a door open.">
-                Add her profile, then find your in. Cami reads the prompts and photos, maps out a
-                few ways to open, and writes openers in your voice for whichever one you pick —
-                grounded in your context file.
+              <EmptyState title="Find your way in">
+                Add her profile screenshots and scan. Cami reads the prompts and photos, maps out
+                a few ways to open, and writes openers in your voice for whichever one you pick.
               </EmptyState>
             </motion.div>
           ) : null}

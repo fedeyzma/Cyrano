@@ -17,26 +17,26 @@ import { Button, IconButton, Input, Spinner, Textarea, focusRing } from "./ui";
 
 const PLATFORMS = ["Hinge", "Tinder", "Bumble", "IRL", "Other"];
 
-/** Letterpress platform chip — folio caps in a hairline frame; the active
- *  chip takes the champagne wash (DESIGN.md §5). Real padding below `sm`
- *  plus .hit-sm keeps the touch target ≥44px effective. */
+/** Platform chip — frosted pill on a soft fill; the active chip takes the
+ *  gold wash + hairline (DESIGN.md §5). Real padding below `sm` plus
+ *  .hit-sm keeps the touch target ≥44px effective. */
 function chipClass(active: boolean) {
   return cx(
-    "hit-sm inline-flex select-none items-center rounded-xs border px-2.5 py-1 text-folio uppercase transition-colors duration-150 max-sm:py-2",
+    "hit-sm inline-flex select-none items-center rounded-full border px-3 py-1 text-label transition-colors duration-150 max-sm:py-2",
     active
       ? "border-line-gilt bg-accent-soft text-accent"
-      : "border-line-strong text-ink-muted hover:bg-fill hover:text-ink-secondary",
+      : "border-transparent bg-fill text-ink-secondary hover:bg-fill-hover hover:text-ink",
     focusRing,
   );
 }
 
-/** Folio field label, with an optional Fraunces "optional" marginalia. */
+/** Quiet sentence-case field label with an optional "Optional" note. */
 function FieldLabel({ text, optional }: { text: string; optional?: boolean }) {
   return (
     <span className="flex items-baseline justify-between gap-3">
-      <span className="text-folio uppercase text-ink-muted">{text}</span>
+      <span className="text-folio text-ink-muted">{text}</span>
       {optional ? (
-        <span className="font-display text-marginalia italic text-ink-muted">optional</span>
+        <span className="text-marginalia text-ink-muted">Optional</span>
       ) : null}
     </span>
   );
@@ -64,7 +64,7 @@ export function NewConversationModal({
   const scrim = rm(reduced, scrimVariants);
   const panel = rm(reduced, modalVariants);
   const alert = rm(reduced, railVariants);
-  // The Fraunces title arrives a beat after the plate (DESIGN.md §8 Modals).
+  // The title settles in a beat after the pane (DESIGN.md §8 Modals).
   const title = rm(reduced, {
     initial: { opacity: 0, y: 6 },
     enter: {
@@ -114,7 +114,7 @@ export function NewConversationModal({
         >
           <motion.button
             aria-label="Close"
-            className="absolute inset-0 bg-[rgb(8_7_6_/_0.72)] backdrop-blur-[8px]"
+            className="absolute inset-0 bg-[rgb(4_5_10_/_0.60)] backdrop-blur-[12px]"
             onClick={onClose}
             variants={scrim}
             initial="initial"
@@ -129,21 +129,21 @@ export function NewConversationModal({
             initial="initial"
             animate="enter"
             exit="exit"
-            className="relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-xl rounded-b-none border border-line-strong bg-surface-high px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 shadow-[var(--shadow-lg),var(--shadow-plate)] sm:rounded-xl sm:pb-6 sm:pt-6"
+            className="glass-modal relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-xl rounded-b-none px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 sm:rounded-xl sm:pb-6 sm:pt-6"
           >
-            {/* Drag handle — bottom-sheet affordance below sm only */}
-            <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-line-strong sm:hidden" aria-hidden="true" />
+            {/* Grab handle — bottom-sheet affordance below sm only (§7D) */}
+            <div className="mx-auto mb-4 h-[5px] w-9 rounded-full bg-[rgb(255_255_255_/_0.25)] sm:hidden" aria-hidden="true" />
 
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <motion.h2
                   id="new-conversation-title"
                   variants={title}
-                  className="font-display text-modal text-ink"
+                  className="text-modal text-ink"
                 >
                   New conversation
                 </motion.h2>
-                <p className="font-display mt-1 text-marginalia italic text-ink-muted">
+                <p className="mt-1 text-marginalia text-ink-muted">
                   Who are you talking to?
                 </p>
               </div>
