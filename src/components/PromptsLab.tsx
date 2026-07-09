@@ -69,10 +69,10 @@ const resultsPanelVariants: Variants = {
   exit: { opacity: 0, transition: { duration: DUR.hair, ease: EASE_INK } },
 };
 
-/* Match Strike (§6.8): the copy glyph swaps to a check that flares gold and
+/* Match Strike (§6.8): the copy glyph swaps to a check that flares rose and
    cools to laurel. Colors are the compiled values of --color-accent /
    --color-laurel (motion can't interpolate var() strings). */
-const STRIKE_FLARE = "#FFD37E";
+const STRIKE_FLARE = "#FB7185";
 const STRIKE_COOL = "#7DE8B4";
 
 function CopySwap({ active, reduced }: { active: boolean; reduced: boolean }) {

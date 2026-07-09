@@ -17,7 +17,7 @@ import { FactRow, groupFacts } from "@/components/factLib";
 import { relativeTime } from "@/lib/time";
 import type { ConversationDetail, FactCategory } from "@/lib/types";
 import { FACT_CATEGORIES, FACT_CATEGORY_LABELS } from "@/lib/types";
-import { IconEdit, IconPlus, IconReply, IconScan, IconSearch } from "./icons";
+import { IconChevronDown, IconEdit, IconPlus, IconReply, IconScan, IconSearch } from "./icons";
 
 /** The profile sheet rises and settles like glass (DESIGN.md v2 §8). */
 const dossierVariants: Variants = {
@@ -307,18 +307,24 @@ export function PersonDossier({
                       <IconPlus size={15} />
                     </button>
                   </div>
-                  <select
-                    aria-label="Category for the new fact"
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value as FactCategory)}
-                    className={cx(inputClass, "py-1.5 sm:w-44")}
-                  >
-                    {FACT_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {FACT_CATEGORY_LABELS[c]}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative sm:w-44">
+                    <select
+                      aria-label="Category for the new fact"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value as FactCategory)}
+                      className={cx(inputClass, "w-full appearance-none py-1.5 pr-8")}
+                    >
+                      {FACT_CATEGORIES.map((c) => (
+                        <option key={c} value={c} className="bg-surface">
+                          {FACT_CATEGORY_LABELS[c]}
+                        </option>
+                      ))}
+                    </select>
+                    <IconChevronDown
+                      size={13}
+                      className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
+                  </div>
                 </div>
 
                 {facts.length === 0 ? (

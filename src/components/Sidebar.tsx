@@ -281,7 +281,7 @@ export function Sidebar({
                         aria-hidden
                         transition={inkTransition}
                         className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-accent"
-                        style={{ boxShadow: "0 0 10px rgb(255 211 126 / 0.5)" }}
+                        style={{ boxShadow: "0 0 10px rgb(251 113 133 / 0.5)" }}
                       />
                     )}
                     <div className="flex min-w-0 items-baseline justify-between gap-2">

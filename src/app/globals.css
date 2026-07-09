@@ -33,8 +33,8 @@
   /* ── Hairlines (white-alpha light edges) ───────────────── */
   --color-line:          rgb(255 255 255 / 0.10);   /* default 1px pane edge */
   --color-line-strong:   rgb(255 255 255 / 0.17);   /* input borders, capsule borders, kbd */
-  --color-line-gilt:     rgb(255 211 126 / 0.45);   /* gold rules, focused inputs, me-bubble edge */
-  --color-line-accent:   rgb(255 211 126 / 0.45);   /* LEGACY alias of line-gilt */
+  --color-line-gilt:     rgb(251 113 133 / 0.45);   /* rose rules, focused inputs, me-bubble edge */
+  --color-line-accent:   rgb(251 113 133 / 0.45);   /* LEGACY alias of line-gilt */
 
   /* ── Ink (cool white ladder — ratios on glass-thick over canvas, eff. ≈ #10131F) ── */
   --color-ink:            #F4F6FC;  /* ~17:1 — primary text */
@@ -43,25 +43,25 @@
   --color-ink-faint:      #5C6379;  /* decorative / disabled ONLY, never functional text */
 
   /* ── Gold (accent — the user's hand; ex-champagne, now solar) ── */
-  --color-accent:        #FFD37E;  /* ~13:1 as text — links, active, focus rings, gold edges */
-  --color-accent-strong: #F5B44C;  /* gradient partner in primary fills; hover on accent */
-  --color-accent-deep:   #B87E1F;  /* pressed fills only, NEVER text */
-  --color-accent-soft:   color-mix(in oklch, #FFD37E 16%, transparent);  /* me-bubble, active chip */
-  --color-accent-faint:  color-mix(in oklch, #FFD37E 9%, transparent);   /* hover washes */
-  --color-on-accent:     #241903;  /* text on gold fills */
+  --color-accent:        #FB7185;  /* the rose (identity restored) — links, active, focus rings, edges */
+  --color-accent-strong: #F43F5E;  /* gradient partner in primary fills; hover on accent */
+  --color-accent-deep:   #9F1239;  /* pressed fills only, NEVER text */
+  --color-accent-soft:   color-mix(in oklch, #FB7185 16%, transparent);  /* me-bubble, active chip */
+  --color-accent-faint:  color-mix(in oklch, #FB7185 9%, transparent);   /* hover washes */
+  --color-on-accent:     #1C0A0E;  /* text on rose fills (as the original build) */
 
   /* ── Garnet & seal (Cyrano at work & commitments) ──────── */
   --color-seal:          #B02440;  /* raspberry gem-disc fill, record dots; never text */
-  --color-seal-bright:   #FF8A96;  /* = garnet; small text/icons (~8.2:1), ≥12px or icons */
+  --color-seal-bright:   #FFA07E;  /* = garnet; small text/icons (~8.2:1), ≥12px or icons */
   --color-danger:        #FF7B70;  /* ~7.3:1 — destructive text/icons */
   --color-danger-soft:   color-mix(in oklch, #FF7B70 16%, transparent);
   --color-success:       #7DE8B4;  /* LEGACY alias of laurel */
   --color-success-soft:  color-mix(in oklch, #7DE8B4 16%, transparent);
 
-  --color-garnet:        #FF8A96;  /* garnet text/icons (~8.2:1); ≥12px or icons */
-  --color-garnet-strong: #E14E60;  /* fills/borders; never text */
-  --color-garnet-soft:   color-mix(in oklch, #FF8A96 16%, transparent);
-  --color-garnet-faint:  color-mix(in oklch, #FF8A96 9%, transparent);
+  --color-garnet:        #FFA07E;  /* ember text/icons — Cyrano's heat, re-spaced off rose; ≥12px or icons */
+  --color-garnet-strong: #E1633F;  /* fills/borders; never text */
+  --color-garnet-soft:   color-mix(in oklch, #FFA07E 16%, transparent);
+  --color-garnet-faint:  color-mix(in oklch, #FFA07E 9%, transparent);
   --color-line-garnet:   rgb(255 138 150 / 0.40);   /* garnet pane edges: queue, working rules */
 
   /* ── Laurel (her side & memory — vivid mint) ───────────── */
@@ -74,13 +74,13 @@
   --color-on-laurel:     #06251A;  /* text on laurel fills */
 
   /* ── Ember (LEGACY — only inside old gradients until converted) ── */
-  --color-ember:         #B87E1F;  /* remapped to accent-deep */
+  --color-ember:         #9F1239;  /* remapped to accent-deep */
 
   /* ── Tone chip inks (refreshed for glass; chip recipe §5) ── */
   --color-tone-dry:      #B9C0D0;  /* ~10:1 */
   --color-tone-playful:  #FFC964;  /* ~12:1 */
   --color-tone-curious:  #7FC4FF;  /* ~9.8:1 */
-  --color-tone-flirty:   #FF8A96;  /* garnet family — flirt is commitment (~8.2:1) */
+  --color-tone-flirty:   #FB7185;  /* garnet family — flirt is commitment (~8.2:1) */
   --color-tone-sincere:  #7DE8B4;  /* laurel (~12:1) */
   --color-tone-bold:     #C79CFF;  /* ~8.4:1 */
 
@@ -101,8 +101,8 @@
   --shadow-plate: inset 0 1px 0 rgb(255 255 255 / 0.12);              /* top-light on every pane */
   --shadow-highlight: inset 0 1px 0 rgb(255 255 255 / 0.12);          /* LEGACY alias of plate */
   --shadow-press: inset 0 2px 6px rgb(0 0 0 / 0.35);                  /* LEGACY name — pressed-glass inner shade */
-  --shadow-gilt:  0 0 36px -6px rgb(255 211 126 / 0.55), 0 8px 24px -8px rgb(255 180 76 / 0.35); /* Generate ONLY */
-  --shadow-glow:  0 0 36px -6px rgb(255 211 126 / 0.55), 0 8px 24px -8px rgb(255 180 76 / 0.35); /* LEGACY alias */
+  --shadow-gilt:  0 0 36px -6px rgb(251 113 133 / 0.55), 0 8px 24px -8px rgb(244 63 94 / 0.35); /* Generate ONLY */
+  --shadow-glow:  0 0 36px -6px rgb(251 113 133 / 0.55), 0 8px 24px -8px rgb(244 63 94 / 0.35); /* LEGACY alias */
 
   /* ── Type scale (roles in DESIGN.md §3 — one sans, sentence case) ── */
   --text-folio:   0.6875rem;              /* 11px/16, 600, +0.02em — section labels, tone chips */
@@ -173,7 +173,7 @@ body {
 }
 
 /* Selection — a wash of gold light */
-::selection { background: rgb(255 211 126 / 0.35); color: #241903; }
+::selection { background: rgb(251 113 133 / 0.35); color: #1C0A0E; }
 
 /* ── Font passthroughs (serif retired — DESIGN.md §3) ──────
    .font-display and .font-wonk keep compiling as no-ops: both resolve to
@@ -199,17 +199,18 @@ body {
 }
 .app-backdrop::before {
   background:
-    radial-gradient(900px 700px at 15% -10%, rgb(122 92 255 / 0.16), transparent 60%),
-    radial-gradient(1100px 800px at 85% 15%, rgb(255 100 130 / 0.10), transparent 60%),
-    radial-gradient(1000px 900px at 50% 115%, rgb(64 180 200 / 0.12), transparent 65%);
-  opacity: 0.7;
+    radial-gradient(900px 700px at 12% -10%, rgb(122 92 255 / 0.24), transparent 62%),
+    radial-gradient(1100px 800px at 88% 12%, rgb(251 113 133 / 0.17), transparent 62%),
+    radial-gradient(1000px 900px at 45% 115%, rgb(64 180 200 / 0.18), transparent 68%),
+    radial-gradient(700px 600px at 0% 70%, rgb(122 92 255 / 0.10), transparent 60%);
+  opacity: 0.85;
   transition: opacity 800ms var(--ease-ink);
   animation: cyrano-aurora 60s var(--ease-in-out-soft) infinite alternate;
   will-change: transform, opacity;
 }
 .app-backdrop.speaking::before { opacity: 1; }
 .app-backdrop::after {
-  background: radial-gradient(800px 600px at 75% 90%, rgb(255 180 76 / 0.05), transparent 60%);
+  background: radial-gradient(800px 600px at 75% 90%, rgb(251 113 133 / 0.09), transparent 60%);
 }
 @keyframes cyrano-aurora {
   from { transform: translate3d(0, 0, 0) scale(1); }
@@ -340,7 +341,7 @@ body::after {
   content: "";
   position: absolute; top: 0; left: 0; right: 0;
   height: 2px; border-radius: 1px;
-  background: linear-gradient(90deg, transparent, var(--rule-tint, rgb(255 211 126 / 0.45)), transparent);
+  background: linear-gradient(90deg, transparent, var(--rule-tint, rgb(251 113 133 / 0.45)), transparent);
 }
 .rule-garnet { --rule-tint: var(--color-line-garnet); }
 @keyframes cyrano-rule-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }

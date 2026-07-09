@@ -48,10 +48,10 @@ const PLATFORMS = ["Hinge", "Tinder", "Bumble"];
 const LANGUAGES = ["Français", "English", "Español", "Italiano"];
 const MOODS = ["funny", "flirty", "dry", "sincere", "curious", "bold"];
 
-/* Match Strike (§6.8): the check flares gold, cools to laurel. Compiled
+/* Match Strike (§6.8): the check flares rose, cools to laurel. Compiled
    values of --color-accent / --color-laurel — motion can't interpolate
    var() strings. */
-const STRIKE_FLARE = "#FFD37E";
+const STRIKE_FLARE = "#FB7185";
 const STRIKE_COOL = "#7DE8B4";
 
 function CopySwap({ active, reduced }: { active: boolean; reduced: boolean }) {

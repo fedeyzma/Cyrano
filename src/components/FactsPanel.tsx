@@ -8,7 +8,7 @@ import { cx } from "@/lib/cx";
 import { FactRow, groupFacts } from "@/components/factLib";
 import type { ConversationDetail, FactCategory } from "@/lib/types";
 import { FACT_CATEGORIES, FACT_CATEGORY_LABELS } from "@/lib/types";
-import { IconClose, IconPlus, IconScan, IconSearch } from "./icons";
+import { IconChevronDown, IconClose, IconPlus, IconScan, IconSearch } from "./icons";
 
 /**
  * FactsPanel — the frosted memory inspector (DESIGN.md v2 §8). The
@@ -209,18 +209,24 @@ export function FactsPanel({
             >
               Category
             </label>
-            <select
-              id={`fact-cat-${conversation.id}`}
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value as FactCategory)}
-              className={cx(inputClass, "min-w-0 flex-1 py-1.5")}
-            >
-              {FACT_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {FACT_CATEGORY_LABELS[c]}
-                </option>
-              ))}
-            </select>
+            <div className="relative min-w-0 flex-1">
+              <select
+                id={`fact-cat-${conversation.id}`}
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value as FactCategory)}
+                className={cx(inputClass, "w-full appearance-none py-1.5 pr-8")}
+              >
+                {FACT_CATEGORIES.map((c) => (
+                  <option key={c} value={c} className="bg-surface">
+                    {FACT_CATEGORY_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+              <IconChevronDown
+                size={13}
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted"
+              />
+            </div>
           </div>
 
           {facts.length > 5 && (

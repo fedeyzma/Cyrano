@@ -87,6 +87,14 @@ const TONE_CHIP = "inline-flex items-center rounded-full px-2 py-0.5 text-folio 
 /** Actions offered by the mobile message action sheet. */
 type SheetAction = "quote" | "target" | "flip" | "up" | "down" | "edit" | "delete";
 
+/** Quoted-reply previews show a glimpse, not the message — a hard clamp so a
+ *  long quoted text can never stretch the reply bubble wide. */
+const QUOTE_PREVIEW_CHARS = 20;
+function clipQuote(s: string): string {
+  const t = s.trim();
+  return t.length > QUOTE_PREVIEW_CHARS ? `${t.slice(0, QUOTE_PREVIEW_CHARS).trimEnd()}…` : t;
+}
+
 /* ── Shared class recipes (tokens only) ─────────────────── */
 
 /** Generate — the one glowing thing (§7E): gold gradient pill wearing the
@@ -558,7 +566,7 @@ export function ConversationView({
                 cy="18"
                 r="17.25"
                 fill="none"
-                stroke="rgb(255 211 126 / 0.5)"
+                stroke="rgb(251 113 133 / 0.5)"
                 strokeWidth="1.25"
                 strokeLinecap="round"
                 initial={reduced ? false : { pathLength: 0 }}
@@ -610,7 +618,7 @@ export function ConversationView({
       </motion.header>
 
       {/* ── Thread (§8 Thread & bubbles) ───────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 pb-6 pt-10 sm:px-6">
+      <div className="flex-1 overflow-y-auto px-4 pb-10 pt-10 max-md:pb-14 sm:px-6">
         <div className="mx-auto max-w-[44rem] space-y-3">
           {messages.length === 0 && (
             <motion.div variants={rm(reduced, fadeUp(6))} initial="initial" animate="enter">
@@ -852,7 +860,7 @@ export function ConversationView({
                               <span className="text-accent">
                                 {quoted.role === "me" ? "You" : conversation.name}:
                               </span>{" "}
-                              {quoted.content}
+                              {clipQuote(quoted.content)}
                             </span>
                           </button>
                         )}
@@ -1471,7 +1479,7 @@ export function ConversationView({
             <input
               value={steer}
               onChange={(e) => setSteer(e.target.value)}
-              placeholder="optional: “be flirtier”, “ask her out”, “say something like…”"
+              placeholder={isCoarse ? "Steer it: “be flirtier”…" : "optional: “be flirtier”, “ask her out”, “say something like…”"}
               className="min-w-0 flex-1 bg-transparent py-0.5 text-label text-ink-secondary outline-none placeholder:text-ink-muted"
             />
             {steer && (

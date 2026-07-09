@@ -13,7 +13,7 @@ This document is the single source of truth for the v2 aesthetic pivot. It repla
 **Five laws (enforced in review):**
 
 1. **Three pigments, one grammar (unchanged semantics, new hues).** Color is meaning, never decoration:
-   - **Gold** (`accent` family, ex-champagne) — **the user's hand & the machine's chrome**: Generate/Use, focus rings, quote-links, active segments, me-bubbles, pinned facts.
+   - **Rose** (`accent` family — the client-chosen highlight, the original Cyrano rose restored) — **the user's hand & the machine's chrome**: Generate/Use, focus rings, quote-links, active segments, me-bubbles, pinned facts.
    - **Garnet** (`garnet`/`seal` family) — **Cyrano at work & commitments**: the thinking shimmer, the status beam, suggestions arriving, the queue gem, unsent badges; as `danger`, destruction.
    - **Laurel** (`laurel` family) — **her side & memory**: reply-targeting (targeted bubbles, target chips), the fact library, plans, success ("Mark sent", sent toasts).
    Neutral glass still belongs to **the match's own words**. A pigment never borrows another's meaning. Washes stay ≤16% (`-soft`) / 9% (`-faint`); pigment text uses only the documented text rungs (§2 contrast table).
@@ -53,7 +53,7 @@ Complete `@theme` ladder for `src/app/globals.css`. **Every existing token name 
   /* ── Hairlines (white-alpha light edges) ───────────────── */
   --color-line:          rgb(255 255 255 / 0.10);   /* default 1px pane edge */
   --color-line-strong:   rgb(255 255 255 / 0.17);   /* input borders, capsule borders, kbd */
-  --color-line-gilt:     rgb(255 211 126 / 0.45);   /* gold rules, focused inputs, me-bubble edge */
+  --color-line-gilt:     rgb(251 113 133 / 0.45);   /* rose rules, focused inputs, me-bubble edge */
   --color-line-accent:   rgb(255 211 126 / 0.45);   /* LEGACY alias of line-gilt */
 
   /* ── Ink (cool white ladder — ratios on glass-thick over canvas, eff. ≈ #10131F) ── */
@@ -62,27 +62,27 @@ Complete `@theme` ladder for `src/app/globals.css`. **Every existing token name 
   --color-ink-muted:      #8E96AF;  /* ~6.2:1 — meta, placeholders, labels */
   --color-ink-faint:      #5C6379;  /* decorative / disabled ONLY, never functional text */
 
-  /* ── Gold (accent — the user's hand; ex-champagne, now solar) ── */
-  --color-accent:        #FFD37E;  /* ~13:1 as text — links, active, focus rings, gold edges */
-  --color-accent-strong: #F5B44C;  /* gradient partner in primary fills; hover on accent */
+  /* ── Rose (accent — the user's hand; the identity color) ── */
+  --color-accent:        #FB7185;  /* ~6.8:1 as text — links, active, focus rings, rose edges */
+  --color-accent-strong: #F43F5E;  /* gradient partner in primary fills; hover on accent */
   --color-accent-deep:   #B87E1F;  /* pressed fills only, NEVER text */
-  --color-accent-soft:   color-mix(in oklch, #FFD37E 16%, transparent);  /* me-bubble, active chip */
-  --color-accent-faint:  color-mix(in oklch, #FFD37E 9%, transparent);   /* hover washes */
-  --color-on-accent:     #241903;  /* text on gold fills */
+  --color-accent-soft:   color-mix(in oklch, #FB7185 16%, transparent);  /* me-bubble, active chip */
+  --color-accent-faint:  color-mix(in oklch, #FB7185 9%, transparent);   /* hover washes */
+  --color-on-accent:     #1C0A0E;  /* text on rose fills */
 
   /* ── Garnet & seal (Cyrano at work & commitments) ──────── */
   --color-seal:          #B02440;  /* raspberry gem-disc fill, record dots; never text */
-  --color-seal-bright:   #FF8A96;  /* = garnet; small text/icons (~8.2:1), ≥12px or icons */
+  --color-seal-bright:   #FFA07E;  /* = garnet; small text/icons (~8.2:1), ≥12px or icons */
   --color-danger:        #FF7B70;  /* ~7.3:1 — destructive text/icons */
   --color-danger-soft:   color-mix(in oklch, #FF7B70 16%, transparent);
   --color-success:       #7DE8B4;  /* LEGACY alias of laurel */
   --color-success-soft:  color-mix(in oklch, #7DE8B4 16%, transparent);
 
-  --color-garnet:        #FF8A96;  /* garnet text/icons (~8.2:1); ≥12px or icons */
+  --color-garnet:        #FFA07E;  /* ember-coral (re-spaced off the rose accent); ≥12px or icons */
   --color-garnet-strong: #E14E60;  /* fills/borders; never text */
-  --color-garnet-soft:   color-mix(in oklch, #FF8A96 16%, transparent);
-  --color-garnet-faint:  color-mix(in oklch, #FF8A96 9%, transparent);
-  --color-line-garnet:   rgb(255 138 150 / 0.40);   /* garnet pane edges: queue, working rules */
+  --color-garnet-soft:   color-mix(in oklch, #FFA07E 16%, transparent);
+  --color-garnet-faint:  color-mix(in oklch, #FFA07E 9%, transparent);
+  --color-line-garnet:   rgb(255 160 126 / 0.40);   /* garnet pane edges: queue, working rules */
 
   /* ── Laurel (her side & memory — vivid mint) ───────────── */
   --color-laurel:        #7DE8B4;  /* laurel text/icons (~12:1) */
@@ -100,7 +100,7 @@ Complete `@theme` ladder for `src/app/globals.css`. **Every existing token name 
   --color-tone-dry:      #B9C0D0;  /* ~10:1 */
   --color-tone-playful:  #FFC964;  /* ~12:1 */
   --color-tone-curious:  #7FC4FF;  /* ~9.8:1 */
-  --color-tone-flirty:   #FF8A96;  /* garnet family — flirt is commitment (~8.2:1) */
+  --color-tone-flirty:   #FFA07E;  /* garnet family — flirt is commitment (~8.2:1) */
   --color-tone-sincere:  #7DE8B4;  /* laurel (~12:1) */
   --color-tone-bold:     #C79CFF;  /* ~8.4:1 */
 
@@ -187,9 +187,9 @@ Complete `@theme` ladder for `src/app/globals.css`. **Every existing token name 
 | `ink` | `#F4F6FC` | ~17:1 | anywhere |
 | `ink-secondary` | `#C0C7DA` | ~10:1 | anywhere |
 | `ink-muted` | `#8E96AF` | ~6.2:1 | meta/labels ≥11px |
-| `accent` | `#FFD37E` | ~13:1 | anywhere |
+| `accent` | `#FB7185` | ~6.8:1 | ≥12px text, icons, edges |
 | `laurel` | `#7DE8B4` | ~12:1 | anywhere |
-| `garnet` / `seal-bright` | `#FF8A96` | ~8.2:1 | ≥12px or icons |
+| `garnet` / `seal-bright` | `#FFA07E` | ~8.2:1 | ≥12px or icons |
 | `danger` | `#FF7B70` | ~7.3:1 | ≥12px or icons |
 | `on-accent` on `accent-strong` | `#241903` | ~9:1 | button labels |
 
@@ -240,7 +240,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 **Rules & edges:**
 - `.rule-double` survives in name only: now a single 1px `--color-line` divider (`border-top: 1px solid var(--color-line)`, `::after` removed). Same whitelist (modal titles, dossier section heads, suggestions header).
 - `.gilt-rule` / `.rose-rule`: 2px light-streak rule fading at both ends, center `rgb(255 211 126 / 0.45)`; `.drawing` keeps the scaleX draw-in. `.rule-garnet` re-tints it garnet.
-- `.kicker`: the 20×2px bar becomes a **glow dot** — a 6px circle, `border-radius: 9999px`, default gold, `box-shadow: 0 0 8px currentColor` at 40%; `.kicker-laurel` / `.kicker-garnet` re-tint. Label beside it in `--text-folio` sentence case.
+- `.kicker`: the 20×2px bar becomes a **glow dot** — a 6px circle, `border-radius: 9999px`, default rose, `box-shadow: 0 0 8px currentColor` at 40%; `.kicker-laurel` / `.kicker-garnet` re-tint. Label beside it in `--text-folio` sentence case.
 - `.dot-leader`: retired visually — keep the class as a plain flex spacer (`border-bottom: none`). Rows justify with `justify-between` instead.
 - `.seal-emboss`: becomes the **gem disc** — `background: linear-gradient(160deg, #D93A5C, var(--color-seal))`, `box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), inset 0 -2px 4px rgb(0 0 0 / 0.35), 0 2px 8px -2px rgb(176 36 64 / 0.5)`, initial in white 600 (not serif).
 
@@ -353,7 +353,7 @@ On fine-pointer hover (or focus-within) of a message row, a **floating frosted c
 - Scrim: `rgb(4 5 10 / 0.60)` + `backdrop-blur(12px)`, fade 180/150ms.
 
 ### 7E. Generate — the one glowing thing
-Full pill, gold gradient fill, `--shadow-gilt` halo, `⌘↵` kbd hint beside it. While thinking: conic ring + the shimmer line. It is the only element allowed a permanent glow (Law 4); everything else earns light only through focus or in-flight states.
+Full pill, rose gradient fill, `--shadow-gilt` halo, `⌘↵` kbd hint beside it. While thinking: conic ring + the shimmer line. It is the only element allowed a permanent glow (Law 4); everything else earns light only through focus or in-flight states.
 
 ---
 
@@ -363,7 +363,7 @@ Full pill, gold gradient fill, `--shadow-gilt` halo, `⌘↵` kbd hint beside it
 Masthead on thin glass (`.plate`, h-16): the gem-disc monogram "C" at 24px, wordmark "Cyrano" in Inter 700 20px with the gold→white gradient text fill, subtitle "Reply copilot" in `--text-folio` `.vibrancy`. Below it the **segmented control** (§5) for Replies / Prompts / Scan — pill container, sliding glass thumb on `layoutId` `"view-tab"`. Search is a pill input with the magnifier inside; sort chips are pills. The list reads **inset-grouped**: rows at `--radius-md` with 8px horizontal inset, hover `bg-fill`, active row `bg-fill-active` + top-light + the **Ribbon Mark** reborn as a 20×3px gold `rounded-full` bar (`layoutId` `"conv-ink"`, Thumb Glide, glow `0 0 10px rgb(255 211 126 / 0.5)`). Row: name (14/600 `ink`) left, relative time right in `--text-marginalia` (no dot leader, no italic); second line platform pill + preview `ink-muted`. Unsent badge: 6px garnet glow dot. Footer: "N people · stored locally" in `--text-marginalia` `.vibrancy`.
 
 ### Conversation header
-Thin glass bar, bottom hairline. Avatar: 36px gem disc whose 1px gold ring plays **Light Streak** on conversation switch. Name in `--text-persona` (upright 700, tight); platform pill beside it; icon buttons right, all `rounded-full`. Drawer button left on mobile, `.hit`.
+Thin glass bar, bottom hairline. Avatar: 36px gem disc whose 1px rose ring plays **Light Streak** on conversation switch. Name in `--text-persona` (upright 700, tight); platform pill beside it; icon buttons right, all `rounded-full`. Drawer button left on mobile, `.hit`.
 
 ### Thread & bubbles
 Column `max-w-[44rem]`. **Them:** `.glass-card` neutral — `rgb(255 255 255 / 0.05)` + top-light, 1px `--color-line`, radius `20/20/20/6`. **Me:** gold-tinted glass — `bg-accent-soft`, 1px `--color-line-gilt`, radius `20/20/6/20`; never a solid gold fill. **Context notes:** floating chips — centered, max-w fit, pill radius, `bg-fill` + hairline, `--text-label` `ink-secondary`, a small note-icon replacing the asterism `⁂`. **Quoted-reply previews:** inside the bubble top — a rounded inset strip (`bg-fill`, radius 10) with a 2px gold left bar and the excerpt in `--text-marginalia` `ink-muted`, one line; tap scrolls to source. **Timestamps:** `--text-marginalia` in the margin ≥md, revealed on hover (Capsule Reveal), below the bubble on touch. **Targeted for reply:** bubble border swaps to `--color-line-laurel` + a laurel wash, with a small laurel tag "Replying to this" above. **Date dividers:** centered `--text-folio` `ink-muted` flanked by hairlines. **Editing:** input recipe inside the bubble; delete confirms in danger. Entrances: Float In, last-8 cascade kept.
@@ -384,13 +384,13 @@ Per §7D: thick glass, radius 28 top, grab handle. Header: message excerpt in `-
 Glow-dot kicker "Profile prompts" above a `--text-scene` title **"Prompts"**, generous `pt-10`. Prompt input, mood/language selectors, avoid field per pill recipes. Generate carries the gilt glow here (it is this view's one glow). Answers reuse the suggestions card recipe verbatim — plain indices, tone pills, Float In arrival with skeletons, Match Strike copy. The panel header reads "Suggestions".
 
 ### ProfileScan
-Same kicker + scene pattern, title **"Scan a profile"**. Dropzone: `.glass-card` at radius 20 with a 1.5px dashed `--color-line-strong` inner border and "Drop screenshots here" in `ink-muted`; on dragover the dash goes gold and the aurora surges (`.speaking`). Results are suggestion-style cards; extracted items show confidence as a tabular percentage beside a status dot (≥80% laurel, 50–79% gold, <50% `ink-muted`). Batch actions as ghost pills.
+Same kicker + scene pattern, title **"Scan a profile"**. Dropzone: `.glass-card` at radius 20 with a 1.5px dashed `--color-line-strong` inner border and "Drop screenshots here" in `ink-muted`; on dragover the dash goes rose and the aurora surges (`.speaking`). Results are suggestion-style cards; extracted items show confidence as a tabular percentage beside a status dot (≥80% laurel, 50–79% rose, <50% `ink-muted`). Batch actions as ghost pills.
 
 ### PersonDossier + facts
 Full-screen **thick-glass sheet** over scrim (`.glass-modal`), radius 28 top on mobile, enters `y 24→0` on `SPRING_SHEET`, `--shadow-lg`. Masthead: 64px gem disc; name in `.text-spread` (sans 700 clamp, upright); beneath, "In conversation since {date} · {n} messages" in `--text-marginalia`; then a single hairline (`.rule-double` new look). Pull-quote: one standout fact in 18px 500 `accent`, glow-dot above. Body ≥lg two columns: left 2/3 bio + facts grouped under glow-dot section labels; right 1/3 **"At a glance"** — a stat stack in `.glass-card` (label `ink-muted` left, tabular value `ink` right, hairline-separated rows). Facts are rows: text left, category pill right, edit/delete icons on hover (Capsule Reveal). `<lg`: single column, stats fold into a horizontal strip under the masthead. FactsPanel (xl drawer) reuses the same rows at compact density with the same add-fact input.
 
 ### Modals
-Scrim per §7D. Panel: `.glass-modal` thick glass, radius 28, 1px `--color-line-strong`, `--shadow-lg` + top-light; enters via `modalVariants` (y 24, scale 0.94 spring). Title `--text-modal` with a hairline beneath. Footer actions right, primary gold pill last. Mobile `<sm`: bottom sheet, radius 28 top, grab handle. Destructive modals: title stays white; only the confirm button is danger.
+Scrim per §7D. Panel: `.glass-modal` thick glass, radius 28, 1px `--color-line-strong`, `--shadow-lg` + top-light; enters via `modalVariants` (y 24, scale 0.94 spring). Title `--text-modal` with a hairline beneath. Footer actions right, primary rose pill last. Mobile `<sm`: bottom sheet, radius 28 top, grab handle. Destructive modals: title stays white; only the confirm button is danger.
 
 ### Empty states
 `--text-display` heading in `ink`; one paragraph `--text-body` `ink-secondary` (no drop cap); a single ghost pill CTA. The aurora behind the glass is the illustration.
@@ -410,7 +410,7 @@ Bubbles, cards, rows, inputs, chips are **simulated glass** (§4) and never blur
 
 **`prefers-reduced-transparency: reduce`:** same solid swaps as above (media query alongside the `@supports` block), aurora opacity drops to 0.3.
 
-**`prefers-reduced-motion: reduce` (CSS backstop, JS gated via `rm()`):** aurora drift off, static at 0.8 opacity (`.speaking` opacity-only lift kept); shimmer text static `ink-secondary`; conic rings hidden; skeleton shimmer off; status beam static gold; Light Streak renders complete; springs → duration 0.
+**`prefers-reduced-motion: reduce` (CSS backstop, JS gated via `rm()`):** aurora drift off, static at 0.8 opacity (`.speaking` opacity-only lift kept); shimmer text static `ink-secondary`; conic rings hidden; skeleton shimmer off; status beam static rose; Light Streak renders complete; springs → duration 0.
 
 **Performance:** blurred panes get `transform: translateZ(0)` only if paint flashing shows repaint storms; never animate `backdrop-filter` itself; the aurora animates `transform`/`opacity` only.
 
