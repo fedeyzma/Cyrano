@@ -648,7 +648,6 @@ export function ConversationView({
                 return (
                   <motion.div
                     key={m.id}
-                    layout={reduced ? false : "position"}
                     variants={rm(reduced, contextNoteVariants)}
                     initial={isNew ? "initial" : false}
                     animate="enter"
@@ -666,7 +665,9 @@ export function ConversationView({
                     ) : (
                       <>
                         <div
-                          title={clockTime(m.created_at)}
+                          // A title tooltip can never fire on touch, and the time
+                          // is already rendered visibly below.
+                          title={isCoarse ? undefined : clockTime(m.created_at)}
                           onClick={isCoarse ? () => setSheetId(m.id) : undefined}
                           className="flex max-w-[85%] items-start gap-2 rounded-full border border-line bg-fill px-3.5 py-1.5 text-label text-ink-secondary shadow-[var(--shadow-plate)]"
                         >
@@ -724,7 +725,6 @@ export function ConversationView({
               return (
                 <motion.div
                   key={m.id}
-                  layout={reduced ? false : "position"}
                   variants={rowVariants}
                   initial={isNew ? "initial" : false}
                   animate="enter"
@@ -824,7 +824,7 @@ export function ConversationView({
                           for them; the small corner tucks toward the sender. */}
                       <div
                         id={`msg-${m.id}`}
-                        title={clockTime(m.created_at)}
+                        title={isCoarse ? undefined : clockTime(m.created_at)}
                         onClick={isCoarse ? () => setSheetId(m.id) : undefined}
                         className={cx(
                           "rounded-[20px] px-4 py-2.5 text-bubble text-ink",
@@ -1220,7 +1220,6 @@ export function ConversationView({
                               return (
                                 <motion.div
                                   key={q.id}
-                                  layout={reduced ? false : "position"}
                                   variants={rm(reduced, queueItemVariants)}
                                   initial="initial"
                                   animate="enter"
@@ -1326,7 +1325,6 @@ export function ConversationView({
                       return (
                         <motion.span
                           key={tid}
-                          layout={reduced ? false : "position"}
                           variants={rmChip}
                           initial="initial"
                           animate="enter"

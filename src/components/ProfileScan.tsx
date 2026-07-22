@@ -86,7 +86,10 @@ function CopySwap({ active, reduced }: { active: boolean; reduced: boolean }) {
   );
 }
 
-async function fileToResizedDataUrl(file: File, max = 1280, quality = 0.82): Promise<string> {
+// 900/0.7 rather than 1280/0.82: screenshots are re-uploaded as base64 on every
+// openers call and every single-opener regen, from the phone's uplink through
+// the tunnel. Roughly halves each upload; still legible to the vision model.
+async function fileToResizedDataUrl(file: File, max = 900, quality = 0.7): Promise<string> {
   const dataUrl = await new Promise<string>((res, rej) => {
     const r = new FileReader();
     r.onload = () => res(r.result as string);

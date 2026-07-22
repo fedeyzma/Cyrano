@@ -24,6 +24,10 @@ ENV NODE_OPTIONS=--experimental-sqlite
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV DATABASE_PATH=/data/cyrano.db
+# Node's default is 5s, so a phone that pauses between taps pays a fresh TCP
+# handshake (plus slow start) on almost every action across the VPN. Two
+# minutes outlives a normal idle gap and still reaps dead sockets.
+ENV KEEP_ALIVE_TIMEOUT=120000
 
 # Writable directory for the SQLite database (mounted as a volume).
 RUN mkdir -p /data && chown -R node:node /data

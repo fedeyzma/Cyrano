@@ -31,6 +31,7 @@ import type {
   ConversationListItem,
   Fact,
   FactCategory,
+  Message,
   MessageRole,
   QueuedReply,
   ReplyOption,
@@ -286,11 +287,34 @@ export default function Home() {
   ) {
     if (selectedId === null) return;
     const id = selectedId;
+    const trimmed = content.trim();
+    if (!trimmed) return;
+
+    // Show it immediately, then reconcile. Waiting on the POST plus a full
+    // detail refetch meant the composer emptied and the thread stayed unchanged
+    // for two round trips, which reads as "the app ate my message".
+    // The list is rendered in array order, so appending puts it last; the
+    // negative temp id never reaches the server.
+    const tempId = -Date.now();
+    const temp: Message = {
+      id: tempId,
+      conversation_id: id,
+      role,
+      content: trimmed,
+      created_at: Date.now(),
+      reply_to_message_id: replyToMessageId ?? null,
+      sort_order: null,
+    };
+    patchDetail(id, (d) => ({ ...d, messages: [...d.messages, temp] }));
     try {
-      await api.addMessage(id, role, content, replyToMessageId);
-      await loadDetail(id, { silent: true });
-      await refreshList();
+      const real = await api.addMessage(id, role, trimmed, replyToMessageId);
+      patchDetail(id, (d) => ({
+        ...d,
+        messages: d.messages.map((m) => (m.id === tempId ? real : m)),
+      }));
+      await refreshList(); // sidebar preview only, never blocks the thread
     } catch (e) {
+      patchDetail(id, (d) => ({ ...d, messages: d.messages.filter((m) => m.id !== tempId) }));
       handleError(e);
     }
   }
@@ -703,16 +727,12 @@ export default function Home() {
 
   const factsCount = detail?.facts.length ?? 0;
 
-  // Crossfade key for the main region: distinguishes the three views, each
-  // open conversation, and the empty/loading state (purely presentational).
-  const viewKey =
-    view === "scan"
-      ? "scan"
-      : view === "prompts"
-        ? "prompts"
-        : detail
-          ? `replies-${detail.conversation.id}`
-          : "replies-empty";
+  // Crossfade key for the main region: distinguishes the three views only.
+  // Keying it per conversation made every sidebar tap pay a mandatory 150ms
+  // exit before the new thread could even start mounting. The switch is still
+  // carried by ConversationView's own remount (its `key` below) plus the name
+  // reveal and the header Light Streak, which is what DESIGN.md §8 specifies.
+  const viewKey = view === "scan" ? "scan" : view === "prompts" ? "prompts" : "replies";
 
   return (
     <div
