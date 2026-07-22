@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     ? body.avoid.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
     : [];
 
-  const system = buildPromptSystem(getUserContext());
+  const system = buildPromptSystem(getUserContext(), language);
   const userMsg = assemblePromptRequest(prompt, mood, count, platform, language, avoid);
 
   try {

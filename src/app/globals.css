@@ -307,6 +307,41 @@ body::after {
   .app-backdrop::before { opacity: 0.3; }
 }
 
+/* ── Mobile performance mode (DESIGN.md §9) — real blur over an animating
+   aurora forces a full re-blur every frame; phone GPUs can't keep up
+   (reported jank over WireGuard + mobile browser). Below md: same tints as
+   solid fills, aurora frozen, grain blend layer off, utility scrim blurs
+   off. The look survives via the fills/hairlines; the GPU sleeps. ── */
+@media (max-width: 767.98px) {
+  .plate, .glass-header, .glass-dock {
+    background: rgb(16 18 32 / 0.94);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass-panel, .glass-drawer, .glass-toast {
+    background: rgb(19 22 36 / 0.96);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass-modal {
+    background: var(--color-surface-high);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  /* Tailwind arbitrary scrim blurs (backdrop-blur-[8px] etc.) */
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  /* Aurora: static pose, no 60s transform loop under the panes */
+  .app-backdrop::before {
+    animation: none;
+    will-change: auto;
+  }
+  /* Grain: mix-blend-mode over the whole viewport is a per-frame tax */
+  body::after { display: none; }
+}
+
 /* ── Touch hit-slop — enlarges the tap area toward ~44px without changing
    the visual size. Coarse-pointer only, so desktop geometry is untouched.
    Do NOT combine with .wick-ring / .gilt-rule / .kicker / [data-tip]

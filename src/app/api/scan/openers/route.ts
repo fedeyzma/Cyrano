@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     ? body.avoid.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
     : [];
 
-  const system = buildScanOpenersSystem(getUserContext());
+  const system = buildScanOpenersSystem(getUserContext(), language);
   const userMsg = assembleScanOpenersRequest(approach, mood, language, count, platform, avoid);
 
   try {

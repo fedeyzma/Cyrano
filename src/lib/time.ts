@@ -14,6 +14,12 @@ export function relativeTime(ts: number | null | undefined): string {
   return new Date(ts).toLocaleDateString();
 }
 
+/**
+ * Built once. `toLocaleTimeString` re-resolves the locale and option bag on
+ * every call, which the thread used to pay per message per render.
+ */
+const TIME_FMT = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+
 export function clockTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return TIME_FMT.format(ts);
 }

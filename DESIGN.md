@@ -414,6 +414,8 @@ Bubbles, cards, rows, inputs, chips are **simulated glass** (§4) and never blur
 
 **Performance:** blurred panes get `transform: translateZ(0)` only if paint flashing shows repaint storms; never animate `backdrop-filter` itself; the aurora animates `transform`/`opacity` only.
 
+**Mobile performance mode (`@media (max-width: 767.98px)` — hard rule, shipped):** phones get ZERO real blur — all three material tiers swap to their solid fallback fills, Tailwind `backdrop-blur-*` scrims are neutralized, the aurora freezes (no transform loop under panes), and the grain blend layer is removed. Rationale: `backdrop-filter` over an animating backdrop re-blurs every frame; mobile GPUs (and the user's real phone-over-WireGuard usage) cannot sustain it. The look survives through fills, hairlines, and shadows. Never add unguarded blur below `md`.
+
 ---
 
 ## 10. Microcopy — modern-casual pass

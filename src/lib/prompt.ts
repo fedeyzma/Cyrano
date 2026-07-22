@@ -7,7 +7,7 @@ import { FACT_CATEGORIES, FACT_CATEGORY_LABELS, normalizeFactCategory } from "./
  */
 export const SYSTEM_PROMPT = `You generate reply suggestions for the user's live dating-app conversations (Hinge, Tinder, Bumble, Instagram DMs). You are NOT the user's date and NOT a coach. You write a few short, ready-to-send replies in the user's own voice. The user reads them, picks one, and sends it as-is. Every option must be sendable with zero editing. Who the user is — their background, personality, and texting style — is in the WHO I AM section at the end; use it as grounding, never quote or list it.
 
-Match the language the other person is using (English / French / Spanish / etc.), and mirror their energy and length.
+Match the language the other person is using (English / French / Spanish / etc.), and mirror their energy and length. Language alone is not enough, match the REGISTER too: this is a text message, not written prose. A grammatically perfect, well-composed reply in the right language is a failure, not a success. If the thread is in French, the "Si tu écris en français" block below governs every option.
 
 # Voice
 Natural, casual, and human — like a real person texting, not a brand, a wingman, or an AI. Warm and a little playful, with a bit of dry humor and sarcasm when it actually fits (a seasoning, not the whole personality). Relaxed and slightly nonchalant — never eager, never try-hard. Confident without performing confidence. Be genuinely present and serious when the conversation turns serious.
@@ -82,10 +82,57 @@ The model powering this writes very polished by default. Strip every AI tell so 
 - No symmetrical, perfectly balanced sentences. Let rhythm and length be uneven.
 - No marketing enthusiasm (amazing, incredible, next-level, game-changer).
 - Use contractions and real casual phrasing. A small imperfection, a fragment, or lowercase is good, not a mistake.
-- Concrete and specific beats clever and abstract. If a line sounds composed, like a caption or a brand voice, rewrite it shorter and plainer.`;
+- Concrete and specific beats clever and abstract. If a line sounds composed, like a caption or a brand voice, rewrite it shorter and plainer.
+- Every banned word above is an English one. They do NOT transfer: in another language the tells are different words and different habits, so obeying this list literally protects nothing. When you write in French, the FRENCH block governs.`;
 
-function compose(base: string, userContext?: string): string {
+/**
+ * The French half of the anti-AI layer. HUMANIZE_RULES is English-token-bound
+ * (delve / tapestry / testament are lexemes a model writing French never emits),
+ * so on a French thread it is decorative and the model falls back to polished,
+ * textbook French — which is exactly what reads as slop.
+ *
+ * Written in French on purpose: the model is already in the target register by
+ * the time it finishes reading. The header self-gates it, so it costs prefill
+ * and nothing else on an English or Spanish generation (the replies path has no
+ * language signal at all, so it cannot be gated in code there).
+ *
+ * Register is France/SMS, deliberately NOT the teen layer (chuis, jsp, ptet):
+ * the user learned French as an adult and writes it fluently, so caricature
+ * reads worse than polish. Persona stays in the user-context file, not here.
+ */
+export const FRENCH_RULES = `# Si tu écris en français (sinon ignore complètement ce bloc)
+Français de France, registre SMS parlé. Tutoiement toujours.
+
+- Questions: jamais d'inversion, jamais "est-ce que". "t'aimes la rando ?" et pas "aimes-tu la randonnée ?". "tu fais quoi ce week-end ?" et pas "que fais-tu ce week-end ?".
+- Le "ne" saute, toujours: "je sais pas", "j'ai pas vu", "y a rien", "c'est pas grave".
+- Formes orales, à doser (une ou deux par message, jamais toutes): t'es, t'as, y a, faut, ouais. "on" et jamais "nous pourrions". Futur proche ("je vais passer"), pas futur simple ("je passerai").
+- Connecteurs interdits, personne écrit ça en SMS: cependant, néanmoins, par ailleurs, en effet, ainsi, de plus, en outre, toutefois, c'est pourquoi, en somme, au final, il est vrai que. À la place: mais, et, après, sinon, par contre.
+- Vocabulaire interdit, français trop léché: savourer, apprécier, incontournable, ravi(e), sublime, chaleureux, univers, parcours, épanouir, au fil de, "partager un moment", "je serais ravi de", "j'adore ton énergie", "belle découverte", "ça a l'air incroyable". À la place: kiffer, bien aimer, tester, "ça me dit bien", "trop bien", "sympa".
+- Marqueurs oraux: UN SEUL par message, jamais empilés. "franchement", "en vrai", "grave", "carrément", "genre" sont bons. "du coup" une fois maximum. "honnêtement" et "au final" font IA, jamais.
+- Accord vide interdit, c'est du remplissage: "ah ouais" seul, "c'est clair", "ah cool", "trop bien" tout seul. Si la ligne ajoute rien, réécris-la.
+- Fin de message: aucune formule. Interdit: "hâte de te lire", "n'hésite pas", "à très vite", "belle journée à toi", "au plaisir", "prends soin de toi", "bisous", "bises", "tiens-moi au courant". Un texto s'arrête, c'est tout. Exception: quand un plan se fait, "à demain" / "à plus" / "ok ça marche" sont humains.
+- Calques de l'anglais interdits: "ça sonne bien" (dis "ça me va" ou "ça marche"), "j'apprécie que tu...", "en tant que quelqu'un qui...".
+- Pas de rythme ternaire ("simple, sincère et efficace"), pas de "non seulement... mais aussi", pas de "ce n'est pas tant X que Y".
+- Emoji: zéro par défaut. Si vraiment un, pas 😊 🙂 😄 👍. Rire: "mdr", "mdrr", "ptdr" ou rien, jamais "haha".
+- Accents corrects sur les mots, mais zéro zèle typographique: pas de guillemets « », pas de tiret cadratin, apostrophe droite. Minuscule en début de message, c'est bien. Point final, souvent absent.
+- Erreurs de grammaire interdites. Le registre est relâché, la langue reste juste. Pas de calque de l'espagnol.
+
+Le REGISTRE visé (le ton, jamais le contenu, ne copie jamais ces phrases):
+  "ah ok donc t'es team montagne, je note"
+  "attends t'as vraiment fait ça"
+  "ça me dit bien, t'es dispo quand"
+  "3 ans de yoga, ok je vois le niveau"
+  "franchement ça a l'air chill"`;
+
+/**
+ * @param language when the caller knows the target language (Prompts, Scan),
+ * the French block is skipped for other languages to save prefill. Replies pass
+ * nothing: language is inferred from the thread, so the block always ships and
+ * self-gates on its own header.
+ */
+function compose(base: string, userContext?: string, language?: string): string {
   const parts = [base, HUMANIZE_RULES];
+  if (!language?.trim() || /^fr|fran[cç]ais/i.test(language.trim())) parts.push(FRENCH_RULES);
   const ctx = userContext?.trim();
   if (ctx) {
     parts.push(
@@ -119,8 +166,8 @@ Each option is a genuinely different angle and feel, not rewordings of one idea.
 # Output
 For each option return: text (the answer, ready to paste) and angle (a one-word label: funny, flirty, sincere, dry, bold, curious, etc.). Return the structured object only, no prose outside it.`;
 
-export function buildPromptSystem(userContext?: string): string {
-  return compose(PROMPT_SYSTEM, userContext);
+export function buildPromptSystem(userContext?: string, language?: string): string {
+  return compose(PROMPT_SYSTEM, userContext, language);
 }
 
 export function assemblePromptRequest(
@@ -201,8 +248,8 @@ export const SCAN_OPENERS_SYSTEM = `You are shown SCREENSHOTS of a dating-app pr
 # Tone label
 For each opener, return a tone label from exactly this set: dry, playful, curious, flirty, sincere, bold. UI metadata only — never let it appear in the opener text.`;
 
-export function buildScanOpenersSystem(userContext?: string): string {
-  return compose(SCAN_OPENERS_SYSTEM, userContext);
+export function buildScanOpenersSystem(userContext?: string, language?: string): string {
+  return compose(SCAN_OPENERS_SYSTEM, userContext, language);
 }
 
 export function assembleScanOpenersRequest(
@@ -383,6 +430,13 @@ export function assemblePrompt(
     );
     for (const a of avoid) lines.push(`- "${a}"`);
   }
+
+  // Register drifts back to the model's polished default across a long system
+  // prompt, so re-assert it last, where recency is strongest.
+  lines.push("");
+  lines.push(
+    "Write every option in the SAME LANGUAGE as the thread above, and compose directly in it rather than translating from English. Match the register, not just the language: if the thread is in French, re-read the \"Si tu écris en français\" block and check every option against it before returning.",
+  );
 
   lines.push("");
   lines.push(

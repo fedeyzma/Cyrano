@@ -96,6 +96,33 @@ async function chat(
 }
 
 /**
+ * Strip the typographic marks a phone keyboard cannot produce. The prompt asks
+ * for these too, but asking is unreliable and an em dash in a text is the single
+ * most legible machine signature there is, so guarantee it here instead.
+ *
+ * SEND-READY TEXT ONLY. Never run this over imported messages (that rewrites her
+ * actual words), over extracted facts, or over a scan approach's `target` (it is
+ * her profile answer quoted verbatim and anchors the stage-2 openers).
+ */
+function cleanSendable(s: string): string {
+  const out = s
+    .replace(/\s*[—–]\s*/g, ", ") // em / en dash -> comma
+    .replace(/^\s*,\s*/, "") // ...unless it opened the line
+    .replace(/,\s*,/g, ",")
+    .replace(/,\s*([.!?…])/g, "$1")
+    .replace(/[‘’]/g, "'") // curly apostrophe -> straight (Gboard writes straight)
+    .replace(/[“”]/g, '"')
+    .replace(/\s*[«»]\s*/g, " ") // guillemets « »
+    // U+202F / U+00A0 before French punctuation is a typesetter's space; a phone
+    // types a plain one. Normalise rather than delete, "ça va ?" is real French.
+    .replace(/[  ]/g, " ")
+    .replace(/;(?![)(DPp3-])/g, ",") // keep the ;) ;( ;D winks
+    .replace(/[^\S\n]{2,}/g, " ") // collapse runs, preserve newlines
+    .trim();
+  return out || s; // never hand back an empty message
+}
+
+/**
  * Ask Cami for reply suggestions as strict JSON, then validate. Cami is an agent
  * (not a plain model), so we explicitly ask for JSON-only output and suppress
  * tool use / notifications. We retry once if the first response isn't parseable.
@@ -108,7 +135,11 @@ export async function generateSuggestions(system: string, prompt: string): Promi
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = await chat(sys, prompt); // network/HTTP errors propagate immediately
     try {
-      return suggestionSchema.parse(extractJson(raw));
+      const parsed = suggestionSchema.parse(extractJson(raw));
+      return {
+        ...parsed,
+        options: parsed.options.map((o) => ({ ...o, texts: o.texts.map(cleanSendable) })),
+      };
     } catch (err) {
       lastParseError = err;
     }
@@ -131,7 +162,10 @@ export async function generatePromptAnswers(
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = await chat(sys, userMsg, { maxTokens: 800, temperature: 0.95 });
     try {
-      return promptAnswersSchema.parse(extractJson(raw));
+      const parsed = promptAnswersSchema.parse(extractJson(raw));
+      return {
+        options: parsed.options.map((o) => ({ ...o, text: cleanSendable(o.text) })),
+      };
     } catch (err) {
       lastParseError = err;
     }
@@ -206,7 +240,10 @@ export async function generateScanOpeners(
       timeoutMs: 90000,
     });
     try {
-      return scanOpenersSchema.parse(extractJson(raw));
+      const parsed = scanOpenersSchema.parse(extractJson(raw));
+      return {
+        openers: parsed.openers.map((o) => ({ ...o, text: cleanSendable(o.text) })),
+      };
     } catch (err) {
       lastParseError = err;
     }

@@ -13,17 +13,21 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: Ctx) {
+export async function GET(req: Request, { params }: Ctx) {
   const id = parseId((await params).id);
   if (id === null) return json({ error: "Not found" }, 404);
   const conversation = getConversation(id);
   if (!conversation) return json({ error: "Not found" }, 404);
-  return json({
-    conversation,
-    messages: getMessages(id),
-    facts: getFacts(id),
-    queued: getQueuedReplies(id),
-  });
+  return json(
+    {
+      conversation,
+      messages: getMessages(id),
+      facts: getFacts(id),
+      queued: getQueuedReplies(id),
+    },
+    200,
+    req,
+  );
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {
