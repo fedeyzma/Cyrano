@@ -316,3 +316,170 @@ This is a pure text task. Do NOT use tools, do NOT notify anyone, do NOT ask que
     lastError,
   );
 }
+
+/* ----------------------- screenshot import (vision) ----------------------- */
+
+/**
+ * Slices per vision call. Small batches keep the JSON from truncating and keep
+ * enough of the thread in view at once for the model to hold the alignment.
+ * Consecutive batches share their edge slice (step = SHOT_BATCH - 1) so a
+ * bubble straddling a batch boundary is read whole by one of the two.
+ */
+const SHOT_BATCH = 3;
+
+type ParsedMsg = { role: Role; content: string };
+
+function normForOverlap(s: string): string {
+  return s.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * Append a batch's messages to what we already have, dropping the ones it
+ * re-read from the slice it shares with the previous batch.
+ *
+ * First pass looks for an exact run — the longest suffix of `acc` that is also
+ * a prefix of `next`. That is the shape a clean re-read produces. Second pass
+ * handles OCR jitter later in the repeat, anchored on two consecutive matches.
+ * Roles come from `acc`, the first read of a message being the one that saw
+ * more of the thread around it.
+ *
+ * Both passes fail safe: an unrecognised repeat survives as a duplicate the
+ * user can delete in the preview, never as a silently dropped message.
+ */
+function stitchBatch(acc: ParsedMsg[], next: ParsedMsg[]): ParsedMsg[] {
+  if (acc.length === 0) return next;
+  if (next.length === 0) return acc;
+
+  const maxRun = Math.min(acc.length, next.length, 20);
+  for (let k = maxRun; k > 0; k--) {
+    let match = true;
+    for (let i = 0; i < k; i++) {
+      if (normForOverlap(acc[acc.length - k + i].content) !== normForOverlap(next[i].content)) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return [...acc, ...next.slice(k)];
+  }
+
+  // Fuzzy fallback, for a repeat that starts cleanly then drifts (one word
+  // misread mid-run). Anchors on TWO consecutive matches: a single match is
+  // not evidence of an overlap — "ouais", "ok" and "lol" recur constantly in a
+  // real thread, and dropping on a coincidence would silently eat messages.
+  // Erring here costs a visible duplicate, which the user can just delete.
+  if (next.length >= 2) {
+    const window = Math.min(acc.length, 25);
+    for (let j = acc.length - 2; j >= acc.length - window; j--) {
+      const repeated = acc.length - j;
+      if (repeated > next.length) continue;
+      if (
+        normForOverlap(acc[j].content) === normForOverlap(next[0].content) &&
+        normForOverlap(acc[j + 1].content) === normForOverlap(next[1].content)
+      ) {
+        return [...acc, ...next.slice(repeated)];
+      }
+    }
+  }
+
+  return [...acc, ...next];
+}
+
+const SCREENSHOT_SYSTEM = (them: string) => `You transcribe a chat screenshot into structured messages. The conversation is between the user ("me") and ${them} ("them").
+
+The images are consecutive top-to-bottom slices of one tall phone screenshot (a scroll capture). Read them in the order given: the first slice is higher up the conversation, the last is further down. Top to bottom is oldest to newest.
+
+Consecutive slices deliberately OVERLAP, so the last messages of one slice reappear at the top of the next. Transcribe each message exactly ONCE.
+
+# Who sent it
+- Bubbles on the RIGHT side of the screen are "me" (the user).
+- Bubbles on the LEFT side are "them" (${them}).
+Alignment decides it. Colour is a secondary hint (the user's own bubble is usually the tinted/coloured one, theirs the grey/white one), and avatars only ever appear on the left. If a bubble sits mid-screen, go by which edge it is closer to.
+
+# Transcribe verbatim
+Keep the original language, the emoji, the lowercase, the typos, the missing punctuation, the "mdr"/"lol"/"ptn". Do NOT translate, correct, punctuate, summarise, merge or tidy anything. Two short bubbles sent back to back are two messages, not one.
+
+# Ignore everything that is not message text
+The phone status bar, the app header and the name/photo at the top, timestamps and date separators, "Delivered"/"Read"/"Seen"/"Sent"/"Vu", typing indicators, emoji reactions stuck to a bubble, "You matched with…", unsent/deleted notices, and the message input box at the bottom.
+
+# Edges and non-text bubbles
+If a bubble is cut by a slice edge, use the slice that shows it whole; if neither does, join the two halves into one message. If a bubble holds only an image, sticker, GIF, voice note or link card, write a short bracketed placeholder instead: [photo], [voice note], [gif], [link].
+
+If you genuinely can't tell which side a bubble is on, make your best guess — the user corrects it afterward. Use exactly "me" or "them" for the role.
+
+This is a pure transcription task. Do NOT use tools, do NOT notify anyone, do NOT ask questions. Return ONLY a single JSON object — no markdown, no commentary — in exactly this shape:\n${IMPORTED_THREAD_JSON_EXAMPLE}`;
+
+/**
+ * Read a sliced chat screenshot into ordered messages.
+ *
+ * Batches run one after another rather than concurrently: Cami is a single
+ * self-hosted box, and firing four vision calls at it at once is a good way to
+ * make all four slow. Each batch also gets the tail of what has been read so
+ * far, which lets the model skip the repeat itself; `stitchBatch` is the
+ * backstop for when it doesn't.
+ *
+ * A batch that fails twice stops the run instead of killing it — the caller
+ * gets the messages read so far plus `slicesRead`, and surfaces the shortfall.
+ */
+export async function parseThreadFromScreenshots(
+  tiles: string[],
+  theirName: string,
+): Promise<{ messages: ParsedMsg[]; slicesRead: number; slicesTotal: number }> {
+  const them = theirName.trim() || "the other person";
+  const system = SCREENSHOT_SYSTEM(them);
+  const step = Math.max(1, SHOT_BATCH - 1);
+
+  let acc: ParsedMsg[] = [];
+  let slicesRead = 0;
+  let lastError: unknown;
+
+  for (let start = 0; start < tiles.length; start += step) {
+    const batch = tiles.slice(start, start + SHOT_BATCH);
+    if (start > 0 && batch.length <= 1) break; // only the shared slice left, nothing new in it
+
+    const tail = acc.slice(-6).map((m) => `${m.role}: ${m.content}`).join("\n");
+    const userMsg = [
+      `Slices ${start + 1}-${start + batch.length} of ${tiles.length}, in top-to-bottom order.`,
+      start > 0 && tail
+        ? `The first slice here is the same one you already read at the end of the last batch. Already transcribed, oldest to newest:\n${tail}\n\nStart from the first message that is NOT in that list.`
+        : "",
+      "Transcribe the messages visible in these slices, in order.",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    let batchMessages: ParsedMsg[] | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const content = await chat(system, userMsg, {
+          images: batch,
+          maxTokens: 4000,
+          temperature: 0.2,
+          timeoutMs: 120000,
+        });
+        const parsed = importedThreadSchema.parse(extractJson(content));
+        batchMessages = parsed.messages
+          .map((m) => ({ role: normalizeRole(m.role), content: m.content.trim() }))
+          .filter((m) => m.content.length > 0);
+        break;
+      } catch (err) {
+        lastError = err; // network AND parse failures both just cost this batch a retry
+      }
+    }
+
+    if (!batchMessages) break; // keep what we have; the caller reports the shortfall
+    acc = stitchBatch(acc, batchMessages);
+    slicesRead = start + batch.length;
+  }
+
+  if (acc.length === 0) {
+    // A dead endpoint and an unreadable image fail in the same place. Don't
+    // blame the screenshot for a network problem — pass the real cause up.
+    if (lastError instanceof LlmError) throw lastError;
+    throw new LlmError(
+      "Cami couldn't read any messages off that screenshot. Check it's the chat itself, not a profile, and that the text is sharp.",
+      lastError,
+    );
+  }
+
+  return { messages: acc, slicesRead, slicesTotal: tiles.length };
+}

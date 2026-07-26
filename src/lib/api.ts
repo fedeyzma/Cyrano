@@ -88,6 +88,17 @@ export const api = {
       { method: "POST", body: JSON.stringify({ raw }) },
     ),
 
+  /** Read a chat screenshot, already sliced client-side by screenshotTiles. */
+  parseScreenshot: (id: number, tiles: string[]) =>
+    req<{
+      messages: Array<{ role: Role; content: string }>;
+      slicesRead: number;
+      slicesTotal: number;
+    }>(`/api/conversations/${id}/parse-screenshot`, {
+      method: "POST",
+      body: JSON.stringify({ tiles }),
+    }),
+
   addQueuedReply: (
     id: number,
     data: { content: string; tone?: string | null; targetMessageId?: number | null },

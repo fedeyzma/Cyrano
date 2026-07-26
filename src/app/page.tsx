@@ -971,6 +971,10 @@ export default function Home() {
           const res = await trackLlm(api.parseThread(selectedId, raw));
           return res.messages;
         }}
+        onScreenshotParse={async (tiles) => {
+          if (selectedId === null) return { messages: [], slicesRead: 0, slicesTotal: 0 };
+          return trackLlm(api.parseScreenshot(selectedId, tiles));
+        }}
       />
 
       {/* Toast — iOS banner: frosted pill dropping in on a spring, with an

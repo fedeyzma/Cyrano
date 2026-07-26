@@ -33,7 +33,9 @@ Single-page client (`src/app/page.tsx`, `"use client"`) that owns all state and 
 
 All generation goes through `src/lib/llm.ts` → `chat()`, a direct `fetch` to Cami's OpenAI-compatible `/v1/chat/completions`. **Cami does not reliably support `response_format`/JSON-schema structured output.** The pattern everywhere is: instruct the model to return strict JSON in the prompt, then `extractJson()` + Zod `.parse()`, with a one-shot retry. There is no AI-SDK dependency. `chat()` takes per-call `{ maxTokens, temperature, timeoutMs }` — parsing/large outputs (e.g. `parseThreadWithAI`) need a much larger `maxTokens` than the default 900, or the JSON gets truncated.
 
-Generation functions in `llm.ts`: `generateSuggestions` (replies), `parseThreadWithAI` (raw thread import), `generatePromptAnswers` (profile prompts). Each has its own Zod schema in `src/lib/schema.ts`.
+Generation functions in `llm.ts`: `generateSuggestions` (replies), `parseThreadWithAI` (raw thread import), `parseThreadFromScreenshots` (screenshot import), `generatePromptAnswers` (profile prompts). Each has its own Zod schema in `src/lib/schema.ts`.
+
+**Screenshot thread import.** A phone "scroll capture" is one huge image (1080×10000+), and a vision encoder squashes that into illegible mush, so `src/lib/screenshotTiles.ts` (client-side, needs canvas) cuts it into overlapping full-width slices first — full width because left/right bubble alignment is the only reliable speaker signal, overlapping so a bubble on a cut is whole in one neighbour. `parseThreadFromScreenshots` then reads the slices a few at a time (sequentially — Cami is one box), with consecutive batches sharing an edge slice, and `stitchBatch` drops the messages the shared slice made it re-read. Output reuses `importedThreadSchema`, so the existing import preview (per-message speaker toggle, flip-all, dedupe against saved messages) works on it unchanged. Slices are capped at `MAX_TILES`, keeping the newest; anything dropped or unread is reported back through `slicesRead`/`slicesTotal` and surfaced in the UI rather than silently truncated.
 
 ### The prompt system (the core of the product)
 

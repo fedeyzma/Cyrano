@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   DUR,
@@ -12,6 +12,7 @@ import {
   railVariants,
   rm,
   scrimVariants,
+  SPRING_MICRO,
   useAppReducedMotion,
   viewVariants,
 } from "@/components/motion";
@@ -22,8 +23,21 @@ import {
   splitNewMessages,
   type ParsedMessage,
 } from "@/lib/parseThread";
-import { IconClose, IconSparkles, IconSwap } from "./icons";
-import { Button, IconButton, Spinner, focusRing, inputClass } from "./ui";
+import {
+  collectTiles,
+  MAX_SHOTS,
+  MAX_TILES,
+  prepareScreenshot,
+  type PreparedShot,
+} from "@/lib/screenshotTiles";
+import { IconClose, IconScan, IconSparkles, IconSwap } from "./icons";
+import { Button, Chip, IconButton, Spinner, focusRing, inputClass } from "./ui";
+
+export interface ScreenshotParseResult {
+  messages: ParsedMessage[];
+  slicesRead: number;
+  slicesTotal: number;
+}
 
 export function ImportThreadModal({
   open,
@@ -34,6 +48,7 @@ export function ImportThreadModal({
   onClose,
   onImport,
   onAiParse,
+  onScreenshotParse,
 }: {
   open: boolean;
   importing: boolean;
@@ -44,13 +59,21 @@ export function ImportThreadModal({
   onClose: () => void;
   onImport: (messages: ParsedMessage[]) => void;
   onAiParse: (raw: string) => Promise<ParsedMessage[]>;
+  onScreenshotParse: (tiles: string[]) => Promise<ScreenshotParseResult>;
 }) {
+  const [source, setSource] = useState<"text" | "shot">("text");
   const [raw, setRaw] = useState("");
+  const [shots, setShots] = useState<PreparedShot[]>([]);
+  const [preparing, setPreparing] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [parsed, setParsed] = useState<ParsedMessage[] | null>(null);
   const [aiParsing, setAiParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  /** Set when the read came back short — surfaced above the preview, never swallowed. */
+  const [shotNote, setShotNote] = useState<string | null>(null);
   const [importAll, setImportAll] = useState(false);
   const reduced = useAppReducedMotion();
+  const shotSeq = useRef(0);
 
   // Overlap against what's already saved — recomputes as roles are toggled.
   const dedup = useMemo(
@@ -58,10 +81,11 @@ export function ImportThreadModal({
     [parsed, existingMessages],
   );
   const toImport = importAll ? (parsed ?? []) : (dedup?.fresh ?? []);
+  const totalSlices = useMemo(() => shots.reduce((n, s) => n + s.tiles.length, 0), [shots]);
 
   const scrim = rm(reduced, scrimVariants);
   const panel = rm(reduced, modalVariants);
-  const stage = rm(reduced, viewVariants); // Crossfade-and-breathe between paste ⇄ preview
+  const stage = rm(reduced, viewVariants); // Crossfade-and-breathe between paste ⇄ shot ⇄ preview
   const alert = rm(reduced, railVariants);
   const galleyList = rm(reduced, listContainer(35));
   const galleyRow = rm(reduced, listItem(10));
@@ -77,9 +101,14 @@ export function ImportThreadModal({
 
   useEffect(() => {
     if (open) {
+      setSource("text");
       setRaw("");
+      setShots([]);
+      setPreparing(false);
+      setDragOver(false);
       setParsed(null);
       setParseError(null);
+      setShotNote(null);
       setAiParsing(false);
       setImportAll(false);
     }
@@ -92,6 +121,45 @@ export function ImportThreadModal({
     if (open) window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  const addFiles = useCallback(async (files: File[]) => {
+    const images = files.filter((f) => f.type.startsWith("image/"));
+    if (images.length === 0) return;
+    setPreparing(true);
+    setParseError(null);
+    try {
+      for (const f of images) {
+        try {
+          const shot = await prepareScreenshot(f, `shot-${(shotSeq.current += 1)}`);
+          setShots((prev) => (prev.length >= MAX_SHOTS ? prev : [...prev, shot]));
+        } catch {
+          setParseError("Couldn't read one of those images — try a PNG or JPG.");
+        }
+      }
+    } finally {
+      setPreparing(false);
+    }
+  }, []);
+
+  // Paste a screenshot straight into the modal (Win+Shift+S, then Ctrl+V).
+  // Only image pastes are intercepted, so pasting text into the textarea is
+  // untouched; an image paste also flips to the screenshot tab.
+  useEffect(() => {
+    if (!open || parsed !== null) return;
+    function onPaste(e: ClipboardEvent) {
+      const files = Array.from(e.clipboardData?.items ?? [])
+        .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+        .map((it) => it.getAsFile())
+        .filter((f): f is File => !!f);
+      if (files.length) {
+        e.preventDefault();
+        setSource("shot");
+        void addFiles(files);
+      }
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [open, parsed, addFiles]);
 
   function setRole(i: number, role: "me" | "them") {
     setParsed((prev) => (prev ? prev.map((m, idx) => (idx === i ? { ...m, role } : m)) : prev));
@@ -115,6 +183,7 @@ export function ImportThreadModal({
   async function runAiParse() {
     setAiParsing(true);
     setParseError(null);
+    setShotNote(null);
     try {
       setParsed(await onAiParse(raw));
     } catch (err) {
@@ -124,7 +193,37 @@ export function ImportThreadModal({
     }
   }
 
+  async function runShotParse() {
+    const { tiles, dropped } = collectTiles(shots);
+    if (tiles.length === 0) return;
+    setAiParsing(true);
+    setParseError(null);
+    setShotNote(null);
+    try {
+      const res = await onScreenshotParse(tiles);
+      const notes: string[] = [];
+      if (dropped > 0) {
+        notes.push(
+          `the oldest ${dropped} ${dropped === 1 ? "slice was" : "slices were"} skipped (past the ${MAX_TILES}-slice limit)`,
+        );
+      }
+      if (res.slicesRead < res.slicesTotal) {
+        notes.push(`Cami only got through ${res.slicesRead} of ${res.slicesTotal} slices`);
+      }
+      setShotNote(
+        notes.length ? `Heads up: ${notes.join(", and ")}. Check the end of the thread.` : null,
+      );
+      setParsed(res.messages);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : "Could not read that screenshot.");
+    } finally {
+      setAiParsing(false);
+    }
+  }
+
   void setRole; // (kept for clarity; toggleRole is used in the UI)
+
+  const stageKey = parsed !== null ? "preview" : source;
 
   return (
     <AnimatePresence>
@@ -166,18 +265,49 @@ export function ImportThreadModal({
                     Import a thread
                   </motion.h2>
                   <p className="mt-1 text-marginalia text-ink-muted">
-                    Paste an existing conversation with {conversationName}.
+                    Paste an existing conversation with {conversationName}, or drop a screenshot of
+                    it.
                   </p>
                 </div>
                 <IconButton label="Close" onClick={onClose} className="-mr-1 -mt-0.5">
                   <IconClose size={18} />
                 </IconButton>
               </div>
+
+              {parsed === null && (
+                <div className="mt-3 flex gap-2" role="tablist" aria-label="Import source">
+                  <Chip
+                    role="tab"
+                    aria-selected={source === "text"}
+                    active={source === "text"}
+                    onClick={() => {
+                      setSource("text");
+                      setParseError(null);
+                    }}
+                    className="hit min-h-7"
+                  >
+                    Paste text
+                  </Chip>
+                  <Chip
+                    role="tab"
+                    aria-selected={source === "shot"}
+                    active={source === "shot"}
+                    onClick={() => {
+                      setSource("shot");
+                      setParseError(null);
+                    }}
+                    className="hit min-h-7"
+                  >
+                    Screenshot
+                  </Chip>
+                </div>
+              )}
+
               <div className="rule-double mt-4" aria-hidden="true" />
             </div>
 
             <AnimatePresence mode="wait" initial={false}>
-              {parsed === null ? (
+              {stageKey === "text" ? (
                 <motion.div
                   key="paste"
                   variants={stage}
@@ -256,6 +386,162 @@ export function ImportThreadModal({
                     </div>
                   </div>
                 </motion.div>
+              ) : stageKey === "shot" ? (
+                <motion.div
+                  key="shot"
+                  variants={stage}
+                  initial="initial"
+                  animate="enter"
+                  exit="exit"
+                  className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 sm:pb-6"
+                >
+                  <label
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOver(false);
+                      void addFiles(Array.from(e.dataTransfer.files));
+                    }}
+                    className={cx(
+                      "group flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-[1.5px] border-dashed bg-[rgb(255_255_255_/_0.03)] px-4 py-8 text-center shadow-[var(--shadow-plate)] transition-colors duration-150",
+                      dragOver
+                        ? "border-line-gilt bg-accent-faint"
+                        : "border-line-strong hover:border-line-gilt hover:bg-fill",
+                    )}
+                  >
+                    <IconScan
+                      size={22}
+                      className={cx(
+                        "transition-colors duration-150",
+                        dragOver ? "text-accent" : "text-ink-muted group-hover:text-accent",
+                      )}
+                    />
+                    <span className="text-title text-ink-secondary">Drop a chat screenshot</span>
+                    <span className="text-label text-ink-muted">
+                      Scroll captures welcome — long ones get sliced up automatically
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        void addFiles(Array.from(e.target.files ?? []));
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+
+                  {shots.length > 0 && (
+                    <div className="mt-4">
+                      <div className="flex flex-wrap gap-2.5">
+                        <AnimatePresence mode="popLayout" initial={false}>
+                          {shots.map((shot) => (
+                            <motion.div
+                              key={shot.id}
+                              layout={!reduced}
+                              initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.9 }}
+                              animate={
+                                reduced
+                                  ? { opacity: 1, transition: { duration: 0.12 } }
+                                  : { opacity: 1, scale: 1, transition: SPRING_MICRO }
+                              }
+                              exit={
+                                reduced
+                                  ? { opacity: 0, transition: { duration: 0.12 } }
+                                  : {
+                                      opacity: 0,
+                                      scale: 0.9,
+                                      transition: { duration: 0.14, ease: EASE_INK },
+                                    }
+                              }
+                              className="group relative"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={shot.thumb}
+                                alt="chat screenshot"
+                                className="h-24 w-20 rounded-md border border-line object-cover object-top"
+                              />
+                              <span className="absolute inset-x-0 bottom-0 rounded-b-md bg-[rgb(4_5_10_/_0.72)] px-1 py-0.5 text-center text-marginalia tabular-nums text-ink-secondary">
+                                {shot.tiles.length}{" "}
+                                {shot.tiles.length === 1 ? "slice" : "slices"}
+                              </span>
+                              <MotionButton
+                                onClick={() =>
+                                  setShots((prev) => prev.filter((x) => x.id !== shot.id))
+                                }
+                                aria-label="Remove screenshot"
+                                className={cx(
+                                  "hit absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-line-strong bg-surface-high text-ink-secondary shadow-[var(--shadow-sm)] transition-colors duration-150 hover:text-danger",
+                                  focusRing,
+                                )}
+                              >
+                                <IconClose size={11} />
+                              </MotionButton>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                      <p className="mt-2 text-marginalia tabular-nums text-ink-muted">
+                        {shots.length} of {MAX_SHOTS} · {totalSlices}{" "}
+                        {totalSlices === 1 ? "slice" : "slices"} to read
+                      </p>
+                      {totalSlices > MAX_TILES && (
+                        <p className="mt-1 text-label tabular-nums text-accent">
+                          Only the last {MAX_TILES} slices will be read — the oldest part gets
+                          skipped
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="mt-4 text-marginalia text-ink-muted">
+                    Cami goes by which side each bubble sits on, so keep the full width of the chat
+                    in frame. You can fix any line, or flip both sides at once, on the next step.
+                  </p>
+
+                  <AnimatePresence initial={false}>
+                    {parseError && (
+                      <motion.div
+                        key="shot-error"
+                        role="alert"
+                        variants={alert}
+                        initial="initial"
+                        animate="enter"
+                        exit="exit"
+                        className="mt-3 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-label text-danger"
+                      >
+                        {parseError}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+                    <Button variant="subtle" className="hit-sm" onClick={onClose}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      className="hit-sm"
+                      onClick={runShotParse}
+                      disabled={shots.length === 0 || aiParsing || preparing}
+                    >
+                      {aiParsing || preparing ? <Spinner size={13} /> : <IconSparkles size={15} />}
+                      {preparing
+                        ? "Slicing…"
+                        : aiParsing
+                          ? totalSlices > 3
+                            ? "Reading… (a minute or two)"
+                            : "Reading…"
+                          : "Read screenshot"}
+                    </Button>
+                  </div>
+                </motion.div>
               ) : (
                 <motion.div
                   key="preview"
@@ -267,13 +553,19 @@ export function ImportThreadModal({
                 >
                   <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-6 py-2">
                     <span className="text-marginalia text-ink-muted">
-                      <span className="tabular-nums">{parsed.length}</span> messages · tap a bubble
-                      to switch speaker
+                      <span className="tabular-nums">{parsed?.length ?? 0}</span> messages · tap a
+                      bubble to switch speaker
                     </span>
                     <Button variant="subtle" size="sm" className="hit -mr-2" onClick={flipAll}>
                       <IconSwap size={14} /> Flip all
                     </Button>
                   </div>
+
+                  {shotNote && (
+                    <div className="shrink-0 border-b border-line bg-accent-faint px-6 py-2 text-label text-accent">
+                      {shotNote}
+                    </div>
+                  )}
 
                   {dedup && dedup.skipped > 0 && (
                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-line bg-fill px-6 py-2 text-label">
@@ -300,12 +592,12 @@ export function ImportThreadModal({
                     animate="enter"
                     className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 py-4 sm:px-6"
                   >
-                    {parsed.length === 0 ? (
+                    {(parsed?.length ?? 0) === 0 ? (
                       <p className="px-6 py-10 text-center text-body text-ink-secondary">
-                        Nothing to import — go back and paste some text.
+                        Nothing to import — go back and add something.
                       </p>
                     ) : (
-                      parsed.map((m, i) => {
+                      parsed?.map((m, i) => {
                         const isDup = !importAll && (dedup?.isDup[i] ?? false);
                         return (
                           <motion.div
@@ -362,7 +654,14 @@ export function ImportThreadModal({
                   </AnimatePresence>
 
                   <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-4">
-                    <Button variant="subtle" className="hit-sm" onClick={() => setParsed(null)}>
+                    <Button
+                      variant="subtle"
+                      className="hit-sm"
+                      onClick={() => {
+                        setParsed(null);
+                        setShotNote(null);
+                      }}
+                    >
                       ← Back to edit
                     </Button>
                     <Button
